@@ -9,9 +9,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import tyro
-from torch.distributions.categorical import Categorical
-from torch.utils.tensorboard import SummaryWriter
+import tyro   # 用于解析命令行参数
+from torch.distributions.categorical import Categorical # 用于离散动作空间
+from torch.utils.tensorboard import SummaryWriter    # 在线显示训练中的指标
 
 
 @dataclass
@@ -40,27 +40,27 @@ class Args:
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_envs: int = 4
+    num_envs: int = 4 # 并行环境的数量
     """the number of parallel game environments"""
-    num_steps: int = 128
+    num_steps: int = 128 # 表示每个环境在每次策略更新前运行的步数
     """the number of steps to run in each environment per policy rollout"""
-    anneal_lr: bool = True
+    anneal_lr: bool = True # 设置学习率是否退火，即是否在训练过程中逐渐减小学习率
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.99
     """the discount factor gamma"""
     gae_lambda: float = 0.95
     """the lambda for the general advantage estimation"""
-    num_minibatches: int = 4
+    num_minibatches: int = 4 
     """the number of mini-batches"""
-    update_epochs: int = 4
+    update_epochs: int = 4 # 表示每个策略更新周期中，对策略网络进行几次梯度更新
     """the K epochs to update the policy"""
-    norm_adv: bool = True
+    norm_adv: bool = True # 是否对优势函数进行归一化处理
     """Toggles advantages normalization"""
     clip_coef: float = 0.2
     """the surrogate clipping coefficient"""
     clip_vloss: bool = True
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
-    ent_coef: float = 0.01
+    ent_coef: float = 0.01 # 熵正则化系数，用于控制策略的探索性
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
@@ -164,6 +164,7 @@ if __name__ == "__main__":
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
+    # 初始化actor和critic网络参数---创建agent的时候
     agent = Agent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
@@ -182,13 +183,16 @@ if __name__ == "__main__":
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
 
+    # 训练主循环
     for iteration in range(1, args.num_iterations + 1):
         # Annealing the rate if instructed to do so.
+        # 设置退火的学习率
         if args.anneal_lr:
             frac = 1.0 - (iteration - 1.0) / args.num_iterations
             lrnow = frac * args.learning_rate
             optimizer.param_groups[0]["lr"] = lrnow
 
+        # 数据采样---每个时间步长，从环境中采样一个动作，执行并记录奖励、_done标志、价值函数预测
         for step in range(0, args.num_steps):
             global_step += args.num_envs
             obs[step] = next_obs
@@ -214,9 +218,11 @@ if __name__ == "__main__":
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
 
+
+        # 计算优势与回报（使用GAE）
         # bootstrap value if not done
-        with torch.no_grad():
-            next_value = agent.get_value(next_obs).reshape(1, -1)
+        with torch.no_grad(): # 禁用梯度计算，因为我们只需要前向传播来计算价值函数
+            next_value = agent.get_value(next_obs).reshape(1, -1) # 预测最后一个观测的价值，作为未来奖励的估计
             advantages = torch.zeros_like(rewards).to(device)
             lastgaelam = 0
             for t in reversed(range(args.num_steps)):
@@ -230,6 +236,7 @@ if __name__ == "__main__":
                 advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + values
 
+        # 将收集得到的训练数据展平处理，方便批量训练
         # flatten the batch
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
         b_logprobs = logprobs.reshape(-1)
@@ -238,11 +245,12 @@ if __name__ == "__main__":
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
+        # 更新策略和价值网络
         # Optimizing the policy and value network
-        b_inds = np.arange(args.batch_size)
-        clipfracs = []
-        for epoch in range(args.update_epochs):
-            np.random.shuffle(b_inds)
+        b_inds = np.arange(args.batch_size) # 生成一个从0到batch_size-1的数组，用于随机采样
+        clipfracs = [] # 记录每个minibatch的动作概率比率被裁剪的比例，用于监控训练进度
+        for epoch in range(args.update_epochs): # 迭代训练
+            np.random.shuffle(b_inds) # 每次迭代前打乱数据顺序
             for start in range(0, args.batch_size, args.minibatch_size):
                 end = start + args.minibatch_size
                 mb_inds = b_inds[start:end]

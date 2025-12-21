@@ -11,7 +11,7 @@ import torch.nn as nn
 import torch.optim as optim
 import tyro
 from torch.distributions.categorical import Categorical
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter    # 在线显示训练中的指标
 
 from cleanrl_utils.atari_wrappers import (  # isort:skip
     ClipRewardEnv,
