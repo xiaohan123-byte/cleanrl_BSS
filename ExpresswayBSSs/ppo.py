@@ -35,8 +35,8 @@ class Args:
     """whether to capture videos of the agent performances (check out `videos` folder)"""
 
     # Algorithm specific arguments
-    env_id: str = "CartPole-v1"   # 改成expresswayBSS
-    """the id of the environment"""
+    env_id: str = "ExpresswayBSS"   # 改成expresswayBSS
+    """the id of the environment: ExpresswayBSS/CartPole-v1"""
     total_timesteps: int = 500000
     """total timesteps of the experiments"""
     learning_rate: float = 2.5e-4
@@ -172,8 +172,8 @@ def make_env(env_id, idx, capture_video, run_name):
             env = gym.make(env_id, render_mode="rgb_array")
             env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
         else:
-            env = gym.make(env_id)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
+            env = gym.make(env_id) # 就是环境名称
+        env = gym.wrappers.RecordEpisodeStatistics(env) # 记录每一轮的统计信息，比如总奖励、长度等
         return env
 
     return thunk
@@ -250,9 +250,12 @@ if __name__ == "__main__":
 
     # env setup
     # 在这里设置BSS环境
+    # 注意，是创建了多个并行环境
     envs = gym.vector.SyncVectorEnv(
         [make_env(args.env_id, i, args.capture_video, run_name) for i in range(args.num_envs)],
     )
+    
+    # 确保动作空间是离散的
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
     # 初始化actor和critic网络参数---创建agent的时候
