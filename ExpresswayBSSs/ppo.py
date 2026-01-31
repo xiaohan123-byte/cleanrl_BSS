@@ -44,7 +44,10 @@ class Args:
     num_envs: int = 4 # 并行环境的数量   如果是cpu采集的，可以多一些？
     """the number of parallel game environments"""
     num_steps: int = 128 # 表示每个环境在每次策略更新前运行的步数
-    """the number of steps to run in each environment per policy rollout"""
+    """
+    the number of steps to run in each environment per policy rollout
+    表示每个环境在每次策略更新前运行的步数
+    """
     anneal_lr: bool = True # 设置学习率是否退火，即是否在训练过程中逐渐减小学习率
     """Toggle learning rate annealing for policy and value networks"""
     gamma: float = 0.99 # 折扣因子，用于计算未来奖励的折扣值 如果我希望折扣因子是变动的，如何修改源代码？
@@ -213,10 +216,11 @@ class Agent(nn.Module):
 
 if __name__ == "__main__":
     args = tyro.cli(Args) # 解析命令行参数，生成Args实例
-    args.batch_size = int(args.num_envs * args.num_steps) # 计算总的批量大小
+    args.batch_size = int(args.num_envs * args.num_steps) # 计算一次策略更新要用的总批量大小
     args.minibatch_size = int(args.batch_size // args.num_minibatches) # 计算每个小批量的大小
-    args.num_iterations = args.total_timesteps // args.batch_size
+    args.num_iterations = args.total_timesteps // args.batch_size # 计算总共要进行多少次策略更新
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+
     if args.track:
         import wandb
 
@@ -234,6 +238,7 @@ if __name__ == "__main__":
         "hyperparameters",
         "|param|value|\n|-|-|\n%s" % ("\n".join([f"|{key}|{value}|" for key, value in vars(args).items()])),
     )
+
 
     # TRY NOT TO MODIFY: seeding
     random.seed(args.seed)
