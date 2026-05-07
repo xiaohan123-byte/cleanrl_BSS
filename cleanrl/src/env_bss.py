@@ -1,9 +1,7 @@
 import math
 from typing import Optional
-
 import numpy as np
-# import sys
-# sys.path.append("C:/Users/myr/Desktop/科研/准备/Code/QMIX_BSS")
+import sys
 import gym
 from gym import spaces
 # from gym.envs.classic_control import utils
@@ -569,7 +567,7 @@ class MultipleBSS(gym.Env): #
 
 if __name__ =="__main__":
     
-    abs_path='C:/Users/myr/Desktop/科研/准备/Code/QMIX_BSS'
+    abs_path='D:\Myfiles\vscode_files\cleanrl_BSS'
     IF=InstanceGenerator(0,1,24)
     np.random.seed(1)
     BSSs=IF.load_inst(abs_path+"./res/test_inst/B5-0.json")
