@@ -2,6 +2,7 @@
 import os
 import random
 import time
+import logging
 from dataclasses import dataclass # 用于定义超参数的类
 
 import gymnasium as gym
@@ -23,7 +24,7 @@ class Args:
     """seed of the experiment"""
     torch_deterministic: bool = True # 是否使用确定性的torch后端，设置为True可以确保实验的可重复性
     """if toggled, `torch.backends.cudnn.deterministic=False`"""
-    cuda: bool = True
+    cuda: bool = False # 其实这种小任务cpu更快
     """if toggled, cuda will be enabled by default"""
     track: bool = False # 是否使用Weights and Biases（WandB）进行实验跟踪
     """if toggled, this experiment will be tracked with Weights and Biases"""
@@ -59,7 +60,7 @@ class Args:
     """Toggles advantages normalization"""
     clip_coef: float = 0.2 # PPO 算法中的裁剪系数，用于限制策略更新的幅度
     """the surrogate clipping coefficient"""
-    clip_vloss: bool = True # 是否对价值函数的损失进行裁剪
+    clip_vloss: bool = False # 是否对价值函数的损失进行裁剪
     """Toggles whether or not to use a clipped loss for the value function, as per the paper."""
     ent_coef: float = 0.01 # 熵正则化系数，用于控制策略的探索性
     """coefficient of the entropy"""
@@ -162,6 +163,18 @@ if __name__ == "__main__":
     args.minibatch_size = int(args.batch_size // args.num_minibatches) # 计算每个小批量的大小
     args.num_iterations = args.total_timesteps // args.batch_size # 计算总的训练迭代次数
     run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{int(time.time())}"
+
+    # 将终端输出同步写入 logs/<run_name>.log
+    os.makedirs("logs", exist_ok=True)
+    logger = logging.getLogger("ppo")
+    logger.setLevel(logging.INFO)
+    logger.handlers.clear()
+    logger.propagate = False
+    formatter = logging.Formatter("%(message)s")
+
+    file_handler = logging.FileHandler(f"logs/{run_name}.log", encoding="utf-8")
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
     # track取的是False，所以不会执行下面的代码块
     if args.track:
         import wandb
@@ -189,6 +202,7 @@ if __name__ == "__main__":
     torch.backends.cudnn.deterministic = args.torch_deterministic
 
     device = torch.device("cuda" if torch.cuda.is_available() and args.cuda else "cpu")
+    logger.info(f"Training on device: {device}")
 
     # env setup
     # 向量化环境，内部运行多个环境实例，并行采集数据，提高训练效率。每个环境实例由make_env函数创建，参数idx用于区分不同的环境实例，capture_video参数用于控制是否录制视频。
@@ -219,6 +233,8 @@ if __name__ == "__main__":
     next_obs, _ = envs.reset(seed=args.seed) # 重置环境，获取四个环境的初始状态，并设置随机种子以确保实验的可重复性
     next_obs = torch.Tensor(next_obs).to(device) # 将初始状态转换为PyTorch张量，并将其移动到指定的设备（CPU或GPU）上
     next_done = torch.zeros(args.num_envs).to(device) # 四个环境的_done标志，初始值为False，表示每个环境都没有结束
+    last_log_step = 0
+    latest_episodic_return = None
 
     # 训练主循环
     for iteration in range(1, args.num_iterations + 1):
@@ -251,9 +267,16 @@ if __name__ == "__main__":
             if "final_info" in infos:
                 for info in infos["final_info"]:
                     if info and "episode" in info:
-                        print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
+                        latest_episodic_return = info["episode"]["r"]
                         writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+
+            if global_step - last_log_step >= 1000:
+                sps = int(global_step / (time.time() - start_time))
+                if latest_episodic_return is not None:
+                    logger.info(f"global_step={global_step}, episodic_return={latest_episodic_return}")
+                logger.info(f"SPS: {sps}")
+                last_log_step = global_step
 
 
         # 计算优势与回报（使用GAE）
@@ -363,7 +386,6 @@ if __name__ == "__main__":
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     envs.close()
