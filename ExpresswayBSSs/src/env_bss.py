@@ -1,3 +1,7 @@
+'''
+自定义高速换电站网络环境
+'''
+
 import math
 from typing import Optional
 import numpy as np
@@ -35,6 +39,7 @@ class MultipleBSS(gym.Env): #
     Action: Total power of a BSS
     reward: electricity cost + battery swap income + power bigger than SOCmax
     这里为了直觉把batchsize放在了所有索引的最前方，但是实际上调用时经常不在最前，可能导致性能的下降
+
     Args:
         gym (_type_): _description_
     """
