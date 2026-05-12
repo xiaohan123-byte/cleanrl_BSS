@@ -6,56 +6,37 @@ import math
 from typing import Optional
 import numpy as np
 import sys
-import gym
-from gym import spaces
-# from gym.envs.classic_control import utils
-from gym.error import DependencyNotInstalled
-from src.instancegenerator import InstanceGenerator
-from src.BSSChargingScheduling import BSSChargingScheduling
-import matplotlib.pyplot as plt
+from pathlib import Path
+import gymnasium as gym
+from gymnasium import spaces
+from gymnasium.error import DependencyNotInstalled
+from instancegenerator import InstanceGenerator
 # 对数组中的指定部分进行降序排列
 from scipy.optimize import minimize_scalar
 
-
-def optimize_func(Q,Saved_Power,evaluate=True):
-    reward_DR=np.zeros(Saved_Power.shape[0])
-    reward_DR[Saved_Power<0.7*Q]=-2*Q
-            
-    reward_DR[(Saved_Power>0.7*Q) & (Saved_Power<=1.2*Q)]=\
-        Saved_Power[(Saved_Power>0.7*Q) & (Saved_Power<=1.2*Q)]
-    reward_DR[Saved_Power>1.2*Q]=\
-        1.2*Q
-    if evaluate:
-        return -np.sum(reward_DR)
-    else:
-        return reward_DR
     
 class MultipleBSS(gym.Env): #
     """
     ### Description
     State:Every SOC in that BSS(arranged in decending order)
-            some future average demand in future(in a order)
-            some electricity price in future
-    Action: Total power of a BSS
-    reward: electricity cost + battery swap income + power bigger than SOCmax
-    这里为了直觉把batchsize放在了所有索引的最前方，但是实际上调用时经常不在最前，可能导致性能的下降
+            some future reservation demand in future (more accurately)
+            some future mean of random demand in future
+            some electricity price in future (necessary or not)            
 
-    Args:
-        gym (_type_): _description_
+    Action: Total power of each BSS (Discrete)
+
+    reward: battery swap income - electricity cost - customer loss cost(both reservation and random demand)
+    
     """
     
-    def __init__(self,args ,other_args,MILP_Power,seed,batch_size,env_time_type):
-        self.parameter=args.parameter
-        self.BSS_Number=args.N
-        self.batch_size=batch_size
-        self.MILP_Power_Get=np.expand_dims(MILP_Power,axis=0)
-        self.MILP_Power_Get=np.repeat(self.MILP_Power_Get,self.batch_size,axis=0)
+    def __init__(self,args ,other_args,seed,env_time_type):
         
+        self.parameter=args.parameter # 业务参数对象
+        self.BSS_Number=args.BSS_num # 在runner里设置
         self.seed=seed
-        self.env_time_type=env_time_type
-        np.random.seed(self.seed)
-        self.Battery_Number=np.array(args.Battery_Number)
-        self.Charging_Slot_Number=np.array(args.Charging_Slot_Number)
+        np.random.seed(self.seed) # 这里设置随机种子
+        self.env_time_type=env_time_type # 环境时间类型，是binary的
+        self.Battery_Number=np.array(args.Battery_Number) # 在业务参数里设置
         self.Demand=np.array(args.Demand,dtype=np.float32)
         self.TOU=np.array(args.TOU)
         self.Name=args.Name
@@ -92,6 +73,7 @@ class MultipleBSS(gym.Env): #
             High.extend([self.parameter.SOCmax for i in range(self.Battery_Number[i])])
             High.extend([np.max(self.Demand) for i in range(self.demand_number)])
         
+
             
         # High=[self.parameter.SOCmax for i in range(sum(self.Battery_Number))]
         # High.extend([])
@@ -128,6 +110,8 @@ class MultipleBSS(gym.Env): #
         self.state= np.repeat(np.array(self.low, dtype=np.float32)[np.newaxis],self.batch_size,axis=0)
         self.bss_begin_index=np.zeros(self.BSS_Number+1,dtype=np.int32)
         begin=0
+
+
         for i in range(self.BSS_Number):
             self.bss_begin_index[i]=begin
             begin+=(self.Battery_Number[i]+self.demand_number)
@@ -138,12 +122,15 @@ class MultipleBSS(gym.Env): #
         # print(self.Demand)
         # print(self.TOU)
         
-    def step(self, action):  #see if seed in setup can control here? action=(batch_size,action_dim)
-        
-        # assert self.action_space.contains(
-        #     action
-        # ), f"{action!r} ({type(action)}) invalid"
-        # time_slot_now=self.state[-1]
+    def step(self, action):  
+
+        '''
+        1. 根据action计算reward
+        2. 更新状态（包括电池SOC，未来需求，未来电价，时间步）
+        3. 判断是否结束（时间步是否达到周期数）
+
+        action是每个BSS的充电功率，需要根据功率计算充电后SOC的变化，以及是否满足需求等，进而计算reward。
+        '''
         
         self.time_slot_now=np.int32(self.time_slot_now)
         
@@ -573,15 +560,24 @@ class MultipleBSS(gym.Env): #
 
 
 if __name__ =="__main__":
+
+    # 项目根目录：'D:\Myfiles\vscode_files\cleanrl_BSS\ExpresswayBSSs'
+    BASE_DIR = Path(__file__).resolve().parents[1]
+
+    IG=InstanceGenerator()
+
+    # 输入目录 + 输入文件
+    input_dir = BASE_DIR / "data_generation_rl" / "output"
+    data = input_dir / "3s6e_station_demand_poisson_70d_merged.json"
+
+    BSSs=IG.load_inst(data)
+    BSSs.discrete_number=10 # test
+    BSSs.station_num = 3 #test
+    # print(BSSs.parameter.Power)
+    # print(BSSs.station_num)
     
-    abs_path='D:\Myfiles\vscode_files\cleanrl_BSS'
-    IF=InstanceGenerator(0,1,24)
-    np.random.seed(1)
-    BSSs=IF.load_inst(abs_path+"./res/test_inst/B5-0.json")
-    BSSs.parameter.Power=BSSs.parameter.Power/(len(BSSs.TOU)/24)
-    BSSs.discrete_number=10
-    Env=MultipleBSS(BSSs)
+    Env = MultipleBSS(BSSs)
     Env.reset()
-    for i in range(96):
-        Env.step([10 for i in range(5)])
-    # print()
+    Env.step([10 for i in range(5)])
+
+    
