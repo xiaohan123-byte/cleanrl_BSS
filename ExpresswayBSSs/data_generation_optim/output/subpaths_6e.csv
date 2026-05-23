@@ -1,0 +1,13 @@
+PATH,SOURCE,ROOT,STATIONS
+p1,e1,e4,"s1,s2"
+p2,e1,e5,"s1,s2"
+p3,e1,e6,"s1,s2,s3"
+p4,e2,e5,s2
+p5,e2,e6,"s2,s3"
+p6,e3,e6,"s2,s3"
+p7,e4,e1,"s2,s1"
+p8,e5,e1,"s2,s1"
+p9,e5,e2,s2
+p10,e6,e1,"s3,s2,s1"
+p11,e6,e2,"s3,s2"
+p12,e6,e3,"s3,s2"

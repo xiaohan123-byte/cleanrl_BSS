@@ -13,7 +13,7 @@ import csv
 AMAP_KEY = "f9a8b42f50b3a8a6e75d21176160de1e"
 REGEO_URL = "https://restapi.amap.com/v3/geocode/regeo"
 
-snum = 8 # 需要处理的e节点数量（根据实际情况调整）
+snum = 6 # 需要处理的e节点数量（根据实际情况调整）
 
 # 城市人口字典（根据你提供的数据）
 CITY_POPULATION = {
