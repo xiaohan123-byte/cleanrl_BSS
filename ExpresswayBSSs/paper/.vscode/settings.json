@@ -1,0 +1,26 @@
+{
+    "latex-workshop.latex.outDir": "%DIR%",
+    "latex-workshop.latex.auxDir": "%DIR%/build",
+    "latex-workshop.latex.recipe.default": "first",
+    "latex-workshop.latex.recipes": [
+        {
+            "name": "latexmk (XeLaTeX)",
+            "tools": [
+                "latexmk"
+            ]
+        }
+    ],
+    "latex-workshop.latex.tools": [
+        {
+            "name": "latexmk",
+            "command": "latexmk",
+            "args": [
+                "-xelatex",
+                "-synctex=1",
+                "-interaction=nonstopmode",
+                "-file-line-error",
+                "%DOC%"
+            ]
+        }
+    ]
+}
