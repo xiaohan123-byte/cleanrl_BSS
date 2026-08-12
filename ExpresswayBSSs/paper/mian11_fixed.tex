@@ -31,22 +31,16 @@
 
 %可选择这里也放一个标题
 \begin{center}
-   \title{ \Huge \textbf{{基于深度强化学习的考虑异质用户的高速公路换电站运营优化}}}
+   \title{ \Huge \textbf{{考虑异质用户的高速公路换电站运营 MPC-RL 分层协同优化}}}
 \end{center}
 
 
 \section{Introduction}
-随着电动汽车在高速公路中长距离出行场景中的普及，沿线换电站的运营能力逐渐成为影响用户出行可靠性与系统运行效率的关键因素。相比传统充电方式，换电模式能够显著缩短车辆补能时间，但其运营过程同时受到用户到达需求、电池库存状态、站内充电过程以及电价变化等因素影响。高速公路用户通常沿既定走廊连续向下游行驶，驶过某一出口或换电站后难以折返，因此每一次站点选择都会改变后续可达站点集合；与此同时，不同车辆的入口 SOC 又会改变其首个可达站点以及整条换电站序列。由此形成的路径可达性与站间电池库存相互耦合，使高速公路换电站运营成为具有时空耦合、库存动态演化和不确定需求特征的序贯决策问题。
+随着电动汽车在高速公路中长距离出行场景中的普及，沿线补能设施的运营能力逐渐成为影响用户出行可靠性与系统运行效率的关键因素。相比传统充电方式，换电模式能够显著缩短车辆补能时间，但其运营过程同时受到用户需求、电池库存状态及电价变化等因素影响。【高速公路用户通常沿既定高速区间连续向下游行驶，驶过某一出口或换电站后难以折返，因此每一次站点选择都会改变后续可达站点集合；与此同时，不同车辆的到达 SOC 又会改变其首个可达站点以及整条换电站序列。】(前面的分析写得不够好，逻辑不够清晰，没有体现出高速换电场景的核心特点。应该是在高速场景下，长途出行的用户往往需要经历多次换电过程，每次换电行为具有相关性。然后解释如何相关。此外，每个用户车辆具有不同的SOC，SOC通过影响用户的续航里程进而影响用户的换电策略及站点的电池库存状态)。因此，高速公路换电站运营是一个复杂的、具有用户车辆电池状态和多站点电池状态时空耦合、动态演化特征的序贯决策问题。
 
-在实际运营中，系统中存在两类异质用户：预约用户和随机到达用户。预约用户在运营日前提交计划进入高速公路的时间、行程起点和终点以及入口 SOC，运营者据此给出初始换电路径，并规划站内电池充电计划以提高服务确定性；随机用户的到达时间和到达 SOC 则具有更强的不确定性，其可服务量取决于现场站点在优先履行预约服务后剩余的满电电池数量。预约用户的实际进入时间和入口 SOC 也可能偏离其提交的信息，因此运营者需要在用户实际进入高速公路时，根据最新到达信息、随机需求预测和站内库存动态调整其换电站序列。分时电价进一步使站内充电成本随时间变化。如何协调预约用户履约、随机用户灵活接纳以及电池充电调度，是高速公路换电网络运营中的核心问题。
+在实际运营中，系统中存在两类异质用户：预约用户和随机到达用户。预约用户在运营日前提交计划到达高速入口的时间、行程起点和终点以及到达 SOC，运营者据此为用户提供换电路径，并提前规划站内电池充电计划以提高服务确定性；随机用户的到达时间和到达 SOC 则具有更强的不确定性，其可服务量取决于现场站点在优先履行预约服务后剩余的满电电池数量。预约用户的实际到达高速入口时间和到达 SOC 也可能偏离其提交的信息，因此运营者需要在用户实际到达高速入口时，根据预约用户和随机用户的最新到达情况、未来随机需求预测信息和站内库存动态情况调整其换电路径，来进一步提高服务质量和运营效率。考虑到分时电价进一步使站内充电成本随时间变化，如何协调预约用户履约、随机用户接纳以及站内电池充电调度，是高速公路换电网络运营中的核心问题。
 
-针对上述问题，本文构建 MPC-RL 分层协同优化框架。换电站的实时运营中存在两类性质不同但相互耦合的决策：一类是预约用户换电路径指派动态调整决策，即根据每位用户的实际进入时间和入口 SOC，调整其相对于日前基准方案的换电站序列；另一类是不同站点、不同 SOC 电池的实时充电功率决策。预约路径调整具有离散组合结构，并同时受到车辆续航、路径连通性、预约履约和多站点库存约束；随机需求预测与实际到达又会随时间不断更新。模型预测控制（Model Predictive Control, MPC）能够在有限预测域内联合评估这些约束和未来库存影响，并在每次获得新观测后重新优化而只执行当前用户批次，因而适合处理该类动态路径调整问题。充电功率的影响则具有明显的跨时段累积性：当前功率不仅决定当期充电成本，还会改变未来各站点的 SOC 库存结构、满电电池供给能力和后续服务水平。本文采用强化学习（Reinforcement Learning, RL）学习充电功率控制策略，使其能够在长期交互过程中根据需求、电价和库存状态自适应调整充电行为。如\autoref{fig:MPC-RL}所示，RL 层输出充电功率并影响电池状态转移，MPC 层在给定功率序列下优化预约用户路径，随机用户服务量由预约履约后的剩余满电电池供给确定。
-
-进一步地，本文利用 RL critic 提供预测时域之外的长期价值信息，以缓解有限预测时域导致的末端效应。传统 MPC 通常通过设置固定终端库存下界避免时域末端过度消耗满电电池，但该方法只能粗略限制末端满电电池数量，难以区分不同站点、不同 SOC 电池在未来需求和电价环境下的长期价值。本文在 RL 训练过程中学习状态价值函数，并在每轮 MPC 求解前计算 critic 对终端库存的梯度，将其作为不同站点、不同 SOC 电池的长期边际价值。对于由当前预约指派产生但换电时刻位于预测域之外的履约需求，本文不额外训练新的 critic 分量，而是将其直接转化为对终端库存的等效影响：未来履约需要消耗满电电池，同时会归还低 SOC 电池。由此，RL 学到的长期库存价值被转化为 MPC 目标函数中的线性终端价值项。
-
-因此，本文提出的 MPC-RL 框架基于决策属性进行分层：MPC 负责处理强约束、组合结构明显且需要可解释性的预约用户路径动态调整问题；RL 负责学习具有长期影响的充电功率策略，并通过 critic 向 MPC 提供终端库存价值信息。二者通过电池库存状态、充电功率决策、在途预约履约事件和终端价值项相互连接，从而在保证预约用户服务质量要求和运营约束可行性的同时，使有限时域 MPC 能够近似感知预测时域之外的长期影响。
-
-本文其余部分安排如下：第 2 节介绍 MPC 优化模型，包括时域设置、变量定义、SOC-wise expanded network 建模方法以及数学规划模型；第 3 节介绍 RL formulation，包括马尔可夫决策过程的建立和所选 RL 算法；第 4 节和第 5 节分别预留实验分析和结论部分。
+针对上述问题，本文构建 MPC-RL 分层协同优化框架。换电站的实时运营中存在两类性质不同但相互耦合的决策：一类是预约用户换电路径指派动态调整决策，即根据每位用户的实际到达高速入口时间和到达 SOC，调整其相对于日前基准方案的换电站序列；另一类是不同站点、不同 SOC 电池的实时充电功率决策。预约路径调整具有离散组合结构，并同时受到车辆续航、路径连通性、预约履约和多站点库存约束；随机需求预测与实际到达又会随时间不断更新。模型预测控制（Model Predictive Control, MPC）能够在有限预测域内联合评估这些约束和未来库存影响，并在每次获得新观测后重新优化而只执行当前用户批次，因而适合处理该类动态路径调整问题。充电功率的影响则具有明显的跨时段累积性：当前功率不仅决定当期充电成本，还会改变未来各站点的 SOC 库存结构、满电电池供给能力和后续服务水平。本文采用强化学习（Reinforcement Learning, RL）学习充电功率控制策略，使其能够在长期交互过程中根据需求、电价和库存状态自适应调整充电行为。如\autoref{fig:MPC-RL}所示，RL 层输出充电功率并影响电池状态转移，MPC 层在给定功率序列下优化预约用户路径，随机用户服务量由预约履约后的剩余满电电池供给确定。
 
 \begin{figure}[!htbp]
     \centering
@@ -55,65 +49,26 @@
     \label{fig:MPC-RL}
 \end{figure}
 
-\section{MPC Formulation}
-\subsection{滚动优化机制}
 
-\begin{figure}[!htbp]
-    \centering
-    \includegraphics[width =1.0\textwidth]{figures/rolling_horizon.png}
-    \caption{Rolling Horizon}
-    \label{fig:Rolling Horizon}
-\end{figure}
+进一步地，本文利用 RL critic 提供预测时域之外的长期价值信息，以缓解有限预测时域导致的末端效应。传统 MPC 通常通过设置固定终端库存下界避免时域末端过度消耗满电电池，但该方法只能粗略限制末端满电电池数量，难以区分不同站点、不同 SOC 电池在未来需求和电价环境下的长期价值。本文在 RL 训练过程中学习状态价值函数，并在每轮 MPC 求解前计算 critic 对终端库存的梯度，将其作为不同站点、不同 SOC 电池的长期边际价值。对于由当前预约指派产生但换电时刻位于预测域之外的履约需求，本文不额外训练新的 critic 分量，而是将其直接转化为对终端库存的等效影响：未来履约需要消耗满电电池，同时会归还低 SOC 电池。由此，RL 学到的长期库存价值被转化为 MPC 目标函数中的线性终端价值项。
 
-如\autoref{fig:Rolling Horizon}所示，所有预约请求均在运营日前提交，因而日内滚动过程中预约用户集合保持不变。设当前滚动决策时刻为 $\ell$，预测周期长度为 $H$。在时刻 $\ell$，系统获得区间 $(\ell-1,\ell]$ 内预约用户和随机用户的实际到达信息，两类观测均包括实际到达时间和到达 SOC；预约用户的实际进入时间和入口 SOC 分别记为 $t_A^{p,k}$ 和 $\mathrm{soc}_A^{p,k}$。与此同时，系统揭示未来区间 $[\ell,\ell+H]$ 内随机用户到达站点、到达数量和到达 SOC 的最新预测，并由 RL 层给出相应时段的充电功率。对于尚未进入高速公路的预约用户，预测域内不再产生新的预约请求，且其未来进入时间和入口 SOC 分别按日前提交的 $\bar t_A^{p,k}$ 和 $\overline{\mathrm{soc}}_A^{p,k}$ 取值。
+因此，本文提出的 MPC-RL 框架基于决策属性进行分层：MPC 负责处理强约束、组合结构明显且需要可解释性的预约用户路径动态调整问题；RL 负责学习具有长期影响的充电功率策略，并通过 critic 向 MPC 提供终端库存价值信息。二者通过电池库存状态、充电功率决策、在途预约履约事件和终端价值项相互连接，从而在保证预约用户服务质量要求和运营约束可行性的同时，使有限时域 MPC 能够近似感知预测时域之外的长期影响。
 
-对 O-D 对 $p$，令
-\begin{align}
-\mathcal K_{\ell}^{0,p}
-&=\left\{k\in\mathcal K^p:t_A^{p,k}\in(\ell-1,\ell]\right\},\\
-\mathcal K_{\ell}^{+,p}
-&=\left\{k\in\mathcal K^p:k\text{ 尚未进入系统},
-\ \bar t_A^{p,k}\in(\ell,\ell+H]\right\},\\
-\mathcal K_{\ell}^{p}
-&=\mathcal K_{\ell}^{0,p}\cup\mathcal K_{\ell}^{+,p}.
-\label{eq:rolling_user_sets}
-\end{align}
-其中，$\mathcal K_{\ell}^{0,p}$ 是本轮已观测到实际信息的预约用户集合，$\mathcal K_{\ell}^{+,p}$ 是预测域内尚未到达的预约用户集合。为统一两类用户在模型中的表达，定义本轮有效进入信息
-\begin{equation}
-\left(\widetilde t_{A,\ell}^{p,k},
-\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}\right)=
-\begin{cases}
-\left(t_A^{p,k},\mathrm{soc}_A^{p,k}\right),
-&k\in\mathcal K_{\ell}^{0,p},\\
-\left(\bar t_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}\right),
-&k\in\mathcal K_{\ell}^{+,p}.
-\end{cases}
-\label{eq:effective_arrival_information}
-\end{equation}
-因此，已到达用户使用实际信息进行路径调整，未来用户使用日前预约信息形成前瞻性路径方案。
+本文其余部分安排如下：第 2 节介绍 MPC 优化模型，包括时域设置、变量定义、SOC-wise expanded network 建模方法以及数学规划模型；第 3 节介绍 RL formulation，包括马尔可夫决策过程的建立和所选 RL 算法；第 4 节和第 5 节分别预留实验分析和结论部分。
 
-令 $\mathcal T_\ell=\{\ell+1,\ell+2,\ldots,\ell+H\}$ 为未来 $H$ 个运行时段，其中 $q$ 对应区间 $(q-1,q]$；库存状态时点集合为 $\mathcal T_\ell^w=\{\ell,\ell+1,\ldots,\ell+H\}$。区间 $(\ell-1,\ell]$ 内随机用户的实际服务结果只用于校准本轮初始库存 $\bar w_{n,i,\ell}$，不会作为新需求在预测域内重复计算；$\mathcal T_\ell$ 内的随机需求均采用时刻 $\ell$ 获得的最新预测。MPC 同时优化 $\mathcal K_\ell^p$ 中所有预约用户的完整换电站序列，以提前计入其对各站库存的影响；求解后仅将 $\mathcal K_{\ell}^{0,p}$ 中本轮实际进入用户的路径发布并固定，$\mathcal K_{\ell}^{+,p}$ 的路径只作为预测域内的前瞻方案。进入时刻 $\ell+1$ 后，系统用新观测重新求解，已发布路径则作为不可更改的在途履约承诺进入后续库存约束。该“全域优化、当前执行”的机制使路径调整始终发生在预约用户实际进入高速公路时。本文假设信息处理和路径发布延迟相对于站间行驶时间可以忽略，因此当前批次在到达首个换电站前能够获得调整方案。
 
-采用单位时段时，定义 $\Pi(a)=\min\{q\in\mathbb Z:a\le q\}$，即将区间 $(q-1,q]$ 内的连续时刻映射至时段 $q$。设 $\tau_{p,i}$ 为 O-D 对 $p$ 从入口到节点 $i$ 的行驶时间，则用户 $k$ 在本轮信息下到达节点 $i$ 的时段为
-\begin{equation}
-\theta_{A,i,\ell}^{p,k}
-=\Pi\!\left(\widetilde t_{A,\ell}^{p,k}+\tau_{p,i}\right).
-\label{eq:user_station_arrival_period}
-\end{equation}
-运行时段和首站间距的设置保证本轮新进入用户在路径发布后才到达任一可选换电站，即
-\begin{equation}
-\theta_{A,i,\ell}^{p,k}\ge\ell+1,
-\quad
-k\in\mathcal K_\ell^{0,p},\
-i\in\mathcal S^p\text{ with }
-(o^p,i)\in\mathcal A^{\nu(\mathrm{soc}_A^{p,k}),p}.
-\label{eq:causal_first_station}
-\end{equation}
-当 $\theta_{A,i,\ell}^{p,k}\in\mathcal T_\ell$ 时，相应换电事件显式进入本轮库存转移；当 $\theta_{A,i,\ell}^{p,k}>\ell+H$ 时，该事件对满电电池的消耗和低 SOC 电池的归还通过 RL 终端价值项进行等效评价。
 
-\subsection{变量列表}
 
-本文使用的主要符号如\autoref{tab:notation}所示。实际进入时间和入口 SOC 是滚动到达后获得的观测参数，预约进入时间和入口 SOC 是运营日前已经确定的参数；二者均不是优化决策变量。RL formulation 中的状态、动作、奖励和算法符号将在第 3 节单独定义。
+
+
+
+\section{Problem Statement and MPC Formulation}
+
+\subsection{Problem Statement}
+
+(先写一段说明我们的问题设置是什么。在一个什么样的场景，用户和运营商需要做什么。我们的问题决策是什么。然后再写一段说明我们是如何使用MPC-RL框架来解决这个问题的。)
+
+本节使用的主要符号如\autoref{tab:notation}所示。实际到达高速入口时间和到达 SOC 是滚动到达后获得的观测参数，预约到达高速入口时间和到达 SOC 是运营日前已经确定的参数；二者均不是优化决策变量。RL formulation 中的状态、动作、奖励和算法符号将在第 3 节单独定义。
 
 \begin{table}[!htbp]
   \centering
@@ -176,9 +131,80 @@ i\in\mathcal S^p\text{ with }
   \end{tabular}
 \end{table}
 
-\subsection{SOC-wise expanded network}
 
-预约用户提交和实际进入高速公路时的 SOC 均为区间 $[0,1]$ 上的连续值，而路径指派网络采用有限个 SOC 层。设
+
+\subsection{MPC Formulation}
+\subsubsection{滚动优化机制}
+
+
+\begin{figure}[!htbp]
+    \centering
+    \includegraphics[width =1.0\textwidth]{figures/rolling_horizon.png}
+    \caption{Rolling Horizon}
+    \label{fig:Rolling Horizon}
+\end{figure}
+
+
+设当前滚动决策时刻为 $\ell$，预测周期长度为 $H$。如\autoref{fig:Rolling Horizon}所示，在时刻 $\ell$，系统获得区间 $(\ell-1,\ell]$ 内预约用户和随机用户的实际到达信息，两类观测均包括实际到达时间和到达 SOC；预约用户的实际到达高速入口时间和到达 SOC 分别记为 $t_A^{p,k}$ 和 $\mathrm{soc}_A^{p,k}$。与此同时，系统揭示未来区间 $[\ell,\ell+H]$ 内随机用户到达站点、到达数量和到达 SOC 的最新预测，并由 RL 层给出相应时段的充电功率。对于尚未进入高速公路的预约用户，预测域内不再产生新的预约请求，且其未来到达高速入口时间和到达 SOC 分别按日前提交的 $\bar t_A^{p,k}$ 和 $\overline{\mathrm{soc}}_A^{p,k}$ 取值。
+
+对 O-D 对 $p$，令
+\begin{align}
+\mathcal K_{\ell}^{0,p}
+&=\left\{k\in\mathcal K^p:t_A^{p,k}\in(\ell-1,\ell]\right\},\\
+\mathcal K_{\ell}^{+,p}
+&=\left\{k\in\mathcal K^p:k\text{ 尚未进入系统},
+\ \bar t_A^{p,k}\in(\ell,\ell+H]\right\},\\
+\mathcal K_{\ell}^{p}
+&=\mathcal K_{\ell}^{0,p}\cup\mathcal K_{\ell}^{+,p}.
+\label{eq:rolling_user_sets}
+\end{align}
+其中，$\mathcal K_{\ell}^{0,p}$ 是本轮已观测到实际信息的预约用户集合，$\mathcal K_{\ell}^{+,p}$ 是预测域内尚未到达的预约用户集合。为统一两类用户在模型中的表达，定义本轮有效进入信息
+\begin{equation}
+\left(\widetilde t_{A,\ell}^{p,k},
+\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}\right)=
+\begin{cases}
+\left(t_A^{p,k},\mathrm{soc}_A^{p,k}\right),
+&k\in\mathcal K_{\ell}^{0,p},\\
+\left(\bar t_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}\right),
+&k\in\mathcal K_{\ell}^{+,p}.
+\end{cases}
+\label{eq:effective_arrival_information}
+\end{equation}
+因此，已到达用户使用实际信息进行路径调整，未来用户使用日前预约信息形成前瞻性路径方案。
+
+令 $\mathcal T_\ell=\{\ell+1,\ell+2,\ldots,\ell+H\}$ 为未来 $H$ 个运行时段，其中 $q$ 对应区间 $(q-1,q]$；库存状态时点集合为 $\mathcal T_\ell^w=\{\ell,\ell+1,\ldots,\ell+H\}$。区间 $(\ell-1,\ell]$ 内随机用户的实际服务结果只用于校准本轮初始库存 $\bar w_{n,i,\ell}$，不会作为新需求在预测域内重复计算；$\mathcal T_\ell$ 内的随机需求均采用时刻 $\ell$ 获得的最新预测。MPC 同时优化 $\mathcal K_\ell^p$ 中所有预约用户的完整换电站序列，以提前计入其对各站库存的影响；求解后仅将 $\mathcal K_{\ell}^{0,p}$ 中本轮实际进入用户的路径发布并固定，$\mathcal K_{\ell}^{+,p}$ 的路径只作为预测域内的前瞻方案。进入时刻 $\ell+1$ 后，系统用新观测重新求解，已发布路径则作为不可更改的在途履约承诺进入后续库存约束。该“全域优化、当前执行”的机制使路径调整始终发生在预约用户实际到达高速入口时。本文假设信息处理和路径发布延迟相对于站间行驶时间可以忽略，因此当前批次在到达首个换电站前能够获得调整方案。
+
+采用单位时段时，定义 $\Pi(a)=\min\{q\in\mathbb Z:a\le q\}$，即将区间 $(q-1,q]$ 内的连续时刻映射至时段 $q$。设 $\tau_{p,i}$ 为 O-D 对 $p$ 从入口到节点 $i$ 的行驶时间，则用户 $k$ 在本轮信息下到达节点 $i$ 的时段为
+\begin{equation}
+\theta_{A,i,\ell}^{p,k}
+=\Pi\!\left(\widetilde t_{A,\ell}^{p,k}+\tau_{p,i}\right).
+\label{eq:user_station_arrival_period}
+\end{equation}
+运行时段和首站间距的设置保证本轮新进入用户在路径发布后才到达任一可选换电站，即
+\begin{equation}
+\theta_{A,i,\ell}^{p,k}\ge\ell+1,
+\quad
+k\in\mathcal K_\ell^{0,p},\
+i\in\mathcal S^p\text{ with }
+(o^p,i)\in\mathcal A^{\nu(\mathrm{soc}_A^{p,k}),p}.
+\label{eq:causal_first_station}
+\end{equation}
+当 $\theta_{A,i,\ell}^{p,k}\in\mathcal T_\ell$ 时，相应换电事件显式进入本轮库存转移；当 $\theta_{A,i,\ell}^{p,k}>\ell+H$ 时，该事件对满电电池的消耗和低 SOC 电池的归还通过 RL 终端价值项进行等效评价。
+
+
+
+
+
+
+
+\subsubsection{SOC-wise expanded network}
+(这里需要解释为什么我们要做SOC-wise expanded network。
+
+我们需要决策每个预约用户的连续的换电路径。一种自然的建模方法是基于图的方法。我们参考了加油站选址模型(FRLM模型)的expanded networkd思路，将用户的补能路径表示为路径网络中的弧上的变量。
+
+因为对初始SOC不同的用户来说，可行换电路径不同，直接在连续SOC上建模会导致网络规模过大，求解困难。我们通过SOC分层的方式将连续SOC离散化为有限个SOC层，并在每个SOC层上建立可行路径网络。这样做的好处是可以将不同初始SOC的用户映射到对应的SOC层，从而在保证可行性的前提下，减少网络规模，加快求解速度。)
+
+预约用户提交和实际到达高速入口时的 SOC 均为区间 $[0,1]$ 上的连续值，而路径指派网络采用有限个 SOC 层。设
 \begin{equation}
 0=\sigma_0<\sigma_1<\cdots<\sigma_N=1
 \label{eq:soc_breakpoints}
@@ -191,7 +217,7 @@ i\in\mathcal S^p\text{ with }
 \end{equation}
 除 $s=1$ 外，$\nu(s)=n$ 对应区间 $[\sigma_n,\sigma_{n+1})$。采用区间下端点代表该层可用电量，可保证在分层网络中判定为可行的首段行程对真实连续 SOC 也一定可行；分层越细，该保守近似造成的可达性损失越小。
 
-对每个 O-D 对 $p$，节点集合 $\mathcal V^p$ 包括入口 $o^p$、出口 $d^p$ 以及沿线换电站 $\mathcal S^p$。同一走廊内的节点按下游里程严格全序排列，任意相邻访问节点之间只有一条物理连接。参数 $v_{i,j}^p$ 已用额定电池能量 $E_B$ 归一化为无量纲 SOC 消耗比例，且所有服务弧满足 $v_{i,j}^p>0$。第 $n$ 层网络为 $\mathcal G^{n,p}=(\mathcal V^p,\mathcal A^{n,p})$，统一主弧集为 $\mathcal A^p=\bigcup_{n\in\mathcal N}\mathcal A^{n,p}$。各层弧可行性满足
+对每个 O-D 对 $p$，节点集合 $\mathcal V^p$ 包括入口 $o^p$、出口 $d^p$ 以及沿线换电站 $\mathcal S^p$。参数 $v_{i,j}^p$ 已用额定电池能量 $E_B$ 归一化为无量纲 SOC 消耗比例，且所有服务弧满足 $v_{i,j}^p>0$。第 $n$ 层网络为 $\mathcal G^{n,p}=(\mathcal V^p,\mathcal A^{n,p})$，统一主弧集为 $\mathcal A^p=\bigcup_{n\in\mathcal N}\mathcal A^{n,p}$。各层弧可行性满足
 \begin{equation}
 (i,j)\in\mathcal A^{n,p}
 \Longleftrightarrow
@@ -220,7 +246,7 @@ g_{A,n,\ell}^{p,k}\,
 \mathbb I\!\left((i,j)\in\mathcal A^{n,p}\right).
 \label{eq:user_arc_availability}
 \end{equation}
-由于连续入口 SOC 在求解前已经观测或由预约信息给定，$g$ 和 $\Gamma$ 均为 $0$--$1$ 参数，无需引入 big-$M$ 约束。后续约束
+由于连续到达 SOC 在求解前已经观测或由预约信息给定，$g$ 和 $\Gamma$ 均为 $0$--$1$ 参数，无需引入 big-$M$ 约束。后续约束
 $y_{A,i,j}^{p,k}\le\Gamma_{A,i,j,\ell}^{p,k}$ 将不带 SOC 层索引的逐用户路径变量与其唯一激活的分层网络连接起来。日前基准路径使用
 $\bar n_A^{p,k}=\nu(\overline{\mathrm{soc}}_A^{p,k})$ 构造；若实际 SOC 与预约 SOC 落入不同层，滚动模型会自动切换可用弧集合。
 
@@ -233,19 +259,19 @@ SOC-wise expanded network 仅用于预约用户的路径可行性和站点序列
     \label{fig:assignment network}
 \end{figure}
 
-\subsection{日前预约路径启发式}
+\subsubsection{日前预约路径启发式}
 
 预约请求提交
 $\left(p,\bar t_A^{p,k},
 \overline{\mathrm{soc}}_A^{p,k}\right)$
 后，运营者立即生成一条完整的日前基准路径。令
 $\mathcal U^{\mathrm{DA}}=(u_1,\ldots,u_R)$
-为全网请求按提交时间排序后的序列，其中
-$u_r=(p_r,k_r)$；同一时刻提交的请求按固定用户编号破同。该全局提交序位 $r$ 与 O-D 对内的用户索引 $k$ 相互独立。
+为全网预约请求按提交时间先后排列得到的序列。这里，$u_r=(p_r,k_r)$ 表示排在第 $r$ 位的请求来自 O-D 对 $p_r$，对应其中的用户 $k_r$。如果多个请求的提交时间相同，则按照预先规定的 $(p,k)$ 顺序确定其先后。需要注意的是，$r$ 表示请求在全网中的排列位置，而 $k_r$ 只是用户在所属 O-D 对内的编号，二者含义不同。
 
-处理请求 $u_r=(p,k)$ 时，入口首弧必须属于预约 SOC 对应的保守网络
-$\mathcal A^{\bar n_A^{p,k},p}$，其中
-$\bar n_A^{p,k}=\nu(\overline{\mathrm{soc}}_A^{p,k})$；连续预约 SOC 用于精确计算到达候选节点后的剩余 SOC。设用户按预约信息到达站点 $i$ 的时段为
+处理请求 $u_r=(p,k)$ 时，对于任意从入口指向下游节点的弧
+$(o^p,j)\in\mathcal A^p$，启发式直接根据连续预约 SOC 判断其续航可达性：只要满足
+$v_{o^p,j}^{p}\le\overline{\mathrm{soc}}_A^{p,k}$，便可将节点 $j$ 作为入口的后继节点；到达节点 $j$ 后的连续剩余 SOC 为
+$\overline{\mathrm{soc}}_A^{p,k}-v_{o^p,j}^{p}$。设用户按预约信息到达站点 $i$ 的时段为
 \begin{equation}
 \bar\theta_{A,i}^{p,k}
 =
@@ -269,37 +295,31 @@ L_{i,q}^{(r)}
 -\widehat D_{R,i,q}^{\mathrm{DA}}.
 \label{eq:heuristic_residual_inventory}
 \end{equation}
-其中 $\widehat F_{i,q}^{\mathrm{DA},(r-1)}$ 已吸收严格早于 $q$ 的库存事件，而
-$\bar Q_{i,q}^{A,(r-1)}$ 仅扣除时段 $q$ 的既有预约事件，因而同一需求不会重复扣减。
+
 
 对单个请求，启发式按以下规则构造路径：
 \begin{enumerate}
-  \item 从入口开始，当前离站 SOC 在入口取
-  $\overline{\mathrm{soc}}_A^{p,k}$，完成一次换电后取 $1$。候选后继必须位于下游、属于相应分层网络、在续航范围内，并存在一条满足后续续航和预计库存条件的完整出口后缀。
+  \item 从入口开始，当前车辆 SOC 在入口取
+  $\overline{\mathrm{soc}}_A^{p,k}$，完成一次换电后取 $1$。候选后继必须位于下游，且相应弧的 SOC 消耗不超过当前车辆 SOC；即入口弧满足
+  $v_{o^p,j}^{p}\le\overline{\mathrm{soc}}_A^{p,k}$，换电后的后续弧满足 $v_{i,j}^{p}\le1$。
   \item 若出口可直接到达且到达出口后的连续 SOC 严格大于 $50\%$，立即选择出口；该规则具有最高优先级。
-  \item 否则，仅保留满足
-  $L_{i,\bar\theta_{A,i}^{p,k}}^{(r)}\ge1$
-  的候选换电站，并按 $L$ 从大到小尝试；若 $L$ 相同，则优先选择更靠下游的站点。
+  \item 否则，按 $L$ 从大到小尝试；若 $L$ 相同，则优先选择更靠下游的站点。
   \item 每次暂选换电站后，在临时事件表中记录“满电电池 $-1$、按连续退回 SOC 所在层的电池 $+1$”。其中，本时段的满电消耗只增加临时预约事件数，不改写服务开始前的 $\widehat F_{i,q}^{\mathrm{DA},(r-1)}$；退回电池及其后续充电仅更新 $q'>q$ 的预计供给。若后续无法形成完整出口路径，则回溯并尝试优先级中的下一候选站。
-  \item 若没有满足库存条件的换电站，但出口仍可在给定安全到达 SOC
-  $s_d^{\min}>0$ 下到达，则选择出口作为可行性回退。
 \end{enumerate}
 
-整条路径成功到达出口后，运营者才原子提交其沿途事件：将各换电事件追加到
-$\bar Q^{A,(r)}$，并把这些事件对后续时段 $q'>q$ 的库存影响写入
-$\widehat F^{\mathrm{DA},(r)}$；构造失败时丢弃临时副本并拒绝该请求。成功生成的弧指示参数构成
-$\bar y_{A,i,j}^{p,k}\in\{0,1\}$，并立即发布给用户。集合
-$\mathcal K^p$ 仅包含日前成功接纳且已获得完整基准路径的用户，因此滚动模型中的每个用户均具有定义完备的
-$\bar y_A^{p,k}$。
+在为该请求构造出能够到达出口的完整路径后，运营者更新日前预约信息：将沿途各站的换电事件计入
+$\bar Q^{A,(r)}$，并据此更新这些事件发生后各时段 $q'>q$ 的预计满电供给
+$\widehat F^{\mathrm{DA},(r)}$。使用二元参数
+$\bar y_{A,i,j}^{p,k}\in\{0,1\}$ 表示其日前基准路径，并将该路径发布给用户。
 
 
-\subsection{Mathematical model}
+\subsubsection{Mathematical model}
 
-本节建立逐用户预约路径动态调整模型。MPC 的核心决策变量
-$y_{A,i,j}^{p,k}$ 表示 O-D 对 $p$ 的预约用户 $k$ 是否经过弧 $(i,j)$，其索引仅包含 O-D 对、用户和物理弧。用户的 SOC 层和各站换电时段分别由式\eqref{eq:user_soc_layer_indicator}和式\eqref{eq:user_station_arrival_period}预先确定。各站 SOC 分层库存 $w_{n,i,q}$ 与随机用户服务量将逐用户路径产生的换电事件连接起来。RL 层在滚动时刻 $\ell$ 沿预测状态生成名义充电序列
+本节建立用户预约路径动态调整模型。MPC 的核心决策变量
+$y_{A,i,j}^{p,k}$ 表示 O-D 对 $p$ 的预约用户 $k$ 是否经过弧 $(i,j)$。用户的 SOC 层和各站换电时段分别由式\eqref{eq:user_soc_layer_indicator}和式\eqref{eq:user_station_arrival_period}预先确定。各站 SOC 分层库存 $w_{n,i,q}$ 与随机用户服务量将逐用户路径产生的换电事件连接起来。RL 层在滚动时刻 $\ell$ 沿预测状态生成名义充电序列
 $\{P_{n,i,q\mid\ell}:q\in\mathcal T_\ell\}$，该序列在本轮 MPC 中作为外部参数；实际闭环中同样只执行首个时段的充电功率。
 
-\subsubsection{预约换电事件与随机服务}
+\textbf{预约换电事件与随机服务}
 
 用户 $k$ 沿入弧 $(j,i)$ 到达换电站 $i$ 时归还电池的连续 SOC 为
 \begin{equation}
@@ -326,7 +346,7 @@ $\{P_{n,i,q\mid\ell}:q\in\mathcal T_\ell\}$，该序列在本轮 MPC 中作为�
 r\in\mathcal N,\ \Gamma_{A,j,i,\ell}^{p,k}=1.
 \label{eq:return_soc_layer}
 \end{equation}
-式\eqref{eq:return_soc}在首个换电站使用实际或预约入口 SOC，在后续换电站使用满电 SOC $1$；只有在更新聚合库存时，连续退回 SOC 才通过 $\nu(\cdot)$ 落入离散层。
+式\eqref{eq:return_soc}在首个换电站使用实际或预约到达 SOC，在后续换电站使用满电 SOC $1$；只有在更新聚合库存时，连续退回 SOC 才通过 $\nu(\cdot)$ 落入离散层。
 
 令 $P_{m,i,q\mid\ell}$ 表示充电功率在一个时段内产生的名义 SOC 增量，并通过投影满足
 $0\le P_{m,i,q\mid\ell}\le1-\sigma_m$，特别地
@@ -359,7 +379,7 @@ y_{A,j,i}^{p,k}.
 \end{equation}
 对于在更早滚动时刻已经进入系统、路径已经发布且至少有一个换电事件尚未完成的用户，令
 $y_{A,j,i}^{\mathrm{fix},p,k}$ 为其固定路径参数，
-$\theta_{A,i}^{\mathrm{fix},p,k}$ 为依据实际进入时间得到的到站时段，则固定承诺量为
+$\theta_{A,i}^{\mathrm{fix},p,k}$ 为依据实际到达高速入口时间得到的到站时段，则固定承诺量为
 \begin{equation}
 Q_{i,q}^{A,\mathrm{fix}}
 =
@@ -392,7 +412,7 @@ y_{A,j,i}^{\mathrm{fix},p,k}.
 \label{eq:fixed_reservation_return}
 \end{align}
 其中，固定路径所含弧上的
-$\zeta_{A,r,j,i}^{\mathrm{fix},p,k}$ 按该用户已观测的入口 SOC 以式\eqref{eq:return_soc}--\eqref{eq:return_soc_layer}计算，固定路径以外的弧将该参数置为零。
+$\zeta_{A,r,j,i}^{\mathrm{fix},p,k}$ 按该用户已观测的到达 SOC 以式\eqref{eq:return_soc}--\eqref{eq:return_soc_layer}计算，固定路径以外的弧将该参数置为零。
 
 时段 $q$ 服务开始前可用于换电的满电电池数量为
 \begin{equation}
@@ -455,7 +475,7 @@ y_R^{r,i,q}(y_A)
 \label{eq:random_induced_soc}
 \end{equation}
 
-\subsubsection{RL 终端库存价值}
+\textbf{RL 终端库存价值}
 
 有限预测时域可能低估靠近域末端的库存及域外预约履约价值。RL critic 学习状态价值函数
 \begin{equation}
@@ -514,7 +534,7 @@ V_{\theta}(\bar s_{\ell+H})
 第一项评价预测域末端的分层库存；第二项将域外预约换电事件近似折算为终端处“减少一块满电电池并增加一块相应 SOC 层电池”的等效影响。所有尚未完成的已发布固定承诺均纳入 critic 的参考终端状态 $\bar s_{\ell+H}$；它们对本轮路径变量的显式域外等效项为常数，故从目标函数中省略。固定承诺的预测域内事件则通过式\eqref{eq:fixed_reservation_swap}显式进入库存转移。
 本文将该线性化项作为经标定的终端启发式，$\beta$ 同时校准 critic 折扣回报与 MPC 域内运营金额的尺度；若采用严格的 Bellman 截断口径，则域内各期金额按 $\gamma$ 折扣并令终端权重取 $\gamma^H$。
 
-\subsubsection{调整损失与目标函数}
+\textbf{调整损失与目标函数}
 
 所有 $k\in\mathcal K^p$ 均为日前已接纳并获得完整基准路径的预约用户。为比较换电站序列，定义当前路径和日前基准路径的站点访问指示量
 \begin{equation}
@@ -527,7 +547,7 @@ x_{A,i}^{p,k}
 \sum_{\{j\mid(j,i)\in\mathcal A^p\}}\bar y_{A,j,i}^{p,k}.
 \label{eq:station_visit_indicator}
 \end{equation}
-同一 O-D 高速走廊上的入口、换电站和出口按下游里程构成严格全序，任意两个相邻访问节点之间只有一条物理连接，因此访问站点集合唯一确定其访问顺序。引入二元变量 $d_A^{p,k}$，并设置
+同一 O-D 高速区间上的入口、换电站和出口按下游里程构成严格全序，任意两个相邻访问节点之间只有一条物理连接，因此访问站点集合唯一确定其访问顺序。引入二元变量 $d_A^{p,k}$，并设置
 \begin{subequations}
 \label{eq:path_adjustment_indicator}
 \begin{align}
@@ -586,7 +606,7 @@ E_B w_{m,i,q-1}P_{m,i,q\mid\ell}e_{i,q}.
 $\mathcal K_\ell^{+,p}$ 中未来用户的调整成本是前瞻成本；只有
 $\mathcal K_\ell^{0,p}$ 中本轮路径被正式发布的用户产生实际调整支出。
 
-\subsubsection{Constraints}
+\textbf{Constraints}
 
 \paragraph{User-level path constraints.}
 定义
@@ -621,7 +641,7 @@ y_{A,i,j}^{p,k}
 p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ (i,j)\in\mathcal A^p.
 \label{eq:path_layer_compatibility}
 \end{equation}
-上述约束与高速走廊的严格下游全序共同保证每位预约用户选择一条与其有效连续入口 SOC 相容的完整入口--出口路径。本文假设日前准入和运营安全库存为所有实际进入的预约用户提供至少一条物理及库存可行路径；若极端 SOC 偏差或设备故障破坏该条件，运营者调用外借满电电池或道路救援等应急资源，该应急过程不属于常规 MPC 路径调整模型。
+上述约束与高速区间的严格下游全序共同保证每位预约用户选择一条与其有效连续到达 SOC 相容的完整入口--出口路径。本文假设日前准入和运营安全库存为所有实际进入的预约用户提供至少一条物理及库存可行路径；若极端 SOC 偏差或设备故障破坏该条件，运营者调用外借满电电池或道路救援等应急资源，该应急过程不属于常规 MPC 路径调整模型。
 
 \paragraph{Battery inventory constraints.}
 对于非满电 SOC 层 $r<N$，库存转移为
