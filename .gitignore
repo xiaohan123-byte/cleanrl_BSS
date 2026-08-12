@@ -129,3 +129,11 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# ExpresswayBSSs paper: keep sources, PDFs, bibliography, and all figures only.
+ExpresswayBSSs/paper/**
+!ExpresswayBSSs/paper/**/
+!ExpresswayBSSs/paper/**/*.pdf
+!ExpresswayBSSs/paper/**/*.tex
+!ExpresswayBSSs/paper/**/*.bib
+!ExpresswayBSSs/paper/figures/**

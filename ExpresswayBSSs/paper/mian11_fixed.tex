@@ -3,7 +3,7 @@
 \usepackage{SJTUReport}
 \usepackage{booktabs} % 三线表
 \usepackage{amsmath}
-\usepackage{amssymb} 
+\usepackage{amssymb}
 
 %%-------------------------------正文开始---------------------------%%
 \begin{document}
@@ -36,15 +36,15 @@
 
 
 \section{Introduction}
-随着电动汽车在高速公路中长距离出行场景中的普及，沿线换电站的运营能力逐渐成为影响用户出行可靠性与系统运行效率的关键因素。相比传统充电方式，换电模式能够显著缩短车辆补能时间，但其运营过程同时受到用户到达需求、电池库存状态、站内充电过程以及电价变化等因素影响。【特别是在高速公路场景中，用户行驶路径具有明显的连续性，不同车辆的初始 SOC 存在差异，导致其可达站点、可行换电路径以及对站内满电电池的使用情况均不相同。】(这句话写得不好，没有讲清楚高速场景下的用户换电特点，只是简单的讲了连续性，但是没有讲清楚连续性是什么)因此，高速公路换电站运营本质上是一个具有时空耦合、库存动态演化和不确定需求特征的序贯决策问题。
+随着电动汽车在高速公路中长距离出行场景中的普及，沿线换电站的运营能力逐渐成为影响用户出行可靠性与系统运行效率的关键因素。相比传统充电方式，换电模式能够显著缩短车辆补能时间，但其运营过程同时受到用户到达需求、电池库存状态、站内充电过程以及电价变化等因素影响。高速公路用户通常沿既定走廊连续向下游行驶，驶过某一出口或换电站后难以折返，因此每一次站点选择都会改变后续可达站点集合；与此同时，不同车辆的入口 SOC 又会改变其首个可达站点以及整条换电站序列。由此形成的路径可达性与站间电池库存相互耦合，使高速公路换电站运营成为具有时空耦合、库存动态演化和不确定需求特征的序贯决策问题。
 
-在实际运营中，系统中存在两类异质用户：预约用户和随机到达用户。预约用户通常提前提交出发时间、行程起点和终点，以及初始 SOC 信息给运营者，运营者告知用户换电站点的合理分配方案，并规划站内电池充电计划以提高服务确定性；随机用户的到达时间和到达 SOC 则具有更强的不确定性，其可服务量取决于现场站点在服务预约到达用户后仍可用的满电电池数量。此外，考虑到在现实中用户提交预约信息的时间和实际到达的时间存在差异，以及系统中存在由随机用户到达带来的不确定性。因此，还需要根据用户实际到达情况(包括到达时间和到达SOC)，为预约用户实时动态规划合理的换电方案。并且，由于分时电价机制的存在，站内电池充电成本会随时间变化，进一步增加了运营决策的复杂性。因此，如何在预约用户服务保障、随机用户灵活接纳以及电池充电调度之间进行协调，是高速公路换电网络运营中的核心问题。
+在实际运营中，系统中存在两类异质用户：预约用户和随机到达用户。预约用户在运营日前提交计划进入高速公路的时间、行程起点和终点以及入口 SOC，运营者据此给出初始换电路径，并规划站内电池充电计划以提高服务确定性；随机用户的到达时间和到达 SOC 则具有更强的不确定性，其可服务量取决于现场站点在优先履行预约服务后剩余的满电电池数量。预约用户的实际进入时间和入口 SOC 也可能偏离其提交的信息，因此运营者需要在用户实际进入高速公路时，根据最新到达信息、随机需求预测和站内库存动态调整其换电站序列。分时电价进一步使站内充电成本随时间变化。如何协调预约用户履约、随机用户灵活接纳以及电池充电调度，是高速公路换电网络运营中的核心问题。
 
-针对上述问题，本文构建 MPC-RL 分层协同优化框架。换电站的实时运营中存在两类性质不同但相互耦合的决策：一类是预约用户换电路径指派动态调整决策，即为每位预约用户相对于提交预约时的规划方案，根据实际到达情况调整其接受服务的换电站序列；另一类是充电功率决策，即不同站点的电池在不同时段的实时充电功率安排。本文采用模型预测控制（Model Predictive Control, MPC）在滚动预测时域内处理预约用户换电路径指派动态调整问题。(在这里需要详细讲为什么采用MPC来做)充电功率决策的影响具有明显的跨时段累积性：当前充电功率不仅决定当前充电成本，还会改变未来各站点不同 SOC 电池分布、满电电池供给能力和后续用户服务水平。本文采用强化学习（Reinforcement Learning, RL）学习充电功率控制策略，使其能够在长期交互过程中根据需求、电价和库存状态自适应调整充电行为。如\autoref{fig:MPC-RL}所示，RL 层输出充电功率决策并影响电池状态转移，MPC 层在给定功率策略下优化预约用户指派方案，随机用户服务量则由剩余满电电池供给确定。
+针对上述问题，本文构建 MPC-RL 分层协同优化框架。换电站的实时运营中存在两类性质不同但相互耦合的决策：一类是预约用户换电路径指派动态调整决策，即根据每位用户的实际进入时间和入口 SOC，调整其相对于日前基准方案的换电站序列；另一类是不同站点、不同 SOC 电池的实时充电功率决策。预约路径调整具有离散组合结构，并同时受到车辆续航、路径连通性、预约履约和多站点库存约束；随机需求预测与实际到达又会随时间不断更新。模型预测控制（Model Predictive Control, MPC）能够在有限预测域内联合评估这些约束和未来库存影响，并在每次获得新观测后重新优化而只执行当前用户批次，因而适合处理该类动态路径调整问题。充电功率的影响则具有明显的跨时段累积性：当前功率不仅决定当期充电成本，还会改变未来各站点的 SOC 库存结构、满电电池供给能力和后续服务水平。本文采用强化学习（Reinforcement Learning, RL）学习充电功率控制策略，使其能够在长期交互过程中根据需求、电价和库存状态自适应调整充电行为。如\autoref{fig:MPC-RL}所示，RL 层输出充电功率并影响电池状态转移，MPC 层在给定功率序列下优化预约用户路径，随机用户服务量由预约履约后的剩余满电电池供给确定。
 
 进一步地，本文利用 RL critic 提供预测时域之外的长期价值信息，以缓解有限预测时域导致的末端效应。传统 MPC 通常通过设置固定终端库存下界避免时域末端过度消耗满电电池，但该方法只能粗略限制末端满电电池数量，难以区分不同站点、不同 SOC 电池在未来需求和电价环境下的长期价值。本文在 RL 训练过程中学习状态价值函数，并在每轮 MPC 求解前计算 critic 对终端库存的梯度，将其作为不同站点、不同 SOC 电池的长期边际价值。对于由当前预约指派产生但换电时刻位于预测域之外的履约需求，本文不额外训练新的 critic 分量，而是将其直接转化为对终端库存的等效影响：未来履约需要消耗满电电池，同时会归还低 SOC 电池。由此，RL 学到的长期库存价值被转化为 MPC 目标函数中的线性终端价值项。
 
-因此，本文提出的 MPC-RL 框架并非将两类方法简单拼接，而是基于决策属性进行分层：MPC 负责处理强约束、组合结构明显且需要可解释性的用户服务分配问题；RL 负责学习具有长期影响的充电功率策略，并通过 critic 向 MPC 提供终端库存价值信息。二者通过电池库存状态、充电功率决策、跨域预约履约需求和终端价值项相互连接，从而在保证预约用户服务质量要求和运营约束可行性的同时，使有限时域 MPC 能够近似感知预测时域之外的长期影响。
+因此，本文提出的 MPC-RL 框架基于决策属性进行分层：MPC 负责处理强约束、组合结构明显且需要可解释性的预约用户路径动态调整问题；RL 负责学习具有长期影响的充电功率策略，并通过 critic 向 MPC 提供终端库存价值信息。二者通过电池库存状态、充电功率决策、在途预约履约事件和终端价值项相互连接，从而在保证预约用户服务质量要求和运营约束可行性的同时，使有限时域 MPC 能够近似感知预测时域之外的长期影响。
 
 本文其余部分安排如下：第 2 节介绍 MPC 优化模型，包括时域设置、变量定义、SOC-wise expanded network 建模方法以及数学规划模型；第 3 节介绍 RL formulation，包括马尔可夫决策过程的建立和所选 RL 算法；第 4 节和第 5 节分别预留实验分析和结论部分。
 
@@ -65,18 +65,55 @@
     \label{fig:Rolling Horizon}
 \end{figure}
 
-如\autoref{fig:Rolling Horizon}所示，本文采用滚动时域优化思想刻画换电站运营中的动态决策过程。设当前滚动决策时刻为 $t$。$H_1$ 表示预测周期长度。在该预测周期内，系统可获得随机到达用户的预测需求信息，包括到达站点、到达数量以及到达时的 SOC 水平；同时，RL 层给出未来 $H_1$ 个时段内的充电功率信息，作为 MPC 库存转移中的外部参数。$H_2$ 表示预约周期长度：在预约模式下，若用户计划在时刻 $t+H_2$ 出发，则必须在时刻 $t$ 之前提交预约信息。因此，在任一滚动决策时刻 $t$，区间 $[t,t+H_2]$ 内出发用户的预约信息可视为已经固定，预约信息包括出发 SOC 水平以及行程起点--终点。$h$ 为提前通知时间，即在区间 $[t+h,t+h+1]$ 出发的预约用户需要在时刻 $t$ 被通知其换电站指派方案。
- 在时刻 $t$ 求解 MPC 时，模型并不只考虑即将通知的一个出发时段，而是在滚动预测窗口内联合优化区间 $[t+h,t+H_1]$ 出发的预约用户指派方案；求解完成后，仅执行并发布区间 $[t+h,t+h+1]$ 出发预约用户的指派结果。进入下一时刻后，系统根据更新后的电池库存、预约信息、随机需求预测和 RL 充电功率重新构造并求解 MPC 问题。
+如\autoref{fig:Rolling Horizon}所示，所有预约请求均在运营日前提交，因而日内滚动过程中预约用户集合保持不变。设当前滚动决策时刻为 $\ell$，预测周期长度为 $H$。在时刻 $\ell$，系统获得区间 $(\ell-1,\ell]$ 内预约用户和随机用户的实际到达信息，两类观测均包括实际到达时间和到达 SOC；预约用户的实际进入时间和入口 SOC 分别记为 $t_A^{p,k}$ 和 $\mathrm{soc}_A^{p,k}$。与此同时，系统揭示未来区间 $[\ell,\ell+H]$ 内随机用户到达站点、到达数量和到达 SOC 的最新预测，并由 RL 层给出相应时段的充电功率。对于尚未进入高速公路的预约用户，预测域内不再产生新的预约请求，且其未来进入时间和入口 SOC 分别按日前提交的 $\bar t_A^{p,k}$ 和 $\overline{\mathrm{soc}}_A^{p,k}$ 取值。
 
+对 O-D 对 $p$，令
+\begin{align}
+\mathcal K_{\ell}^{0,p}
+&=\left\{k\in\mathcal K^p:t_A^{p,k}\in(\ell-1,\ell]\right\},\\
+\mathcal K_{\ell}^{+,p}
+&=\left\{k\in\mathcal K^p:k\text{ 尚未进入系统},
+\ \bar t_A^{p,k}\in(\ell,\ell+H]\right\},\\
+\mathcal K_{\ell}^{p}
+&=\mathcal K_{\ell}^{0,p}\cup\mathcal K_{\ell}^{+,p}.
+\label{eq:rolling_user_sets}
+\end{align}
+其中，$\mathcal K_{\ell}^{0,p}$ 是本轮已观测到实际信息的预约用户集合，$\mathcal K_{\ell}^{+,p}$ 是预测域内尚未到达的预约用户集合。为统一两类用户在模型中的表达，定义本轮有效进入信息
+\begin{equation}
+\left(\widetilde t_{A,\ell}^{p,k},
+\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}\right)=
+\begin{cases}
+\left(t_A^{p,k},\mathrm{soc}_A^{p,k}\right),
+&k\in\mathcal K_{\ell}^{0,p},\\
+\left(\bar t_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}\right),
+&k\in\mathcal K_{\ell}^{+,p}.
+\end{cases}
+\label{eq:effective_arrival_information}
+\end{equation}
+因此，已到达用户使用实际信息进行路径调整，未来用户使用日前预约信息形成前瞻性路径方案。
 
+令 $\mathcal T_\ell=\{\ell+1,\ell+2,\ldots,\ell+H\}$ 为未来 $H$ 个运行时段，其中 $q$ 对应区间 $(q-1,q]$；库存状态时点集合为 $\mathcal T_\ell^w=\{\ell,\ell+1,\ldots,\ell+H\}$。区间 $(\ell-1,\ell]$ 内随机用户的实际服务结果只用于校准本轮初始库存 $\bar w_{n,i,\ell}$，不会作为新需求在预测域内重复计算；$\mathcal T_\ell$ 内的随机需求均采用时刻 $\ell$ 获得的最新预测。MPC 同时优化 $\mathcal K_\ell^p$ 中所有预约用户的完整换电站序列，以提前计入其对各站库存的影响；求解后仅将 $\mathcal K_{\ell}^{0,p}$ 中本轮实际进入用户的路径发布并固定，$\mathcal K_{\ell}^{+,p}$ 的路径只作为预测域内的前瞻方案。进入时刻 $\ell+1$ 后，系统用新观测重新求解，已发布路径则作为不可更改的在途履约承诺进入后续库存约束。该“全域优化、当前执行”的机制使路径调整始终发生在预约用户实际进入高速公路时。本文假设信息处理和路径发布延迟相对于站间行驶时间可以忽略，因此当前批次在到达首个换电站前能够获得调整方案。
 
-为便于数学表达，后文将当前滚动窗口重新编号为局部时段集合 $\mathcal{T}=\{1,\ldots,H\}$，其中 $t=1$ 对应本轮将要发布指派的出发区间 $[t+h,t+h+1]$，$H_1$ 对应优化窗口 $[t+h,t+H_1]$ 内的最后一个预约出发时段；电池库存状态时点集合为 $\mathcal{T}^{w}=\{0,1,\ldots,H_1\}$。MPC 的服务决策指预约用户在 expanded network 上的指派变量 $y_{A,i,j}^{n,p,t}$；随机到达用户不作为独立服务决策变量，而是在给定站点、时段的满电电池库存扣除预约用户到达服务需求后，由剩余满电电池自动服务。对于预约用户，$t$ 表示其出发时段，换电服务发生在其到达相应换电站的时段。本文假设站点间的旅行时间不变，因此 O-D 对 $p$ 的用户到达节点 $i$ 的时段为 $t+\tau_{p,i}$。预约用户的决策索引仍为出发时段 $t$，而电池消耗和状态转移通过 $t+\tau_{p,i}$ 关联到实际到达时段。
-
-当 $t+\tau_{p,i}\le H_1$ 时，对应换电事件位于当前预测时域内，并显式进入电池库存转移约束；当 $t+\tau_{p,i}>H_1$ 时，若直接忽略该事件，会导致模型在预测域末端获得预约服务收益和服务率贡献，却不承担相应的未来满电电池消耗。为避免这一边界效应，本文不截断预约决策集合，也不额外引入新的跨域承诺决策变量，而是将预测域外的预约履约影响直接并入 RL 终端库存价值项。具体而言，一个预测域外的预约履约事件在未来会消耗一块满电电池，并归还一块对应 SOC 的低电量电池。本文将该未来库存影响近似折算为预测域终端的等效库存修正，即用终端状态处的库存边际价值评价“$-$ 满电电池需求 $+$ 低 SOC 电池归还”。在滚动进入后续时域后，这些已形成的预约承诺会以历史预约承诺 $\bar{y}_{A,i,j}^{n,p,k}$ 的形式进入库存状态转移。
+采用单位时段时，定义 $\Pi(a)=\min\{q\in\mathbb Z:a\le q\}$，即将区间 $(q-1,q]$ 内的连续时刻映射至时段 $q$。设 $\tau_{p,i}$ 为 O-D 对 $p$ 从入口到节点 $i$ 的行驶时间，则用户 $k$ 在本轮信息下到达节点 $i$ 的时段为
+\begin{equation}
+\theta_{A,i,\ell}^{p,k}
+=\Pi\!\left(\widetilde t_{A,\ell}^{p,k}+\tau_{p,i}\right).
+\label{eq:user_station_arrival_period}
+\end{equation}
+运行时段和首站间距的设置保证本轮新进入用户在路径发布后才到达任一可选换电站，即
+\begin{equation}
+\theta_{A,i,\ell}^{p,k}\ge\ell+1,
+\quad
+k\in\mathcal K_\ell^{0,p},\
+i\in\mathcal S^p\text{ with }
+(o^p,i)\in\mathcal A^{\nu(\mathrm{soc}_A^{p,k}),p}.
+\label{eq:causal_first_station}
+\end{equation}
+当 $\theta_{A,i,\ell}^{p,k}\in\mathcal T_\ell$ 时，相应换电事件显式进入本轮库存转移；当 $\theta_{A,i,\ell}^{p,k}>\ell+H$ 时，该事件对满电电池的消耗和低 SOC 电池的归还通过 RL 终端价值项进行等效评价。
 
 \subsection{变量列表}
 
-本文使用的变量如\autoref{tab:notation}所示。该符号表仅列出 MPC 优化模型所需集合、参数和决策变量；RL formulation 中的状态、动作、奖励和算法符号将在第 3 节单独定义。
+本文使用的主要符号如\autoref{tab:notation}所示。实际进入时间和入口 SOC 是滚动到达后获得的观测参数，预约进入时间和入口 SOC 是运营日前已经确定的参数；二者均不是优化决策变量。RL formulation 中的状态、动作、奖励和算法符号将在第 3 节单独定义。
 
 \begin{table}[!htbp]
   \centering
@@ -84,62 +121,110 @@
   \label{tab:notation}
   \scriptsize
   \setlength{\tabcolsep}{2pt}
-  \renewcommand{\arraystretch}{0.82}
+  \renewcommand{\arraystretch}{0.78}
   \begin{tabular}{@{}lp{13cm}@{}}
     \toprule
     \textbf{Notation} & \textbf{Description} \\
     \midrule
     \multicolumn{2}{l}{\textit{Sets and Indices}} \\
     $\mathcal{P}$ & Set of O-D pairs, indexed by $p$ \\
-    $\mathcal{T}$ & Set of decision periods in the predictive horizon, $\mathcal{T}:=\{1,\dots,H\}$, indexed by $t$ \\
-    $\mathcal{T}^{w}$ & Set of battery inventory state points, $\mathcal{T}^{w}:=\{0,1,\dots,H\}$ \\
+    $\mathcal{K}^{p}$ & Set of day-ahead accepted users of O-D pair $p$ with complete published baseline paths, indexed by $k$ \\
+    $\mathcal{K}_{\ell}^{0,p}$ & Reservation users whose actual entries are observed in $(\ell-1,\ell]$ \\
+    $\mathcal{K}_{\ell}^{+,p}$ & Not-yet-arrived reservation users with booked entries in $(\ell,\ell+H]$ \\
+    $\mathcal{K}_{\ell}^{p}$ & Users optimized in rolling epoch $\ell$, $\mathcal{K}_{\ell}^{p}:=\mathcal{K}_{\ell}^{0,p}\cup\mathcal{K}_{\ell}^{+,p}$ \\
+    $\mathcal{K}_{\ell}^{\mathrm{fix},p}$ & Previously routed users with at least one uncompleted swapping event \\
+    $\mathcal{T}_{\ell}$ & Future operating periods, $\mathcal{T}_{\ell}:=\{\ell+1,\dots,\ell+H\}$, indexed by $q$ \\
+    $\mathcal{T}_{\ell}^{w}$ & Battery inventory state points, $\mathcal{T}_{\ell}^{w}:=\{\ell,\dots,\ell+H\}$ \\
     $\mathcal{N}$ & Set of discretized battery SOC states, $\mathcal{N}:=\{0,\dots,N\}$, indexed by $n,m,r$ \\
     $\mathcal{S}^{p}$ & Set of intermediate BSSs on the path of O-D pair $p$, indexed by $i,j$ \\
     $\mathcal{S}$ & Set of all BSSs in the system, $\mathcal{S}:=\bigcup_{p\in\mathcal{P}}\mathcal{S}^{p}$ \\
     $\mathcal{V}^{p}$ & Node set consisting of origin $o^{p}$, destination $d^{p}$, and BSSs $\mathcal{S}^{p}$ on the path of O-D pair $p$ \\
-    $\mathcal{A}^{n,p}$ & Arc set in the SOC-wise expanded network for initial SOC state $n$ and O-D pair $p$ \\
+    $\mathcal{A}^{p}$ & Set of all downstream physical arcs for O-D pair $p$ \\
+    $\mathcal{A}^{n,p}$ & Feasible arc set in SOC layer $n$ for O-D pair $p$ \\
     $\mathcal{G}^{n,p}$ & Directed graph for initial SOC state $n$ and O-D pair $p$, $\mathcal{G}^{n,p}:=(\mathcal{V}^{p},\mathcal{A}^{n,p})$ \\
     \midrule
     \multicolumn{2}{l}{\textit{Parameters}} \\
-    $h$ & Advance notice time for publishing reservation assignment decisions \\
-    $H_1$ & Length of the prediction horizon for random demand information and RL charging power \\
-    $H_2$ & Length of the reservation horizon with fixed reservation information \\
-    $H$ & Number of locally indexed reservation departure periods optimized in the current rolling MPC window \\
+    $H$ & Length of the rolling prediction horizon \\
+    $t_A^{p,k},\bar t_A^{p,k}$ & Actual and day-ahead booked highway-entry times of reservation user $k$ \\
+    $\mathrm{soc}_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}$ & Actual and day-ahead booked continuous entry SOC values of reservation user $k$ \\
+    $\widetilde t_{A,\ell}^{p,k},\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$ & Effective entry time and SOC used in rolling epoch $\ell$ \\
+    $\Pi(\cdot),\theta_{A,i,\ell}^{p,k}$ & Time-binning map and the resulting arrival period of user $k$ at node $i$ \\
+    $\sigma_n,\nu(\cdot)$ & Lower endpoint of SOC layer $n$ and the conservative continuous-to-discrete SOC map \\
     $\tau_{p,i}$ & Travel time from the origin to node $i$ for an EV of O-D pair $p$; it is independent of the departure time \\
-    $\tau_{p,\max}$ & Maximum travel time of EVs for O-D pair $p$ \\
-    $\tau_{\max}$ & Maximum travel time over all O-D pairs, $\tau_{\max}:=\max_{p\in\mathcal{P}}\tau_{p,\max}$ \\
-    $P_{n,i,t}$ & Charging increment or power applied to batteries with SOC state $n$ at station $i$ during period $t$; it is provided by the RL layer and treated as a parameter in MPC \\
-    $e_{i,t}$ & Electricity price at station $i$ during period $t$ \\
-    $s$ & Fixed unit swapping service fee, independent of station and time \\
-    $v^{p}_{i,j}$ & Energy consumption from node $i$ to node $j$ for an EV of O-D pair $p$; it is independent of the user's initial SOC \\
-    $\alpha$ & Penalty cost per unit of unsatisfied reservation demand \\
-    $\eta$ & Minimum reservation service rate required within the predictive horizon \\
+    $P_{n,i,q\mid\ell},e_{i,q}$ & Nominal SOC charging increment in epoch $\ell$ and electricity price (currency per unit energy) at station $i$ in period $q$ \\
+    $E_B,\overline E_{i,q}$ & Rated battery energy and station charging-energy limit in period $q$ \\
+    $s_A^{p,k},s_R$ & Fixed contract revenue of an accepted reservation and unit swapping fee for a random user \\
+    $v^{p}_{i,j}$ & Dimensionless SOC consumption from $i$ to $j$, obtained by dividing route energy use by rated battery energy $E_B$ \\
+    $\widehat f_{R,\ell}^{n,i,q}$ & Predicted random demand returning a battery in SOC layer $n$ at station $i$ \\
+    $\bar y_{A,i,j}^{p,k}$ & Day-ahead baseline path generated when reservation user $k$ submits information \\
+    $y_{A,i,j}^{\mathrm{fix},p,k}$ & Published and fixed path of a previously entered reservation user \\
+    $\bar w_{n,i,\ell}$ & Observed initial inventory in SOC layer $n$ at rolling epoch $\ell$ \\
+    $w_{n,i,\ell+H}^{\mathrm{ref}}$ & Inventory component of the reference terminal state used for critic linearization \\
+    $\kappa$ & Positive penalty coefficient for changing an accepted user's baseline path \\
     $\beta$ & Weight coefficient of the RL terminal inventory value in the MPC objective \\
     $\lambda_{i,n,\ell}$ & Marginal terminal value of one additional battery with SOC state $n$ at station $i$ at the current rolling decision epoch $\ell$ \\
-    $f_{A}^{n,p,t}$ & Reservation demand volume of EVs with initial SOC state $n$ for O-D pair $p$ departing in period $t$ \\
-    $f_{R}^{n,i,t}$ & Random demand volume of EVs with returned SOC state $n$ at station $i$ in period $t$ \\
-    $\bar{y}_{A,i,j}^{n,p,k}$ & Historical service volume of reservation flows on arc $(i,j)$ that departed before the current predictive horizon, $k\in\{-\tau_{p,\max},\dots,0\}$ \\
-    $\bar{w}_{n,i,0}$ & Initial number of batteries with SOC state $n$ at station $i$ at the beginning of the predictive horizon \\
+    $M_{i,q}^{R}$ & Valid upper bound used to linearize random service at station $i$ in period $q$ \\
     $\underline{w}_{N,i}$ & Minimum number of fully charged batteries retained at station $i$ at the end of the predictive horizon \\
-    $\Phi^{\mathrm{RL}}_{\ell}$ & Linear terminal value term provided by the RL critic at the current rolling decision epoch $\ell$ \\
     \midrule
     \multicolumn{2}{l}{\textit{Decision Variables and Induced Quantities}} \\
-    $y_{A,i,j}^{n,p,t}$ & Service flow of reservation demand $f_{A}^{n,p,t}$ on arc $(i,j)\in\mathcal{A}^{n,p}$ \\
-    $w_{n,i,t}$ & Number of batteries with SOC state $n$ at station $i$ at inventory state point $t\in\mathcal{T}^{w}$ \\
-    $y_{R}^{n,i,t}(y_A)$ & Induced service volume of random demand $f_{R}^{n,i,t}$ after serving reservation arrivals at station $i$ in period $t$ \\
+    $y_{A,i,j}^{p,k}$ & Binary variable equal to one iff reservation user $k$ of O-D pair $p$ traverses arc $(i,j)$ \\
+    $d_A^{p,k}$ & Binary indicator equal to one iff the dynamic path differs from its day-ahead baseline \\
+    $Q_{i,q}^{R},b_{R,i,q}$ & Random service quantity and binary selector used in its exact minimum linearization \\
+    $w_{n,i,q}$ & Number of batteries in SOC layer $n$ at station $i$ and inventory state point $q$ \\
+    $y_{R}^{n,i,q}(y_A)$ & Random demand served after satisfying reservation swapping demand \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{SOC-wise expanded network}
 
-高速公路换电场景中的预约用户具有明确的 OD 路径和初始 SOC。由于初始 SOC 不同，同一 OD 对上的用户可达站点集合和可行换电路径可能不同。为刻画这种 SOC 相关的路径可行性，本文在传统 expanded network 的基础上构建 SOC-wise expanded network。该建模方法针对每一个 OD 对 $p\in\mathcal{P}$ 和每一个初始 SOC 状态 $n\in\mathcal{N}$，分别构造一个有向网络 $\mathcal{G}^{n,p}=(\mathcal{V}^{p},\mathcal{A}^{n,p})$。
+预约用户提交和实际进入高速公路时的 SOC 均为区间 $[0,1]$ 上的连续值，而路径指派网络采用有限个 SOC 层。设
+\begin{equation}
+0=\sigma_0<\sigma_1<\cdots<\sigma_N=1
+\label{eq:soc_breakpoints}
+\end{equation}
+为 SOC 分层下端点，并定义保守映射
+\begin{equation}
+\nu(s)=\max\left\{n\in\mathcal N:\sigma_n\le s\right\},
+\qquad s\in[0,1].
+\label{eq:soc_layer_map}
+\end{equation}
+除 $s=1$ 外，$\nu(s)=n$ 对应区间 $[\sigma_n,\sigma_{n+1})$。采用区间下端点代表该层可用电量，可保证在分层网络中判定为可行的首段行程对真实连续 SOC 也一定可行；分层越细，该保守近似造成的可达性损失越小。
 
-在网络 $\mathcal{G}^{n,p}$ 中，节点集合 $\mathcal{V}^{p}$ 包括 OD 对 $p$ 的起点 $o^p$、终点 $d^p$ 以及该路径上可经过的所有中间换电站 $\mathcal{S}^{p}$。弧集合 $\mathcal{A}^{n,p}$ 用于表示在初始 SOC 为 $n$ 的条件下，用户从一个节点行驶到另一个节点并完成后续换电服务的可行连接。弧的可行性由路段能耗 $v^p_{i,j}$ 与车辆可用电量共同决定：若弧从起点 $o^p$ 出发，则要求 $n\ge v^p_{o^p,j}$；若弧从某一中间换电站出发，则车辆刚完成换电并获得满电电池，因而要求 $N\ge v^p_{i,j}$。因此，能耗参数 $v^p_{i,j}$ 本身不需要索引初始 SOC，而初始 SOC 的影响通过网络弧集合 $\mathcal{A}^{n,p}$ 体现。
+对每个 O-D 对 $p$，节点集合 $\mathcal V^p$ 包括入口 $o^p$、出口 $d^p$ 以及沿线换电站 $\mathcal S^p$。同一走廊内的节点按下游里程严格全序排列，任意相邻访问节点之间只有一条物理连接。参数 $v_{i,j}^p$ 已用额定电池能量 $E_B$ 归一化为无量纲 SOC 消耗比例，且所有服务弧满足 $v_{i,j}^p>0$。第 $n$ 层网络为 $\mathcal G^{n,p}=(\mathcal V^p,\mathcal A^{n,p})$，统一主弧集为 $\mathcal A^p=\bigcup_{n\in\mathcal N}\mathcal A^{n,p}$。各层弧可行性满足
+\begin{equation}
+(i,j)\in\mathcal A^{n,p}
+\Longleftrightarrow
+\begin{cases}
+v_{o^p,j}^{p}\le \sigma_n, & i=o^p,\\
+v_{i,j}^{p}\le 1, & i\in\mathcal S^p,
+\end{cases}
+\label{eq:layer_arc_feasibility}
+\end{equation}
+并要求节点 $j$ 仍存在一条通往出口的下游可行路径。第二种情形使用满电 SOC $1$，因为车辆在中间换电站完成换电后继续行驶。
 
-该网络建模方式具有两个作用。第一，它将用户初始 SOC 对可达站点和换电路径的影响显式嵌入网络结构，使得不可行的站点选择不会进入优化模型。第二，它使预约用户指派问题可以表示为网络流决策：预约需求 $f_A^{n,p,t}$ 从起点 $o^p$ 进入网络，服务变量 $y_{A,i,j}^{n,p,t}$ 表示该类需求在弧 $(i,j)\in\mathcal{A}^{n,p}$ 上的服务流量。通过流平衡约束，模型可以保证被服务的预约用户沿一条可行路径从起点移动到终点，并在路径上的换电站消耗满电电池、归还低 SOC 电池。
+在滚动时刻 $\ell$，定义已知的分层指示参数
+\begin{equation}
+g_{A,n,\ell}^{p,k}
+=\mathbb I\!\left(\nu\!\left(
+\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}\right)=n\right),
+\qquad
+\sum_{n\in\mathcal N}g_{A,n,\ell}^{p,k}=1,
+\label{eq:user_soc_layer_indicator}
+\end{equation}
+以及弧可用参数
+\begin{equation}
+\Gamma_{A,i,j,\ell}^{p,k}
+=\sum_{n\in\mathcal N}
+g_{A,n,\ell}^{p,k}\,
+\mathbb I\!\left((i,j)\in\mathcal A^{n,p}\right).
+\label{eq:user_arc_availability}
+\end{equation}
+由于连续入口 SOC 在求解前已经观测或由预约信息给定，$g$ 和 $\Gamma$ 均为 $0$--$1$ 参数，无需引入 big-$M$ 约束。后续约束
+$y_{A,i,j}^{p,k}\le\Gamma_{A,i,j,\ell}^{p,k}$ 将不带 SOC 层索引的逐用户路径变量与其唯一激活的分层网络连接起来。日前基准路径使用
+$\bar n_A^{p,k}=\nu(\overline{\mathrm{soc}}_A^{p,k})$ 构造；若实际 SOC 与预约 SOC 落入不同层，滚动模型会自动切换可用弧集合。
 
-需要注意的是，SOC-wise expanded network 主要用于刻画预约用户的可行路径和站点指派。随机用户由于在换电站现场到达，本文不再为其构造 OD 网络，也不将其服务量作为独立优化决策；其服务量由同一站点、同一时段在服务预约到达用户后的剩余满电电池数量决定。预约用户和随机用户在电池库存层面相互耦合：两类用户服务均会消耗站内满电电池，并向站内归还不同 SOC 状态的电池。
+SOC-wise expanded network 仅用于预约用户的路径可行性和站点序列决策。随机用户在换电站现场到达，其服务量不设独立路径变量，而由站点在优先满足预约履约后剩余的满电电池数量决定。两类用户均在库存层面消耗一块满电电池，并归还一块具有连续 SOC 的电池；归还 SOC 再通过式\eqref{eq:soc_layer_map}映射至库存层。
 
 \begin{figure}[!htbp]
     \centering
@@ -148,313 +233,485 @@
     \label{fig:assignment network}
 \end{figure}
 
+\subsection{日前预约路径启发式}
+
+预约请求提交
+$\left(p,\bar t_A^{p,k},
+\overline{\mathrm{soc}}_A^{p,k}\right)$
+后，运营者立即生成一条完整的日前基准路径。令
+$\mathcal U^{\mathrm{DA}}=(u_1,\ldots,u_R)$
+为全网请求按提交时间排序后的序列，其中
+$u_r=(p_r,k_r)$；同一时刻提交的请求按固定用户编号破同。该全局提交序位 $r$ 与 O-D 对内的用户索引 $k$ 相互独立。
+
+处理请求 $u_r=(p,k)$ 时，入口首弧必须属于预约 SOC 对应的保守网络
+$\mathcal A^{\bar n_A^{p,k},p}$，其中
+$\bar n_A^{p,k}=\nu(\overline{\mathrm{soc}}_A^{p,k})$；连续预约 SOC 用于精确计算到达候选节点后的剩余 SOC。设用户按预约信息到达站点 $i$ 的时段为
+\begin{equation}
+\bar\theta_{A,i}^{p,k}
+=
+\Pi\!\left(\bar t_A^{p,k}+\tau_{p,i}\right).
+\label{eq:baseline_arrival_period}
+\end{equation}
+本文假设换电停留时间相对于运行时段可以忽略，或已包含在
+$\tau_{p,i}$ 中，因此到站时段只由入口时间和节点位置决定。
+
+在处理第 $r$ 个请求前，维护两类随时段传播的日前量：
+$\widehat F_{i,q}^{\mathrm{DA},(r-1)}$
+表示考虑前 $r-1$ 个已接纳请求在时段 $q$ 之前产生的满电消耗、低 SOC 电池归还和后续充电后，时段 $q$ 服务开始前的预计满电供给；
+$\bar Q_{i,q}^{A,(r-1)}$
+表示这些请求恰在站点 $i$、时段 $q$ 形成的预约换电事件数。令
+$\widehat D_{R,i,q}^{\mathrm{DA}}$ 为随机步入需求预测，则候选站的预计剩余可用满电电池数为
+\begin{equation}
+L_{i,q}^{(r)}
+=
+\widehat F_{i,q}^{\mathrm{DA},(r-1)}
+-\bar Q_{i,q}^{A,(r-1)}
+-\widehat D_{R,i,q}^{\mathrm{DA}}.
+\label{eq:heuristic_residual_inventory}
+\end{equation}
+其中 $\widehat F_{i,q}^{\mathrm{DA},(r-1)}$ 已吸收严格早于 $q$ 的库存事件，而
+$\bar Q_{i,q}^{A,(r-1)}$ 仅扣除时段 $q$ 的既有预约事件，因而同一需求不会重复扣减。
+
+对单个请求，启发式按以下规则构造路径：
+\begin{enumerate}
+  \item 从入口开始，当前离站 SOC 在入口取
+  $\overline{\mathrm{soc}}_A^{p,k}$，完成一次换电后取 $1$。候选后继必须位于下游、属于相应分层网络、在续航范围内，并存在一条满足后续续航和预计库存条件的完整出口后缀。
+  \item 若出口可直接到达且到达出口后的连续 SOC 严格大于 $50\%$，立即选择出口；该规则具有最高优先级。
+  \item 否则，仅保留满足
+  $L_{i,\bar\theta_{A,i}^{p,k}}^{(r)}\ge1$
+  的候选换电站，并按 $L$ 从大到小尝试；若 $L$ 相同，则优先选择更靠下游的站点。
+  \item 每次暂选换电站后，在临时事件表中记录“满电电池 $-1$、按连续退回 SOC 所在层的电池 $+1$”。其中，本时段的满电消耗只增加临时预约事件数，不改写服务开始前的 $\widehat F_{i,q}^{\mathrm{DA},(r-1)}$；退回电池及其后续充电仅更新 $q'>q$ 的预计供给。若后续无法形成完整出口路径，则回溯并尝试优先级中的下一候选站。
+  \item 若没有满足库存条件的换电站，但出口仍可在给定安全到达 SOC
+  $s_d^{\min}>0$ 下到达，则选择出口作为可行性回退。
+\end{enumerate}
+
+整条路径成功到达出口后，运营者才原子提交其沿途事件：将各换电事件追加到
+$\bar Q^{A,(r)}$，并把这些事件对后续时段 $q'>q$ 的库存影响写入
+$\widehat F^{\mathrm{DA},(r)}$；构造失败时丢弃临时副本并拒绝该请求。成功生成的弧指示参数构成
+$\bar y_{A,i,j}^{p,k}\in\{0,1\}$，并立即发布给用户。集合
+$\mathcal K^p$ 仅包含日前成功接纳且已获得完整基准路径的用户，因此滚动模型中的每个用户均具有定义完备的
+$\bar y_A^{p,k}$。
+
+
 \subsection{Mathematical model}
 
-1. 决策变量从指派到调整。 -- 索引k
-2. 怎么衡量调整损失。
+本节建立逐用户预约路径动态调整模型。MPC 的核心决策变量
+$y_{A,i,j}^{p,k}$ 表示 O-D 对 $p$ 的预约用户 $k$ 是否经过弧 $(i,j)$，其索引仅包含 O-D 对、用户和物理弧。用户的 SOC 层和各站换电时段分别由式\eqref{eq:user_soc_layer_indicator}和式\eqref{eq:user_station_arrival_period}预先确定。各站 SOC 分层库存 $w_{n,i,q}$ 与随机用户服务量将逐用户路径产生的换电事件连接起来。RL 层在滚动时刻 $\ell$ 沿预测状态生成名义充电序列
+$\{P_{n,i,q\mid\ell}:q\in\mathcal T_\ell\}$，该序列在本轮 MPC 中作为外部参数；实际闭环中同样只执行首个时段的充电功率。
 
-本节给出 MPC 层的数学规划模型。MPC 层的显式决策变量包括预约用户在 SOC-wise expanded network 上的服务流量 $y_{A,i,j}^{n,p,t}$ 以及各站点不同 SOC 电池库存 $w_{n,i,t}$。随机到达用户的服务量由同一站点、同一时段的可用满电电池数量以及预约用户实际到达换电量共同决定：在满足预约用户到达服务后，剩余满电电池用于服务随机到达用户。RL 层输出的充电功率 $P_{n,i,t}$ 在每轮 MPC 求解时作为外部给定参数进入电池状态转移和充电成本项。\textcolor{red}{服务费为固定单位服务费 $s$}，旅行时间为只依赖于 O-D 对和到达节点的参数 $\tau_{p,i}$。
+\subsubsection{预约换电事件与随机服务}
 
-为刻画预约用户到达站点后的退回电池 SOC，定义辅助函数
+用户 $k$ 沿入弧 $(j,i)$ 到达换电站 $i$ 时归还电池的连续 SOC 为
 \begin{equation}
-\rho_{j,i}^{n,p}=
+\rho_{A,j,i,\ell}^{p,k}
+=
 \begin{cases}
- n-v_{j,i}^{p}, & j=o^p,\\
- N-v_{j,i}^{p}, & j\in\mathcal{S}^{p},
+\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}-v_{o^p,i}^{p},
+&j=o^p,\\
+1-v_{j,i}^{p},
+&j\in\mathcal S^p.
 \end{cases}
+\quad
+\text{for }\Gamma_{A,j,i,\ell}^{p,k}=1.
 \label{eq:return_soc}
 \end{equation}
-其中 $\rho_{j,i}^{n,p}$ 表示初始 SOC 为 $n$ 的预约用户沿弧 $(j,i)$ 到达站点 $i$ 时退回电池的 SOC。第一种情况对应用户从起点携带原始电池行驶至第一个换电站，第二种情况对应用户在前一换电站换得满电电池后继续行驶。
-
-为表示充电导致的 SOC 转移，定义
+相应的库存分层指示参数为
 \begin{equation}
-\chi_{m,i,t}^{r}=\mathbb{I}\!\left(\min\{m+P_{m,i,t},N\}=r\right),
-\quad \forall m,r\in\mathcal{N},\ i\in\mathcal{S},\ t\in\mathcal{T}.
+\zeta_{A,r,j,i,\ell}^{p,k}
+=
+\mathbb I\!\left(
+\nu\!\left(\rho_{A,j,i,\ell}^{p,k}\right)=r
+\right),
+\quad
+r\in\mathcal N,\ \Gamma_{A,j,i,\ell}^{p,k}=1.
+\label{eq:return_soc_layer}
+\end{equation}
+式\eqref{eq:return_soc}在首个换电站使用实际或预约入口 SOC，在后续换电站使用满电 SOC $1$；只有在更新聚合库存时，连续退回 SOC 才通过 $\nu(\cdot)$ 落入离散层。
+
+令 $P_{m,i,q\mid\ell}$ 表示充电功率在一个时段内产生的名义 SOC 增量，并通过投影满足
+$0\le P_{m,i,q\mid\ell}\le1-\sigma_m$，特别地
+$P_{N,i,q\mid\ell}=0$。为表示该连续充电增量作用于分层库存后的状态转移，定义
+\begin{equation}
+\chi_{m,i,q\mid\ell}^{r}
+=
+\mathbb I\!\left[
+\nu\!\left(
+\sigma_m+P_{m,i,q\mid\ell}
+\right)=r
+\right],
+\quad
+m,r\in\mathcal N,\ i\in\mathcal S,\ q\in\mathcal T_\ell.
 \label{eq:charging_indicator}
 \end{equation}
-若 SOC 和功率均采用离散刻度，$\chi_{m,i,t}^{r}$ 表示时点 $t-1$ 处于 SOC $m$ 的电池经过时段 $t$ 的充电后，在时点 $t$ 转移至 SOC $r$。
+由于 $P_{m,i,q\mid\ell}$ 在求解 MPC 时已由 RL 层给定，
+$\chi_{m,i,q\mid\ell}^{r}$ 是可预先计算的参数。该写法允许充电功率和单车报告 SOC 连续取值，同时保持站内库存按 SOC 区间聚合。
 
-为简化表达，定义时段 $t$ 站点 $i$ 需要消耗满电电池的当前预约服务量和历史预约服务量分别为
-\begin{align}
-Q_{i,t}^{A,\mathrm{cur}}
-&=
-\sum_{p\in\mathcal{P}}
-\sum_{n\in\mathcal{N}}
-\sum_{\{j\mid (j,i)\in\mathcal{A}^{n,p}\}}
-\sum_{\{k\in\mathcal{T}\mid k+\tau_{p,i}=t\}}
-y_{A,j,i}^{n,p,k},
-\label{eq:current_reservation_swap}\\
-Q_{i,t}^{A,\mathrm{his}}
-&=
-\sum_{p\in\mathcal{P}}
-\sum_{n\in\mathcal{N}}
-\sum_{\{j\mid (j,i)\in\mathcal{A}^{n,p}\}}
-\sum_{\{k\in\{-\tau_{p,\max},\ldots,0\}\mid k+\tau_{p,i}=t\}}
-\bar{y}_{A,j,i}^{n,p,k}.
-\label{eq:historical_reservation_swap}
-\end{align}
-上述两个量均采用到达站点 $i$ 的入弧流量，电池在用户到达站点 $i$ 并完成换电时被消耗。
-
-令时段 $t$ 站点 $i$ 在服务用户前可用于换电的满电电池数量为
+定义本轮决策路径在站点 $i$、时段 $q$ 产生的预约换电量为
 \begin{equation}
-F_{i,t}=\sum_{m\in\mathcal{N}}w_{m,i,t-1}\chi_{m,i,t}^{N}.
+Q_{i,q}^{A,\mathrm{dec}}
+=
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+\mathbb I\!\left(\theta_{A,i,\ell}^{p,k}=q\right)
+\sum_{\{j\mid(j,i)\in\mathcal A^p\}}
+y_{A,j,i}^{p,k}.
+\label{eq:current_reservation_swap}
+\end{equation}
+对于在更早滚动时刻已经进入系统、路径已经发布且至少有一个换电事件尚未完成的用户，令
+$y_{A,j,i}^{\mathrm{fix},p,k}$ 为其固定路径参数，
+$\theta_{A,i}^{\mathrm{fix},p,k}$ 为依据实际进入时间得到的到站时段，则固定承诺量为
+\begin{equation}
+Q_{i,q}^{A,\mathrm{fix}}
+=
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^{\mathrm{fix},p}}
+\mathbb I\!\left(\theta_{A,i}^{\mathrm{fix},p,k}=q\right)
+\sum_{\{j\mid(j,i)\in\mathcal A^p\}}
+y_{A,j,i}^{\mathrm{fix},p,k}.
+\label{eq:fixed_reservation_swap}
+\end{equation}
+对应的分层退回电池量分别为
+\begin{align}
+R_{r,i,q}^{A,\mathrm{dec}}
+&=
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+\mathbb I\!\left(\theta_{A,i,\ell}^{p,k}=q\right)
+\sum_{\substack{j:(j,i)\in\mathcal A^p\\
+\Gamma_{A,j,i,\ell}^{p,k}=1}}
+\zeta_{A,r,j,i,\ell}^{p,k}y_{A,j,i}^{p,k},
+\label{eq:decision_reservation_return}\\
+R_{r,i,q}^{A,\mathrm{fix}}
+&=
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^{\mathrm{fix},p}}
+\mathbb I\!\left(\theta_{A,i}^{\mathrm{fix},p,k}=q\right)
+\sum_{\{j\mid(j,i)\in\mathcal A^p\}}
+\zeta_{A,r,j,i}^{\mathrm{fix},p,k}
+y_{A,j,i}^{\mathrm{fix},p,k}.
+\label{eq:fixed_reservation_return}
+\end{align}
+其中，固定路径所含弧上的
+$\zeta_{A,r,j,i}^{\mathrm{fix},p,k}$ 按该用户已观测的入口 SOC 以式\eqref{eq:return_soc}--\eqref{eq:return_soc_layer}计算，固定路径以外的弧将该参数置为零。
+
+时段 $q$ 服务开始前可用于换电的满电电池数量为
+\begin{equation}
+F_{i,q}
+=
+\sum_{m\in\mathcal N}
+w_{m,i,q-1}\chi_{m,i,q\mid\ell}^{N}.
 \label{eq:available_full_batteries}
 \end{equation}
-则扣除当前时段实际到达的预约换电需求后，可供随机到达用户使用的剩余满电电池数量为
+优先满足预约用户后可用于随机用户的剩余容量为
 \begin{equation}
-B_{i,t}(y_A)=
-F_{i,t}-Q_{i,t}^{A,\mathrm{cur}}-Q_{i,t}^{A,\mathrm{his}}.
+B_{i,q}(y_A)
+=
+F_{i,q}
+-Q_{i,q}^{A,\mathrm{dec}}
+-Q_{i,q}^{A,\mathrm{fix}}.
 \label{eq:random_residual_capacity}
 \end{equation}
-在物理可行约束下 $B_{i,t}(y_A)\ge 0$。设站点 $i$、时段 $t$ 的随机到达预测总量为
+申请换电的随机用户归还电池 SOC 严格小于 $1$，故
+$\widehat f_{R,\ell}^{N,i,q}=0$。随机用户预测总量为
 \begin{equation}
-D_{R,i,t}=\sum_{n\in\mathcal{N}}f_R^{n,i,t}.
+D_{R,i,q}
+=
+\sum_{r\in\mathcal N\setminus\{N\}}
+\widehat f_{R,\ell}^{r,i,q}.
 \label{eq:random_total_demand}
 \end{equation}
-则随机到达用户的总服务量由剩余满电电池和随机需求共同决定：
+随机用户总服务量满足
+$Q_{i,q}^{R}=\min\{D_{R,i,q},B_{i,q}(y_A)\}$。为保持模型的混合整数线性结构，引入
+$b_{R,i,q}\in\{0,1\}$ 和有效常数 $M_{i,q}^{R}$，将该 minimum 精确表示为
+\begin{subequations}
+\label{eq:random_min_linearization}
+\begin{align}
+0\le Q_{i,q}^{R}
+&\le D_{R,i,q},
+\quad i\in\mathcal S,\ q\in\mathcal T_\ell,\\
+Q_{i,q}^{R}
+&\le B_{i,q}(y_A),
+\quad i\in\mathcal S,\ q\in\mathcal T_\ell,\\
+Q_{i,q}^{R}
+&\ge D_{R,i,q}-M_{i,q}^{R}(1-b_{R,i,q}),
+\quad i\in\mathcal S,\ q\in\mathcal T_\ell,\\
+Q_{i,q}^{R}
+&\ge B_{i,q}(y_A)-M_{i,q}^{R}b_{R,i,q},
+\quad i\in\mathcal S,\ q\in\mathcal T_\ell.
+\end{align}
+\end{subequations}
+$M_{i,q}^{R}$ 同时不小于 $D_{R,i,q}$ 与
+$B_{i,q}(y_A)$ 在可行域上的上界；可直接用站点电池总容量与预测需求上界中的较大者构造。
+各非满电退回 SOC 层的随机服务量按预测构成比例分配：
 \begin{equation}
-Q_{i,t}^{R}(y_A)=\min\left\{D_{R,i,t},B_{i,t}(y_A)\right\}.
-\label{eq:random_induced_total}
-\end{equation}
-本文假设各 SOC 类型的随机到达用户按其在随机需求中的占比分配服务量，即
-\begin{equation}
-y_R^{n,i,t}(y_A)=
+y_R^{r,i,q}(y_A)
+=
 \begin{cases}
-\dfrac{f_R^{n,i,t}}{D_{R,i,t}}Q_{i,t}^{R}(y_A), & D_{R,i,t}>0,\\
-0, & D_{R,i,t}=0.
+\dfrac{\widehat f_{R,\ell}^{r,i,q}}{D_{R,i,q}}Q_{i,q}^{R},
+&D_{R,i,q}>0,\\
+0,&D_{R,i,q}=0.
 \end{cases}
+\quad r\in\mathcal N\setminus\{N\}.
 \label{eq:random_induced_soc}
 \end{equation}
 
+\subsubsection{RL 终端库存价值}
 
-对于由当前预测域内的预约指派产生、但换电到达时刻位于预测域之外的事件，本文不再单独定义新的承诺变量。若预约服务流 $y_{A,j,i}^{n,p,t}$ 满足 $t+\tau_{p,i}>H$，则该履约事件不会直接改变当前预测域内的库存变量 $w_{n,i,t}$，因为实际换电发生在 $H$ 之后。然而，它会在未来站点 $i$ 消耗满电电池，并归还 SOC 为 $\rho_{j,i}^{n,p}$ 的电池。因此，本文在终端价值中直接用 $-\lambda_{i,N,\ell}$ 评价未来满电电池需求，用 $+\lambda_{i,\rho_{j,i}^{n,p},\ell}$ 评价未来低 SOC 电池归还。需要注意的是，预测域外履约实际发生在终端时刻之后，本文将其库存影响近似折算为终端等效库存修正，而不再为不同域外到达时刻引入额外的时变价值系数。
-
-有限预测时域 MPC 若仅优化预测时域内收益，可能在时域末端过度服务当前用户，从而留下对未来运营不利的库存结构。特别地，当某些预约指派的实际换电时刻超过 $H$ 时，如果只考虑终端库存而不考虑这些域外履约需求，终端状态会遗漏未来必须履约的满电电池需求。为缓解这一末端效应，本文利用 RL critic 学到的长期库存价值信息构造线性终端价值项。RL critic 学习状态价值函数
+有限预测时域可能低估靠近域末端的库存及域外预约履约价值。RL critic 学习状态价值函数
 \begin{equation}
-V_{\theta}(s_t)\approx
-\mathbb{E}\left[\sum_{h=0}^{\infty}\gamma^h r_{t+h}\mid s_t\right].
+V_{\theta}(s_q)
+\approx
+\mathbb E\!\left[
+\sum_{h=0}^{\infty}\gamma^h r_{q+h}
+\mid s_q
+\right].
 \label{eq:critic_value}
 \end{equation}
-由于 $V_{\theta}(s)$ 通常由深度神经网络表示，直接将其嵌入 MPC 会导致优化模型非线性且难以求解。因此，本文仅利用 critic 提取终端库存的局部边际价值。在每轮 MPC 求解前，先构造参考终端状态 $\bar{s}_{\ell+H}$，然后在该状态处对 $V_{\theta}(s)$ 关于终端库存进行一阶线性化：
+在每轮 MPC 求解前，系统使用已发布固定路径、未来用户的日前基准路径和随机需求均值构造与本轮路径变量无关的参考终端状态
+$\bar s_{\ell+H}$，并在该点对 critic 关于终端库存作一阶线性化：
 \begin{equation}
 V_{\theta}(s_{\ell+H})
 \approx
-V_{\theta}(\bar{s}_{\ell+H})
+V_{\theta}(\bar s_{\ell+H})
 +
-\sum_{i\in\mathcal{S}}\sum_{n\in\mathcal{N}}
-\lambda_{i,n,\ell}\left(w_{n,i,H}-\bar{w}_{n,i,H}\right),
+\sum_{i\in\mathcal S}\sum_{r\in\mathcal N}
+\lambda_{i,r,\ell}
+\left(w_{r,i,\ell+H}-w_{r,i,\ell+H}^{\mathrm{ref}}\right),
 \label{eq:value_linearization}
 \end{equation}
 其中
 \begin{equation}
-\lambda_{i,n,\ell}
+\lambda_{i,r,\ell}
 =
 \left.
-\frac{\partial V_{\theta}(s)}{\partial w_{n,i}}
-\right|_{s=\bar{s}_{\ell+H}},
-\quad \forall i\in\mathcal{S},\ n\in\mathcal{N}.
+\frac{\partial V_{\theta}(s)}
+{\partial w_{r,i}}
+\right|_{s=\bar s_{\ell+H}},
+\quad i\in\mathcal S,\ r\in\mathcal N.
 \label{eq:marginal_value_w}
 \end{equation}
-$\lambda_{i,n,\ell}$ 表示在当前滚动决策时刻 $\ell$，critic 在参考终端状态 $\bar{s}_{\ell+H}$ 处评估得到的库存边际价值，即站点 $i$ 增加一块 SOC 为 $n$ 的电池对长期价值的边际贡献。对于预测域外的预约履约需求，本文不引入新的 critic 参数，也不引入额外承诺决策变量，而是直接使用同一组库存边际价值进行终端等效评价：未来满电电池需求相当于减少满电库存，未来低 SOC 电池归还相当于增加相应 SOC 库存。因此，常数项不影响 MPC 最优解时，目标函数中保留的线性终端价值项为
+去除不影响最优解的常数项后，本轮终端价值写为
 \begin{equation}
 \begin{aligned}
-\Phi^{\mathrm{RL}}_{\ell}
-=&
-\sum_{i\in\mathcal{S}}\sum_{n\in\mathcal{N}}
-\lambda_{i,n,\ell}w_{n,i,H} \\
+\Phi_{\ell}^{\mathrm{RL}}
+={}&
+\sum_{i\in\mathcal S}\sum_{r\in\mathcal N}
+\lambda_{i,r,\ell}w_{r,i,\ell+H}\\
 &+
-\sum_{p\in\mathcal{P}}
-\sum_{n\in\mathcal{N}}
-\sum_{i\in\mathcal{S}^{p}}
-\sum_{\{j\mid (j,i)\in\mathcal{A}^{n,p}\}}
-\sum_{\{t\in\mathcal{T}\mid t+\tau_{p,i}>H\}}
-\left(\lambda_{i,\rho_{j,i}^{n,p},\ell}-\lambda_{i,N,\ell}\right)
-y_{A,j,i}^{n,p,t}.
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+\sum_{i\in\mathcal S^p}
+\sum_{\substack{j:(j,i)\in\mathcal A^p,\ \Gamma_{A,j,i,\ell}^{p,k}=1\\
+\theta_{A,i,\ell}^{p,k}>\ell+H}}
+\left[
+\sum_{r\in\mathcal N}
+\lambda_{i,r,\ell}\zeta_{A,r,j,i,\ell}^{p,k}
+-\lambda_{i,N,\ell}
+\right]y_{A,j,i}^{p,k}.
 \end{aligned}
 \label{eq:rl_terminal_value}
 \end{equation}
-在 MPC 求解时，$\lambda_{i,n,\ell}$ 是固定参数，故式\eqref{eq:rl_terminal_value} 仍然对决策变量保持线性，不会破坏原优化模型的可求解性。上述表达式的第一项评价预测域终端库存；第二项评价由当前预约指派产生、但实际换电发生在预测域之外的履约影响。若 $y_{A,j,i}^{n,p,t}$ 在预测域外到达站点 $i$，则它未来需要消耗一块满电电池，带来 $-\lambda_{i,N,\ell}y_{A,j,i}^{n,p,t}$；同时归还一块 SOC 为 $\rho_{j,i}^{n,p}$ 的电池，带来 $+\lambda_{i,\rho_{j,i}^{n,p},\ell}y_{A,j,i}^{n,p,t}$。由于该履约事件实际发生在 $\ell+H$ 之后，本文将其近似为终端等效库存修正；该近似避免了为预测域外每一个到达时刻引入额外的时间索引和价值系数。
+第一项评价预测域末端的分层库存；第二项将域外预约换电事件近似折算为终端处“减少一块满电电池并增加一块相应 SOC 层电池”的等效影响。所有尚未完成的已发布固定承诺均纳入 critic 的参考终端状态 $\bar s_{\ell+H}$；它们对本轮路径变量的显式域外等效项为常数，故从目标函数中省略。固定承诺的预测域内事件则通过式\eqref{eq:fixed_reservation_swap}显式进入库存转移。
+本文将该线性化项作为经标定的终端启发式，$\beta$ 同时校准 critic 折扣回报与 MPC 域内运营金额的尺度；若采用严格的 Bellman 截断口径，则域内各期金额按 $\gamma$ 折扣并令终端权重取 $\gamma^H$。
 
-\subsubsection{Reservation service representation}
+\subsubsection{调整损失与目标函数}
 
-首先定义预测时域内被服务的预约需求总量：
+所有 $k\in\mathcal K^p$ 均为日前已接纳并获得完整基准路径的预约用户。为比较换电站序列，定义当前路径和日前基准路径的站点访问指示量
 \begin{equation}
-S_A(y_A)=
-\sum_{t\in\mathcal{T}}\sum_{p\in\mathcal{P}}\sum_{n\in\mathcal{N}}
-\sum_{\{j\mid (o^p,j)\in\mathcal{A}^{n,p}\}}
-y_{A,o^p,j}^{n,p,t}.
-\label{eq:served_reservation_total}
+x_{A,i}^{p,k}
+=
+\sum_{\{j\mid(j,i)\in\mathcal A^p\}}y_{A,j,i}^{p,k},
+\qquad
+\bar x_{A,i}^{p,k}
+=
+\sum_{\{j\mid(j,i)\in\mathcal A^p\}}\bar y_{A,j,i}^{p,k}.
+\label{eq:station_visit_indicator}
 \end{equation}
-预测时域内预约需求总量为
+同一 O-D 高速走廊上的入口、换电站和出口按下游里程构成严格全序，任意两个相邻访问节点之间只有一条物理连接，因此访问站点集合唯一确定其访问顺序。引入二元变量 $d_A^{p,k}$，并设置
+\begin{subequations}
+\label{eq:path_adjustment_indicator}
+\begin{align}
+d_A^{p,k}
+&\ge x_{A,i}^{p,k}
+-\bar x_{A,i}^{p,k},
+\quad p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ i\in\mathcal S^p,\\
+d_A^{p,k}
+&\ge \bar x_{A,i}^{p,k}
+-x_{A,i}^{p,k},
+\quad p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ i\in\mathcal S^p.
+\end{align}
+\end{subequations}
+由于 $\kappa>0$，任一换电站发生增删时
+$d_A^{p,k}=1$，完整站点序列不变时 $d_A^{p,k}=0$。每名用户无论改变多少个站点均只产生一次调整惩罚，路径调整成本为
 \begin{equation}
-D_A=
-\sum_{t\in\mathcal{T}}\sum_{p\in\mathcal{P}}\sum_{n\in\mathcal{N}}
-f_A^{n,p,t}.
-\label{eq:reservation_total_demand}
+C_{\mathrm{adj}}
+=
+\kappa
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+d_A^{p,k}.
+\label{eq:adjustment_cost}
 \end{equation}
-因此，未满足预约需求量可表示为 $U_A=D_A-S_A(y_A)$，其对应的惩罚项进入目标函数。除此之外，本文设置预约服务率约束 $S_A(y_A)\ge \eta D_A$，用于描述平台对已进入滚动窗口的预约用户所要求的最低服务水平。\textcolor{red}{随机到达用户的服务量由式\eqref{eq:random_induced_total}--\eqref{eq:random_induced_soc} 给出，即在同一站点和时段内由预约服务后的剩余满电电池自然决定，因此模型中不再需要额外设置两类用户之间的服务排序规则。}
 
-\subsubsection{Objective function}
-
-目标函数为最大化预测时域内的服务收益，减去未满足预约需求惩罚和电站充电成本，并加入 RL critic 提供的线性终端价值：
+目标函数最大化换电服务收益，减去充电成本和路径调整成本，并加入 RL 终端库存价值：
 \begin{equation}
-\max \quad I-C_1-C_2+\beta\Phi^{\mathrm{RL}}_{\ell}.
+\max\quad
+I-C_{\mathrm{ch}}-C_{\mathrm{adj}}
++\beta\Phi_{\ell}^{\mathrm{RL}}.
 \label{eq:objective}
 \end{equation}
-
-服务收益由预约用户和随机用户完成换电所产生的服务费构成。为保持与预约指派决策的时间逻辑一致，预约用户收益项以出发或指派时段 $t$ 为决策索引；随机用户收益项则由预约服务后的剩余满电电池诱导得到：
+预约用户的合同收入在日前接纳时确定，不随动态路径中的换电站数量变化；随机用户按实际换电次数收费。因此，与本轮决策相关的服务收益写为
 \begin{equation}
-\begin{aligned}
-I=&
-\sum_{t\in\mathcal{T}}\sum_{p\in\mathcal{P}}\sum_{n\in\mathcal{N}}
-\sum_{i\in\mathcal{S}^{p}}
-\sum_{\{j\mid (j,i)\in\mathcal{A}^{n,p}\}}
- y_{A,j,i}^{n,p,t}
-\left(N-\rho_{j,i}^{n,p}\right)s
-\\
-&+
-\sum_{t\in\mathcal{T}}\sum_{i\in\mathcal{S}}\sum_{n\in\mathcal{N}}
-y_R^{n,i,t}(y_A)(N-n)s.
-\end{aligned}
+I
+=
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+s_A^{p,k}
++
+s_R\sum_{q\in\mathcal T_\ell}
+\sum_{i\in\mathcal S}Q_{i,q}^{R}.
 \label{eq:income}
 \end{equation}
-其中 $N-\rho_{j,i}^{n,p}$ 和 $N-n$ 分别表示预约用户与随机用户在换电时获得的补能量，$s$ 为固定单位服务费。若服务费按次收取而非按补能量收取，可将上述补能量系数并入固定服务费参数中。由于 $y_R^{n,i,t}(y_A)$ 不是独立决策变量，随机用户收益仅反映预约指派方案和库存状态所留下的可服务随机需求；跨越预测时域边界的预约指派不在当前库存转移中结算，而是通过式\eqref{eq:rl_terminal_value} 中的终端等效库存修正项承担未来库存影响。
-
-未满足预约需求惩罚为
+第一项在给定滚动用户集合后为常数，列出它仅用于完整核算，求解时可以省略。该收费口径消除了通过增加非必要预约换电站获取额外收入的激励；已发布固定路径的合同收入也不会在后续窗口重复计算。
+其中 $E_B$ 为单块电池的额定能量，充电效率已折算进有效电价 $e_{i,q}$。因 $P$ 表示 SOC 增量，充电购电成本为
 \begin{equation}
-C_1 = \alpha \sum_{t\in \mathcal{T}} \sum_{p\in \mathcal{P}}  \sum_{n\in \mathcal{N}} 
-\left[
-f_A^{n,p,t} - \sum_{\{j \mid (o^p,j) \in \mathcal{A}^{n,p}\}} y_{A,o^p,j}^{n,p,t} \right].
-\label{eq:penaltycost}
-\end{equation}
-
-电站充电成本按照时段开始时的库存和该时段的充电功率计算：
-\begin{equation}
-C_2 = \sum_{t \in \mathcal{T}}  \sum_{n \in \mathcal{N}} \sum_{i \in \mathcal{S}}
- w_{n,i,t-1}P_{n,i,t}e_{i,t}.
+C_{\mathrm{ch}}
+=
+\sum_{q\in\mathcal T_\ell}
+\sum_{m\in\mathcal N}
+\sum_{i\in\mathcal S}
+E_B w_{m,i,q-1}P_{m,i,q\mid\ell}e_{i,q}.
 \label{eq:chargingcost}
 \end{equation}
+$\mathcal K_\ell^{+,p}$ 中未来用户的调整成本是前瞻成本；只有
+$\mathcal K_\ell^{0,p}$ 中本轮路径被正式发布的用户产生实际调整支出。
 
 \subsubsection{Constraints}
 
-\paragraph{Flow conservation constraints.}
-预约需求从起点进入 SOC-wise expanded network，且服务量不超过实际预约需求：
-\begin{subequations}
-\label{eq:flow}
-\begin{gather}
-\sum_{\{j\mid (o^p,j)\in \mathcal{A}^{n,p}\}}{y_{A,o^p,j}^{n,p,t}} \leq f_A^{n,p,t},
-\quad \forall p\in \mathcal{P},\ t\in \mathcal{T},\ n \in \mathcal{N},\label{eq:flow1}\\
-\sum_{\{j\mid (i,j)\in \mathcal{A}^{n,p}\}}{y_{A,i,j}^{n,p,t}} =
-\sum_{\{j\mid (j,i)\in \mathcal{A}^{n,p}\}}{y_{A,j,i}^{n,p,t}},
-\quad \forall p\in \mathcal{P},\ t\in \mathcal{T},\ i\in \mathcal{S}^p,
-\ n\in\mathcal{N}.
-\label{eq:flow2}
-\end{gather}
-\end{subequations}
-由于高速公路路径具有方向性，网络 $\mathcal{G}^{n,p}$ 可按路径顺序构造为无回路网络；在该条件下，起点流量结合中间站点流平衡即可保证被服务预约流最终到达终点。
-
-\paragraph{Reservation service-level constraint.}
-为保证预约业务的服务质量，本文要求预测时域内预约用户服务率不低于给定阈值 $\eta$：
+\paragraph{User-level path constraints.}
+定义
 \begin{equation}
-S_A(y_A)\ge \eta D_A.
-\label{eq:reservation_service_rate}
+b_v^p=
+\begin{cases}
+1,&v=o^p,\\
+-1,&v=d^p,\\
+0,&v\in\mathcal S^p.
+\end{cases}
+\label{eq:node_supply}
 \end{equation}
-其中，$S_A(y_A)$ 和 $D_A$ 分别由式\eqref{eq:served_reservation_total} 和式\eqref{eq:reservation_total_demand} 定义。当 $\eta$ 趋近于 1 时，模型更接近对预约用户的刚性服务保障；当 $\eta$ 较低时，模型具有更大的经济优化自由度。由于跨越预测时域边界的预约指派已通过式\eqref{eq:rl_terminal_value} 的终端等效库存修正项承担未来库存影响，服务率约束仍可在完整预测决策集合 $\mathcal{T}$ 上计算，而无需人为剔除靠近预测域末端的预约需求。
+每位预约用户的路径满足
+\begin{equation}
+\sum_{\{j\mid(v,j)\in\mathcal A^p\}}
+y_{A,v,j}^{p,k}
+-
+\sum_{\{j\mid(j,v)\in\mathcal A^p\}}
+y_{A,j,v}^{p,k}
+=
+b_v^p,
+\quad
+p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ v\in\mathcal V^p,
+\label{eq:flow}
+\end{equation}
+以及
+\begin{equation}
+y_{A,i,j}^{p,k}
+\le
+\Gamma_{A,i,j,\ell}^{p,k},
+\quad
+p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ (i,j)\in\mathcal A^p.
+\label{eq:path_layer_compatibility}
+\end{equation}
+上述约束与高速走廊的严格下游全序共同保证每位预约用户选择一条与其有效连续入口 SOC 相容的完整入口--出口路径。本文假设日前准入和运营安全库存为所有实际进入的预约用户提供至少一条物理及库存可行路径；若极端 SOC 偏差或设备故障破坏该条件，运营者调用外借满电电池或道路救援等应急资源，该应急过程不属于常规 MPC 路径调整模型。
 
-\paragraph{Battery state transition constraints.}
-对于 SOC 状态 $r<N$ 的电池，时点 $t$、站点 $i$ 的库存由当前预测时域内到达并归还 SOC 为 $r$ 电池的预约用户、预测时域开始前已经出发但在当前时域内到达的历史预约用户、当前随机用户归还的 SOC 为 $r$ 电池，以及上一时点经过充电后转移到 SOC $r$ 的站内电池构成：
+\paragraph{Battery inventory constraints.}
+对于非满电 SOC 层 $r<N$，库存转移为
 \begin{equation}
 \begin{aligned}
-w_{r,i,t}
-=&
-\sum_{p\in \mathcal{P}}
-\sum_{n\in \mathcal{N}}
-\sum_{\{j\mid (j,i)\in \mathcal{A}^{n,p}\}}
-\sum_{\{k\in \mathcal{T}\mid k+\tau_{p,i}=t\}}
-y_{A,j,i}^{n,p,k}
-\mathbb{I}\!\left(\rho_{j,i}^{n,p}=r\right)
+w_{r,i,q}
+={}&
+\sum_{m\in\mathcal N}
+w_{m,i,q-1}\chi_{m,i,q\mid\ell}^{r}
++R_{r,i,q}^{A,\mathrm{dec}}
++R_{r,i,q}^{A,\mathrm{fix}}
++y_R^{r,i,q}(y_A),
 \\
-&+
-\sum_{p\in \mathcal{P}}
-\sum_{n\in \mathcal{N}}
-\sum_{\{j\mid (j,i)\in \mathcal{A}^{n,p}\}}
-\sum_{\{k\in\{-\tau_{p,\max},\ldots,0\}\mid k+\tau_{p,i}=t\}}
-\bar{y}_{A,j,i}^{n,p,k}
-\mathbb{I}\!\left(\rho_{j,i}^{n,p}=r\right)
-\\
-&+
-y_R^{r,i,t}(y_A)
-+
-\sum_{m\in \mathcal{N}}
-w_{m,i,t-1}\chi_{m,i,t}^{r},
-\\
-&\forall i\in \mathcal{S},\ r\in \mathcal{N}\setminus\{N\},\ t\in \mathcal{T}.
+& i\in\mathcal S,\quad
+r\in\mathcal N\setminus\{N\},\quad
+q\in\mathcal T_\ell.
 \end{aligned}
 \label{eq:transition_nonfull}
 \end{equation}
-
-对于满电电池，时点 $t$ 的库存等于上一时点经过充电达到满电的电池数量，减去当前时段被预约用户和随机用户换走的满电电池数量：
+满电库存等于充电后可用满电库存减去预约和随机换电量：
 \begin{equation}
-\begin{aligned}
-w_{N,i,t}
-=&
-\sum_{m\in \mathcal{N}}
-w_{m,i,t-1}\chi_{m,i,t}^{N}
--
-Q_{i,t}^{A,\mathrm{cur}}
--
-Q_{i,t}^{A,\mathrm{his}}
--
-\sum_{n\in \mathcal{N}}y_R^{n,i,t}(y_A),
-\\
-&\forall i\in \mathcal{S},\ t\in \mathcal{T}.
-\end{aligned}
+w_{N,i,q}
+=
+F_{i,q}
+-Q_{i,q}^{A,\mathrm{dec}}
+-Q_{i,q}^{A,\mathrm{fix}}
+-Q_{i,q}^{R},
+\quad
+i\in\mathcal S,\ q\in\mathcal T_\ell.
 \label{eq:transition_full}
 \end{equation}
-
-
-\paragraph{Swapping capacity constraints.}
-预约用户在时段 $t$ 到达站点 $i$ 的换电服务量不能超过可用满电电池数量：
+预约路径必须满足满电电池容量约束
 \begin{equation}
-Q_{i,t}^{A,\mathrm{cur}}+Q_{i,t}^{A,\mathrm{his}}
-\le F_{i,t},
-\quad \forall i\in\mathcal{S},\ t\in\mathcal{T}.
+Q_{i,q}^{A,\mathrm{dec}}
++Q_{i,q}^{A,\mathrm{fix}}
+\le F_{i,q},
+\quad
+i\in\mathcal S,\ q\in\mathcal T_\ell.
 \label{eq:full_battery_capacity}
 \end{equation}
-该约束保证预约指派在实际到达换电时具有物理可行性。随机用户服务量随后由式\eqref{eq:random_induced_total}--\eqref{eq:random_induced_soc} 根据剩余满电电池计算，其总量天然不超过随机需求和剩余满电电池数量，因此不再需要设置独立的随机用户服务上界约束。
+式\eqref{eq:random_min_linearization}随后保证随机服务量不超过预测需求和预约履约后的剩余满电库存。
 
-\paragraph{Boundary and integrality constraints.}
-预测时域起点的电池 SOC 分布为已知初始状态：
+名义充电序列还必须在本轮优化得到的实际库存轨迹下满足站点充电资源上限：
 \begin{equation}
-w_{n,i,0}=\bar{w}_{n,i,0},
-\quad \forall n\in \mathcal{N},\ i\in \mathcal{S}.
+\sum_{m\in\mathcal N}
+E_B w_{m,i,q-1}P_{m,i,q\mid\ell}
+\le \overline E_{i,q},
+\quad
+i\in\mathcal S,\ q\in\mathcal T_\ell.
+\label{eq:station_charging_capacity}
+\end{equation}
+由于 $P_{m,i,q\mid\ell}$ 是 MPC 的给定参数，式\eqref{eq:station_charging_capacity}关于库存变量保持线性。
+
+本轮初始库存已吸收区间 $(\ell-1,\ell]$ 内预约与随机用户的实际服务结果：
+\begin{equation}
+w_{n,i,\ell}
+=
+\bar w_{n,i,\ell},
+\quad
+n\in\mathcal N,\ i\in\mathcal S.
 \label{eq:initial_inventory}
 \end{equation}
 
-所有预约服务量和电池库存变量均应满足非负性约束：
-\begin{gather}
-w_{n,i,t}\ge 0,
-\quad \forall n\in \mathcal{N},\ i\in \mathcal{S},\ t\in \mathcal{T}^{w},
-\label{eq:nonnegative_w}\\
-y_{A,i,j}^{n,p,t}\ge 0,
-\quad \forall p\in \mathcal{P},\ n\in \mathcal{N},\ t\in \mathcal{T},\ (i,j)\in \mathcal{A}^{n,p},
-\label{eq:nonnegative_a}
-\end{gather}
+\paragraph{Variable domains and terminal safety.}
+变量域为
+\begin{align}
+&y_{A,i,j}^{p,k}\in\{0,1\},
+\quad p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ (i,j)\in\mathcal A^p,
+\label{eq:binary_variables}\\
+&d_A^{p,k}\in\{0,1\},
+\quad p\in\mathcal P,\ k\in\mathcal K_\ell^p,\\
+&b_{R,i,q}\in\{0,1\},\quad Q_{i,q}^{R}\ge0,
+\quad i\in\mathcal S,\ q\in\mathcal T_\ell,\\
+&w_{n,i,q}\ge0,
+\quad n\in\mathcal N,\ i\in\mathcal S,\ q\in\mathcal T_\ell^w.
+\label{eq:nonnegative_variables}
+\end{align}
+由于随机需求按 SOC 构成比例分配，$y_R^{r,i,q}$ 以及相应的预测库存一般为非整数，故 $w_{n,i,q}$ 采用非负连续变量；若使用逐用户整数随机需求情景，则可相应加强为整数库存变量。
 
-若需求量和电池数量均以整数计，则进一步有
+RL 终端价值用于差异化评价末端库存，运行安全由下列满电库存下界保证：
 \begin{equation}
-w_{n,i,t}\in \mathbb{Z}_{+},\quad
- y_{A,i,j}^{n,p,t}\in \mathbb{Z}_{+}.
-\label{eq:integer}
-\end{equation}
-
-引入 RL 终端价值后，MPC 不再仅依赖固定终端库存下界来处理末端效应。式\eqref{eq:rl_terminal_value} 使用同一组库存边际价值 $\lambda_{i,n,\ell}$ 同时评估终端库存以及预测域外预约履约的终端等效库存修正，从而引导 MPC 在预测时域末端形成更合理的库存与预约承诺结构。与此同时，为保证运行安全，仍可保留如下终端满电电池库存下界作为可选硬约束：
-\begin{equation}
-w_{N,i,H}\ge \underline{w}_{N,i},
-\quad \forall i\in \mathcal{S}.
+w_{N,i,\ell+H}
+\ge
+\underline w_{N,i},
+\quad
+i\in\mathcal S.
 \label{eq:terminal_inventory}
 \end{equation}
-其中，$\underline{w}_{N,i}$ 表示预测时域末端电站 $i$ 至少需要保留的满电电池数量。在本文框架中，该约束主要作为安全库存下界，而长期影响的差异化评估由 RL critic 提供的终端库存价值项承担。
+该下界提供物理安全裕度，而式\eqref{eq:rl_terminal_value}负责近似评价不同站点、不同 SOC 层及域外预约履约的长期价值。
+
 
 \section{RL Formulation}
 
@@ -463,44 +720,103 @@ RL 层用于学习充电功率控制策略，并通过 critic 为 MPC 提供终�
 \subsection{Markov decision process}
 
 \paragraph{State.}
-在决策时刻 $t$，RL agent 观测系统状态 $s_t$。状态应包含影响当前充电功率决策及其长期后果的关键信息，主要包括各站点、各 SOC 状态的电池库存，未来预约需求，随机需求预测，未来电价，以及时间特征等：
+在滚动决策时刻 $\ell$，RL agent 观测系统状态 $s_\ell$。除当前分层库存、随机需求预测、电价和时间特征外，状态还包含本轮实际进入用户、全天所有尚未进入的已知预约以及已发布的在途承诺。令
+$\mathcal K_\ell^{\mathrm{rem},p}$ 表示时刻 $\ell$ 尚未进入高速公路的日前预约用户集合，则
 \begin{equation}
-s_t=
+\begin{aligned}
+\mathcal Z_{A,\ell}
+={}&
+\left\{
+\left(p,k,t_A^{p,k},
+\mathrm{soc}_A^{p,k},
+\bar y_A^{p,k}\right):
+k\in\mathcal K_\ell^{0,p}
+\right\}\\
+&\cup
+\left\{
+\left(p,k,\bar t_A^{p,k},
+\overline{\mathrm{soc}}_A^{p,k},
+\bar y_A^{p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{rem},p}
+\right\}\\
+&\cup
+\left\{
+\left(p,k,t_A^{p,k},\mathrm{soc}_A^{p,k},
+y_A^{\mathrm{fix},p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{fix},p}
+\right\}
+\end{aligned}
+\label{eq:rl_reservation_information}
+\end{equation}
+表示 RL 的预约信息集合。MPC 路径变量仍仅针对
+$\mathcal K_\ell^p$，而预测域之外的剩余预约用于保持长期状态信息。由于 $\mathcal Z_{A,\ell}$ 的元素数量随滚动时刻变化，使用
+$\mathcal E_A(\mathcal Z_{A,\ell})$ 将其编码为固定维度特征；该编码可以采用站点--时段--SOC 聚合张量或置换不变的集合编码器。于是状态表示为
+\begin{equation}
+s_\ell=
 \left(
-\{w_{n,i,t}\}_{i\in\mathcal{S},n\in\mathcal{N}},
-\{f_A^{n,p,\tau}\}_{\tau\in\mathcal{H}_t},
-\{\hat{f}_R^{n,i,\tau}\}_{\tau\in\mathcal{H}_t},
-\{e_{i,\tau}\}_{\tau\in\mathcal{H}_t},
-\xi_t
+\{w_{n,i,\ell}\}_{i\in\mathcal S,n\in\mathcal N},
+\mathcal E_A(\mathcal Z_{A,\ell}),
+\{\widehat f_{R,\ell}^{n,i,q}\}_{q\in\mathcal T_\ell},
+\{e_{i,q}\}_{q\in\mathcal T_\ell},
+\xi_\ell
 \right),
 \label{eq:rl_state}
 \end{equation}
-其中 $\mathcal{H}_t$ 表示 RL 可获得的预测信息窗口，$\xi_t$ 表示时段、节假日或交通高峰等外生时间特征。已经形成但尚未到达的预约承诺在环境中作为未来履约需求处理，并在对应到达时刻转化为满电电池消耗和低 SOC 电池归还。状态中包含未来预测信息，是因为充电功率决策对后续满电电池供给、预约履约能力和充电成本具有跨时段影响。
+其中 $\xi_\ell$ 表示时段、节假日或交通高峰等外生特征。这样的状态同时保留未来预约的前瞻信息和已经形成的刚性履约承诺。
 
 \paragraph{Action.}
-RL 的动作是充电功率决策。本文将动作表示为各站点、各 SOC 状态电池在当前时段采用的充电功率向量：
+RL 的实际动作是下一运行时段各站点、各 SOC 层电池的连续充电增量：
 \begin{equation}
-a_t=
-\{P_{n,i,t}\}_{i\in\mathcal{S},n\in\mathcal{N}}.
+a_\ell=
+\{P_{n,i,\ell+1\mid\ell}\}_{i\in\mathcal S,n\in\mathcal N}.
 \label{eq:rl_action}
 \end{equation}
-动作需要满足功率上下界和充电资源限制。实际执行时，可将 actor 网络输出映射到可行功率区间，并通过投影或裁剪保证 $P_{n,i,t}$ 不超过站点充电能力和充电槽数量限制。该动作随后作为参数输入 MPC 层，用于计算充电成本和电池 SOC 状态转移。
+动作通过投影满足
+$0\le P_{n,i,\ell+1\mid\ell}\le1-\sigma_n$、满电层增量为零以及站点充电资源限制。为向 MPC 提供未来 $H$ 个时段的名义功率，系统从
+$\bar s_{\ell\mid\ell}=s_\ell$ 出发，利用同一 actor 的均值动作和预测状态递推进行策略 rollout：
+\begin{equation}
+\{P_{n,i,q\mid\ell}\}_{i,n}
+=
+\mu_\phi(\bar s_{q-1\mid\ell}),
+\quad q\in\mathcal T_\ell,
+\label{eq:rl_power_rollout}
+\end{equation}
+其中 $\mu_\phi$ 表示策略分布的均值。为避免充电序列生成与本轮待求路径之间形成循环依赖，参考状态 $\bar s_{q\mid\ell}$ 使用已发布固定路径、未来用户的日前基准路径和随机需求均值进行名义库存转移；本轮动态路径尚不参与该 rollout。整条名义序列作为本轮 MPC 参数，并由式\eqref{eq:station_charging_capacity}在优化库存轨迹上再次检查站点资源可行性。闭环系统只执行首项
+$P_{n,i,\ell+1\mid\ell}$；下一滚动时刻重新生成序列。
 
 \paragraph{Transition.}
-给定状态 $s_t$ 和动作 $a_t$ 后，系统首先以 $P_{n,i,t}$ 作为充电功率参数求解 MPC 用户服务分配模型，得到预约用户服务流量 $y_A$；随机用户服务量随后由站点库存、预约用户实际到达服务量和随机需求实现值共同确定。其中，预测域内到达的预约换电事件进入库存转移；预测域外到达的预约履约事件则通过终端等效库存修正进入目标函数。随后，环境根据用户服务结果、随机需求实现值、电池充电过程以及预约承诺的滚动更新进入下一状态 $s_{t+1}$。因此，状态转移可抽象表示为
+给定 $s_\ell$ 和名义充电序列后，系统求解 MPC，得到逐用户二元路径
+$\{y_{A,i,j}^{p,k*}\}$。仅
+$k\in\mathcal K_\ell^{0,p}$ 的完整换电站序列被正式发布并加入固定承诺集合；
+$k\in\mathcal K_\ell^{+,p}$ 的路径只用于当前预测，不对用户发布，并在下一轮用更新信息重新计算。随后，环境执行首期充电功率，根据区间
+$(\ell,\ell+1]$ 内随机需求实现值和已到站预约承诺更新库存，进入状态 $s_{\ell+1}$。状态转移可表示为
 \begin{equation}
-s_{t+1}\sim \mathcal{P}(\cdot\mid s_t,a_t,\mathrm{MPC}(s_t,a_t)),
+s_{\ell+1}
+\sim
+\mathcal P\!\left(
+\cdot\mid
+s_\ell,a_\ell,
+\mathrm{MPC}(s_\ell,\mathbf P_\ell)
+\right),
 \label{eq:rl_transition}
 \end{equation}
-其中 $\mathrm{MPC}(s_t,a_t)$ 表示在当前状态和充电功率动作下求解得到的预约用户指派决策。滚动执行时，仅发布并实施当前通知窗口内的预约指派；随机用户服务量由实际到达时的剩余满电电池决定。已经实施且到达时刻位于未来的预约承诺会随时间前移，并在到达相应站点时进入库存消耗和归还电池更新。
+其中
+$\mathbf P_\ell=\{P_{n,i,q\mid\ell}:q\in\mathcal T_\ell\}$。
+这一定义与 MPC 的“优化完整预测域、只执行当前一步”保持一致。
 
 \paragraph{Reward.}
-RL reward 与系统运营目标保持一致，由实际执行时段内的服务收益、未满足预约需求惩罚和充电成本构成：
+RL reward 使用当前实际执行时段的已实现运营收益，并计入本轮实际发布路径产生的调整成本：
 \begin{equation}
-r_t=I_t-C_{1,t}-C_{2,t}.
+r_\ell
+=
+I_\ell
+-C_{\mathrm{ch},\ell}
+-C_{\mathrm{adj},\ell}.
 \label{eq:rl_reward}
 \end{equation}
-其中 $I_t$、$C_{1,t}$ 和 $C_{2,t}$ 分别表示当前执行时段内实现的服务收益、未满足预约需求惩罚和充电成本。通过该 reward 设计，RL 层能够学习在不同需求、电价和库存状态下如何选择充电功率，以提高长期累计运营收益。
+其中 $C_{\mathrm{adj},\ell}$ 仅统计
+$\mathcal K_\ell^{0,p}$ 中实际路径不同于日前基准路径的用户；未来用户在 MPC 中的调整成本只是前瞻评价，不会在当期 reward 中重复实现。该 reward 使 actor 学习充电功率对当前成本、路径稳定性和长期库存价值的共同影响。
+
 
 \subsection{RL algorithm}
 
@@ -540,7 +856,7 @@ L_{\mathrm{CLIP}}(\phi)=
 \end{equation}
 其中 $\zeta$ 为 GAE 参数。
 
-训练完成后，actor 用于在每个决策时刻输出充电功率动作；critic 则用于提供 MPC 终端价值信息。具体而言，在每轮 MPC 求解前，系统构造参考终端状态 $\bar{s}_{\ell+H}$，并通过自动微分计算 $V_{\theta}(s)$ 关于终端库存 $w_{n,i,H}$ 的梯度，得到 $\lambda_{i,n,\ell}$。这些库存边际价值随后作为固定参数进入 MPC 目标函数中的线性终端价值项 $\Phi_{\ell}^{\mathrm{RL}}$；预测域外预约履约需求则被近似折算为终端等效库存修正，即用同一组 $\lambda_{i,n,\ell}$ 评价未来“$-$ 满电电池需求 $+$ 低 SOC 电池归还”的库存影响。由此，RL 层不仅提供充电功率控制动作，还将长期库存价值信息反馈给 MPC，形成闭环的 MPC-RL 协同优化机制。
+训练完成后，actor 在每个滚动时刻输出首期充电动作，并通过式\eqref{eq:rl_power_rollout}生成供 MPC 使用的名义功率序列；实际仅执行首期功率。critic 则提供终端库存价值信息：系统构造参考终端状态 $\bar{s}_{\ell+H}$，通过自动微分计算 $V_{\theta}(s)$ 关于终端库存 $w_{n,i,\ell+H}$ 的梯度，得到 $\lambda_{i,n,\ell}$。这些边际价值作为固定参数进入线性终端价值项 $\Phi_{\ell}^{\mathrm{RL}}$；预测域外的逐用户预约换电事件则用同一组 $\lambda_{i,n,\ell}$ 评价未来“$-$ 满电电池需求 $+$ 相应 SOC 层电池归还”的等效库存影响。由此，RL 层同时向 MPC 提供名义充电轨迹和长期库存价值，MPC 则反馈逐用户路径与库存演化结果，形成闭环协同机制。
 
 \section{Experiments}
 
