@@ -1,0 +1,1951 @@
+{
+  "schema_version": 2,
+  "generator": "run_mpc.py",
+  "seed": 42,
+  "num_periods": 8,
+  "horizon": 4,
+  "service_policy": {
+    "reservation_priority": true,
+    "reservation_failure_penalty": 1000.0,
+    "reservation_failure_unit": "per_unfulfilled_swap_event",
+    "random_policy": "mandatory_fcfs_when_full_battery_available",
+    "full_soc_tolerance": 1e-06,
+    "full_power_tolerance_kw": 0.00010526315789473683
+  },
+  "rounds": [
+    {
+      "ell": 0,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 909.01605532452,
+        "income_reservation": 90.05988268702583,
+        "income_random": 628.8331240349387,
+        "charging_cost": 210.0,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "terminal_value": 400.1230486025552
+      },
+      "published_paths": [
+        {
+          "od_id": 0,
+          "user_id": 0,
+          "path": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              "exit"
+            ]
+          ]
+        }
+      ],
+      "path_adjusted": [
+        {
+          "od_id": 0,
+          "user_id": 0,
+          "adjusted": 0
+        }
+      ],
+      "predicted": {
+        "random_served": 12,
+        "random_requests": 16,
+        "reservation_failures": 0,
+        "at_risk_reservation_events": [],
+        "window_events": 17
+      },
+      "actual": {
+        "reservation_swaps": [],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 0,
+            "request_id": "A0_0_1",
+            "return_soc": 0.27448757595839346
+          },
+          {
+            "station": 0,
+            "slot": 1,
+            "request_id": "A0_0_2",
+            "return_soc": 0.7940870140900138
+          },
+          {
+            "station": 0,
+            "slot": 2,
+            "request_id": "A0_0_0",
+            "return_soc": 0.7333735393364451
+          },
+          {
+            "station": 1,
+            "slot": 0,
+            "request_id": "A1_0_2",
+            "return_soc": 0.4792946099982004
+          },
+          {
+            "station": 1,
+            "slot": 1,
+            "request_id": "A1_0_1",
+            "return_soc": 0.682907342469735
+          },
+          {
+            "station": 1,
+            "slot": 2,
+            "request_id": "A1_0_0",
+            "return_soc": 0.8502394451015238
+          },
+          {
+            "station": 2,
+            "slot": 0,
+            "request_id": "A2_0_2",
+            "return_soc": 0.48183489747158814
+          },
+          {
+            "station": 2,
+            "slot": 1,
+            "request_id": "A2_0_0",
+            "return_soc": 0.7103530946218954
+          },
+          {
+            "station": 2,
+            "slot": 2,
+            "request_id": "A2_0_1",
+            "return_soc": 0.8889156479561762
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          0.0,
+          10.526315789473685,
+          42.10526315789474,
+          59.99989473684211,
+          59.99989473684211
+        ],
+        [
+          0.0,
+          10.526315789473685,
+          42.10526315789474,
+          59.99989473684211,
+          59.99989473684211
+        ],
+        [
+          0.0,
+          10.526315789473685,
+          42.10526315789474,
+          59.99989473684211,
+          59.99989473684211
+        ]
+      ],
+      "ready": [
+        [
+          1,
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          0,
+          0
+        ],
+        [
+          1,
+          1,
+          1,
+          0,
+          0
+        ]
+      ],
+      "available_full": [
+        3,
+        3,
+        3
+      ],
+      "soc_obs_start": [
+        [
+          1.0,
+          0.9,
+          0.6,
+          0.4,
+          0.2
+        ],
+        [
+          1.0,
+          0.9,
+          0.6,
+          0.4,
+          0.2
+        ],
+        [
+          1.0,
+          0.9,
+          0.6,
+          0.4,
+          0.2
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.27448757595839346,
+          0.7940870140900138,
+          0.7333735393364451,
+          0.9699990000000001,
+          0.7699990000000001
+        ],
+        [
+          0.4792946099982004,
+          0.682907342469735,
+          0.8502394451015238,
+          0.9699990000000001,
+          0.7699990000000001
+        ],
+        [
+          0.48183489747158814,
+          0.7103530946218954,
+          0.8889156479561762,
+          0.9699990000000001,
+          0.7699990000000001
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.26770146378342463,
+          0.3088356498682471,
+          0.43561618157883875,
+          0.24950097760811785,
+          0.764989791292066
+        ],
+        [
+          0.3713676476059984,
+          0.8926663454456167,
+          0.5898648206422525,
+          0.789996344132867,
+          1.0
+        ],
+        [
+          0.7544555550540748,
+          0.5872581273507013,
+          0.5276349214492743,
+          0.46933711817215,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 1,
+      "user_states": {
+        "pending": [
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "arr": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          }
+        ],
+        "fixed": [],
+        "completed": [],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 0,
+        "income_random": 372.5408199595234,
+        "charging_cost": 181.2629368421053,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 191.2778831174181
+      },
+      "solve_time_sec": 0.0064246000000000025
+    },
+    {
+      "ell": 1,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 166.36901563635774,
+        "income_reservation": 90.05988268702583,
+        "income_random": 620.8452952958679,
+        "charging_cost": 148.0245809222202,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 1000.0,
+        "terminal_value": 603.4884185756841
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 13,
+        "random_requests": 14,
+        "reservation_failures": 1,
+        "at_risk_reservation_events": [
+          {
+            "event_id": 1,
+            "kind": "dec",
+            "station": 0,
+            "period": 4,
+            "return_soc": 0.05558120897058183,
+            "user_key": [
+              0,
+              1
+            ],
+            "od_id": 0,
+            "user_id": 1,
+            "arc": [
+              "entry",
+              0
+            ],
+            "request_id": null,
+            "arrival_time": null,
+            "reservation_active": 1,
+            "reservation_served": 0,
+            "reservation_failed": 1
+          }
+        ],
+        "window_events": 16
+      },
+      "actual": {
+        "reservation_swaps": [
+          {
+            "period": 1,
+            "station": 0,
+            "slot": 1,
+            "od_id": 0,
+            "user_id": 0,
+            "return_soc": 0.249500977608118
+          }
+        ],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 2,
+            "request_id": "A0_1_1",
+            "return_soc": 0.46173969681380356
+          },
+          {
+            "station": 0,
+            "slot": 3,
+            "request_id": "A0_1_0",
+            "return_soc": 0.5553640173843439
+          },
+          {
+            "station": 1,
+            "slot": 0,
+            "request_id": "A1_1_1",
+            "return_soc": 0.3572881359220902
+          },
+          {
+            "station": 1,
+            "slot": 1,
+            "request_id": "A1_1_0",
+            "return_soc": 0.5623030887249134
+          },
+          {
+            "station": 2,
+            "slot": 0,
+            "request_id": "A2_1_1",
+            "return_soc": 0.5754000277372411
+          },
+          {
+            "station": 2,
+            "slot": 1,
+            "request_id": "A2_1_0",
+            "return_soc": 0.2764883225713628
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          59.99989473684211,
+          21.6750511484196,
+          28.065943227742622,
+          3.1580000000000013,
+          24.210631578947357
+        ],
+        [
+          54.811093684399964,
+          33.378174476870015,
+          15.764268936681702,
+          3.1580000000000013,
+          24.210631578947357
+        ],
+        [
+          54.543695002990724,
+          30.48914793453733,
+          11.693089688823562,
+          3.1580000000000013,
+          24.210631578947357
+        ]
+      ],
+      "ready": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        4,
+        5,
+        5
+      ],
+      "soc_obs_start": [
+        [
+          0.27448757595839346,
+          0.7940870140900138,
+          0.7333735393364451,
+          0.9699990000000001,
+          0.7699990000000001
+        ],
+        [
+          0.4792946099982004,
+          0.682907342469735,
+          0.8502394451015238,
+          0.9699990000000001,
+          0.7699990000000001
+        ],
+        [
+          0.48183489747158814,
+          0.7103530946218954,
+          0.8889156479561762,
+          0.9699990000000001,
+          0.7699990000000001
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.8444865759583935,
+          0.249500977608118,
+          0.46173969681380356,
+          0.5553640173843439,
+          1.0
+        ],
+        [
+          0.3572881359220902,
+          0.5623030887249134,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.5754000277372411,
+          0.2764883225713628,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.40522479698496566,
+          0.24950097760811868,
+          0.7649897912920673,
+          0.5753596640182916,
+          0.33460201317966226
+        ],
+        [
+          0.3713676476059984,
+          0.8926663454456167,
+          0.589864820642253,
+          0.7899963441328676,
+          0.7635320605398501
+        ],
+        [
+          0.7544555550540748,
+          0.5872581273507012,
+          0.5276349214492746,
+          0.46933711817215007,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 0,
+      "user_states": {
+        "pending": [
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "arr": [],
+        "fixed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          }
+        ],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 90.05988268702583,
+        "income_random": 385.3700053015494,
+        "charging_cost": 137.38418875095243,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 338.0456992376228
+      },
+      "solve_time_sec": 0.007062799999999994
+    },
+    {
+      "ell": 2,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 203.88796946731168,
+        "income_reservation": 209.18460743804826,
+        "income_random": 501.11479308363505,
+        "charging_cost": 300.9847848406442,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 1000.0,
+        "terminal_value": 794.5733537862728
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 12,
+        "random_requests": 15,
+        "reservation_failures": 1,
+        "at_risk_reservation_events": [
+          {
+            "event_id": 2,
+            "kind": "dec",
+            "station": 1,
+            "period": 5,
+            "return_soc": 0.26660131967447864,
+            "user_key": [
+              1,
+              3
+            ],
+            "od_id": 1,
+            "user_id": 3,
+            "arc": [
+              "entry",
+              1
+            ],
+            "request_id": null,
+            "arrival_time": null,
+            "reservation_active": 1,
+            "reservation_served": 0,
+            "reservation_failed": 1
+          }
+        ],
+        "window_events": 18
+      },
+      "actual": {
+        "reservation_swaps": [],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 0,
+            "request_id": "A0_2_0",
+            "return_soc": 0.7450385350413908
+          },
+          {
+            "station": 1,
+            "slot": 1,
+            "request_id": "A1_2_0",
+            "return_soc": 0.5877450656971359
+          },
+          {
+            "station": 1,
+            "slot": 2,
+            "request_id": "A1_2_1",
+            "return_soc": 0.2050335872895655
+          },
+          {
+            "station": 2,
+            "slot": 0,
+            "request_id": "A2_2_0",
+            "return_soc": 0.39498160126685833
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          16.369834109642795,
+          59.99989473684211,
+          56.65897928275752,
+          46.803787643753274,
+          0.0
+        ],
+        [
+          59.99989473684211,
+          46.073359081588066,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          44.69473392239568,
+          59.99989473684211,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        4,
+        4,
+        4
+      ],
+      "soc_obs_start": [
+        [
+          0.8444865759583935,
+          0.249500977608118,
+          0.46173969681380356,
+          0.5553640173843439,
+          1.0
+        ],
+        [
+          0.3572881359220902,
+          0.5623030887249134,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.5754000277372411,
+          0.2764883225713628,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.7450385350413908,
+          0.819499977608118,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.9272871359220902,
+          0.5877450656971359,
+          0.2050335872895655,
+          1.0,
+          1.0
+        ],
+        [
+          0.39498160126685833,
+          0.8464873225713628,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.40522479698496505,
+          0.05558120897058183,
+          0.3346020131796619,
+          0.8198162235557647,
+          0.8896550644625303
+        ],
+        [
+          0.7635320605398501,
+          0.8926663454456175,
+          0.5898648206422528,
+          0.7899963441328671,
+          0.20121372904568247
+        ],
+        [
+          0.7544555550540748,
+          0.5872581273507012,
+          0.5276349214492747,
+          0.4693371181721504,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 0,
+      "user_states": {
+        "pending": [
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "arr": [],
+        "fixed": [],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 0,
+        "income_random": 248.06414528460596,
+        "charging_cost": 253.89024586293135,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": -5.826100578325395
+      },
+      "solve_time_sec": 0.007248100000000007
+    },
+    {
+      "ell": 3,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 1204.2338997107022,
+        "income_reservation": 297.19244907711084,
+        "income_random": 544.939924214188,
+        "charging_cost": 286.4546791646133,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "terminal_value": 648.5562055840165
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 10,
+        "random_requests": 14,
+        "reservation_failures": 0,
+        "at_risk_reservation_events": [],
+        "window_events": 17
+      },
+      "actual": {
+        "reservation_swaps": [],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 2,
+            "slot": 1,
+            "request_id": "A2_3_0",
+            "return_soc": 0.2527694218620026
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          26.838048943011486,
+          19.000002357040216,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          7.653985692411553,
+          43.39525624240675,
+          59.99989473684211,
+          0.0,
+          0.0
+        ],
+        [
+          59.99989473684211,
+          16.159229203014434,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        5,
+        4,
+        4
+      ],
+      "soc_obs_start": [
+        [
+          0.7450385350413908,
+          0.819499977608118,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.9272871359220902,
+          0.5877450656971359,
+          0.2050335872895655,
+          1.0,
+          1.0
+        ],
+        [
+          0.39498160126685833,
+          0.8464873225713628,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          0.7750325872895656,
+          1.0,
+          1.0
+        ],
+        [
+          0.9649806012668584,
+          0.2527694218620026,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.05558120897058183,
+          0.8896550644625303,
+          0.4660883575274163,
+          1.0,
+          1.0
+        ],
+        [
+          0.7635320605398501,
+          0.20121372904568258,
+          0.26660131967447864,
+          0.34768799051042865,
+          0.658807065706416
+        ],
+        [
+          0.3107104280412688,
+          0.5872581273507025,
+          0.5276349214492753,
+          0.4693371181721506,
+          0.4381228311217302
+        ]
+      ],
+      "num_fixed_commitments": 0,
+      "user_states": {
+        "pending": [
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "arr": [],
+        "fixed": [],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 0,
+        "income_random": 89.66766937655969,
+        "charging_cost": 256.3509431027255,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": -166.68327372616585
+      },
+      "solve_time_sec": 0.006186200000000003
+    },
+    {
+      "ell": 4,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 161.568784856531,
+        "income_reservation": 200.33801061706885,
+        "income_random": 493.1550876744843,
+        "charging_cost": 108.2299914081718,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 1000.0,
+        "terminal_value": 576.3056779731497
+      },
+      "published_paths": [
+        {
+          "od_id": 0,
+          "user_id": 1,
+          "path": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              "exit"
+            ]
+          ]
+        },
+        {
+          "od_id": 0,
+          "user_id": 2,
+          "path": [
+            [
+              "entry",
+              1
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ]
+        },
+        {
+          "od_id": 1,
+          "user_id": 3,
+          "path": [
+            [
+              "entry",
+              1
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ]
+        }
+      ],
+      "path_adjusted": [
+        {
+          "od_id": 0,
+          "user_id": 1,
+          "adjusted": 0
+        },
+        {
+          "od_id": 0,
+          "user_id": 2,
+          "adjusted": 0
+        },
+        {
+          "od_id": 1,
+          "user_id": 3,
+          "adjusted": 0
+        }
+      ],
+      "predicted": {
+        "random_served": 10,
+        "random_requests": 17,
+        "reservation_failures": 1,
+        "at_risk_reservation_events": [
+          {
+            "event_id": 2,
+            "kind": "dec",
+            "station": 1,
+            "period": 6,
+            "return_soc": 0.19316571114184833,
+            "user_key": [
+              0,
+              2
+            ],
+            "od_id": 0,
+            "user_id": 2,
+            "arc": [
+              "entry",
+              1
+            ],
+            "request_id": null,
+            "arrival_time": null,
+            "reservation_active": 1,
+            "reservation_served": 0,
+            "reservation_failed": 1
+          }
+        ],
+        "window_events": 20
+      },
+      "actual": {
+        "reservation_swaps": [
+          {
+            "period": 4,
+            "station": 0,
+            "slot": 0,
+            "od_id": 0,
+            "user_id": 1,
+            "return_soc": 0.033333333333333326
+          }
+        ],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 1,
+            "request_id": "A0_4_1",
+            "return_soc": 0.8897249652606685
+          },
+          {
+            "station": 0,
+            "slot": 2,
+            "request_id": "A0_4_0",
+            "return_soc": 0.27830740772462653
+          },
+          {
+            "station": 1,
+            "slot": 0,
+            "request_id": "A1_4_0",
+            "return_soc": 0.2219890706371127
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          23.680780285308884,
+          0.0,
+          0.0
+        ],
+        [
+          3.6862524982254428,
+          59.99989473684211,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          0,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        5,
+        5,
+        4
+      ],
+      "soc_obs_start": [
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          0.7750325872895656,
+          1.0,
+          1.0
+        ],
+        [
+          0.9649806012668584,
+          0.2527694218620026,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.033333333333333326,
+          0.8897249652606685,
+          0.27830740772462653,
+          1.0,
+          1.0
+        ],
+        [
+          0.2219890706371127,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.8227684218620026,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.03333333333333333,
+          0.8896550644625317,
+          0.46608835752741673,
+          0.8556582113987459,
+          0.3466549215400414
+        ],
+        [
+          0.763532060539851,
+          0.29718324485776004,
+          0.3476879905104291,
+          0.6588070657064171,
+          0.8134573385308688
+        ],
+        [
+          0.3107104280412688,
+          0.43812283112173167,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 2,
+      "user_states": {
+        "pending": [],
+        "arr": [
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "fixed": [],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          },
+          {
+            "od_id": 0,
+            "user_id": 1
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 116.0,
+        "income_random": 193.1974267653111,
+        "charging_cost": 96.10362027241408,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 213.09380649289702
+      },
+      "solve_time_sec": 0.007123099999999993
+    },
+    {
+      "ell": 5,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 966.1593374237348,
+        "income_reservation": 181.15812528004705,
+        "income_random": 530.1330319057791,
+        "charging_cost": 168.51859196760364,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "terminal_value": 423.38677220551216
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 10,
+        "random_requests": 16,
+        "reservation_failures": 0,
+        "at_risk_reservation_events": [],
+        "window_events": 18
+      },
+      "actual": {
+        "reservation_swaps": [
+          {
+            "period": 5,
+            "station": 1,
+            "slot": 1,
+            "od_id": 1,
+            "user_id": 3,
+            "return_soc": 0.2971832448577595
+          }
+        ],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 1,
+            "request_id": "A0_5_0",
+            "return_soc": 0.36861011471306315
+          },
+          {
+            "station": 0,
+            "slot": 3,
+            "request_id": "A0_5_1",
+            "return_soc": 0.25512993380395627
+          },
+          {
+            "station": 1,
+            "slot": 2,
+            "request_id": "A1_5_0",
+            "return_soc": 0.36660324405829664
+          },
+          {
+            "station": 1,
+            "slot": 3,
+            "request_id": "A1_5_1",
+            "return_soc": 0.349965765159307
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          59.99989473684211,
+          11.607898393613851,
+          59.99989473684211,
+          0.0,
+          0.0
+        ],
+        [
+          59.99989473684211,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          18.655955593473408,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          0,
+          1,
+          0,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        3,
+        4,
+        5
+      ],
+      "soc_obs_start": [
+        [
+          0.033333333333333326,
+          0.8897249652606685,
+          0.27830740772462653,
+          1.0,
+          1.0
+        ],
+        [
+          0.2219890706371127,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.8227684218620026,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.6033323333333334,
+          0.36861011471306315,
+          0.8483064077246265,
+          0.25512993380395627,
+          1.0
+        ],
+        [
+          0.7919880706371127,
+          0.2971832448577595,
+          0.36660324405829664,
+          0.349965765159307,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.4660883575274163,
+          0.8896550644625303,
+          0.8556582113987459,
+          0.3466549215400414,
+          0.455382525279059
+        ],
+        [
+          0.1931657111418481,
+          0.29718324485775915,
+          0.3476879905104293,
+          0.658807065706417,
+          0.813457338530869
+        ],
+        [
+          0.3107104280412688,
+          0.43812283112173167,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 1,
+      "user_states": {
+        "pending": [],
+        "arr": [],
+        "fixed": [
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          },
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 84.33801061706886,
+        "income_random": 319.16291307184525,
+        "charging_cost": 136.6712998284488,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 266.8296238604653
+      },
+      "solve_time_sec": 0.006503800000000004
+    },
+    {
+      "ell": 6,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 886.3569298388452,
+        "income_reservation": 96.8201146629782,
+        "income_random": 622.5777881708846,
+        "charging_cost": 170.7291283594355,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "terminal_value": 337.688155364418
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 10,
+        "random_requests": 12,
+        "reservation_failures": 0,
+        "at_risk_reservation_events": [],
+        "window_events": 13
+      },
+      "actual": {
+        "reservation_swaps": [
+          {
+            "period": 6,
+            "station": 1,
+            "slot": 0,
+            "od_id": 0,
+            "user_id": 2,
+            "return_soc": 0.19316571114184833
+          }
+        ],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 0,
+            "request_id": "A0_6_1",
+            "return_soc": 0.28803235806430894
+          },
+          {
+            "station": 0,
+            "slot": 2,
+            "request_id": "A0_6_2",
+            "return_soc": 0.8627940757934935
+          },
+          {
+            "station": 0,
+            "slot": 4,
+            "request_id": "A0_6_0",
+            "return_soc": 0.8845891455741339
+          },
+          {
+            "station": 1,
+            "slot": 4,
+            "request_id": "A1_6_0",
+            "return_soc": 0.8176681525985163
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          41.75449122807017,
+          59.99989473684211,
+          15.967746555302469,
+          59.99989473684211,
+          0.0
+        ],
+        [
+          21.895992564514444,
+          59.99989473684211,
+          59.99989473684211,
+          59.99989473684211,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          1,
+          0,
+          1,
+          0,
+          1
+        ],
+        [
+          1,
+          0,
+          0,
+          0,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        3,
+        2,
+        5
+      ],
+      "soc_obs_start": [
+        [
+          0.6033323333333334,
+          0.36861011471306315,
+          0.8483064077246265,
+          0.25512993380395627,
+          1.0
+        ],
+        [
+          0.7919880706371127,
+          0.2971832448577595,
+          0.36660324405829664,
+          0.349965765159307,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.28803235806430894,
+          0.9386091147130632,
+          0.8627940757934935,
+          0.8251289338039562,
+          0.8845891455741339
+        ],
+        [
+          0.19316571114184833,
+          0.8671822448577595,
+          0.9366022440582966,
+          0.919964765159307,
+          0.8176681525985163
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          0.4660883575274163,
+          0.8556582113987459,
+          0.34665492154004174,
+          0.45538252527905965,
+          1.0
+        ],
+        [
+          0.19316571114184844,
+          0.8982763245465772,
+          0.26363658852165583,
+          0.4795803535982781,
+          0.2977412236678545
+        ],
+        [
+          0.3107104280412688,
+          0.43812283112173167,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 0,
+      "user_states": {
+        "pending": [],
+        "arr": [],
+        "fixed": [
+          {
+            "od_id": 0,
+            "user_id": 2
+          }
+        ],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          },
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 96.8201146629782,
+        "income_random": 137.62995215634567,
+        "charging_cost": 151.84708161283905,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 82.60298520648482
+      },
+      "solve_time_sec": 0.0045388000000000095
+    },
+    {
+      "ell": 7,
+      "status": "OPTIMAL",
+      "objective": {
+        "total": 663.7066109656338,
+        "income_reservation": 0.0,
+        "income_random": 324.09732901387713,
+        "charging_cost": 90.86233041919586,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "terminal_value": 430.4716123709526
+      },
+      "published_paths": [],
+      "path_adjusted": [],
+      "predicted": {
+        "random_served": 6,
+        "random_requests": 6,
+        "reservation_failures": 0,
+        "at_risk_reservation_events": [],
+        "window_events": 6
+      },
+      "actual": {
+        "reservation_swaps": [],
+        "reservation_failures": [],
+        "random_served": [
+          {
+            "station": 0,
+            "slot": 1,
+            "request_id": "A0_7_0",
+            "return_soc": 0.8107031287596802
+          },
+          {
+            "station": 1,
+            "slot": 1,
+            "request_id": "A1_7_0",
+            "return_soc": 0.5310810600612156
+          },
+          {
+            "station": 1,
+            "slot": 2,
+            "request_id": "A1_7_1",
+            "return_soc": 0.2660280575443176
+          },
+          {
+            "station": 1,
+            "slot": 3,
+            "request_id": "A1_7_2",
+            "return_soc": 0.44800829661268765
+          }
+        ],
+        "random_rejected": []
+      },
+      "power_kw": [
+        [
+          59.99989473684211,
+          6.462198451256512,
+          14.442728863842788,
+          18.407480652215128,
+          12.148510992196435
+        ],
+        [
+          59.99989473684211,
+          13.980816330762153,
+          6.673447993863519,
+          8.424761562178205,
+          19.192826042261444
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "ready": [
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          0,
+          1,
+          1,
+          1,
+          1
+        ],
+        [
+          1,
+          1,
+          1,
+          1,
+          1
+        ]
+      ],
+      "available_full": [
+        4,
+        4,
+        5
+      ],
+      "soc_obs_start": [
+        [
+          0.28803235806430894,
+          0.9386091147130632,
+          0.8627940757934935,
+          0.8251289338039562,
+          0.8845891455741339
+        ],
+        [
+          0.19316571114184833,
+          0.8671822448577595,
+          0.9366022440582966,
+          0.919964765159307,
+          0.8176681525985163
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "soc_obs_end": [
+        [
+          0.858031358064309,
+          0.8107031287596802,
+          1.0,
+          1.0,
+          1.0
+        ],
+        [
+          0.7631647111418484,
+          0.5310810600612156,
+          0.2660280575443176,
+          0.44800829661268765,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "terminal_soc_pred": [
+        [
+          1.0,
+          0.8556582113987459,
+          0.3466549215400424,
+          0.45538252527905965,
+          1.0
+        ],
+        [
+          1.0,
+          0.8982763245465772,
+          0.2636365885216565,
+          0.47958035359827855,
+          1.0
+        ],
+        [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "num_fixed_commitments": 0,
+      "user_states": {
+        "pending": [],
+        "arr": [],
+        "fixed": [],
+        "completed": [
+          {
+            "od_id": 0,
+            "user_id": 0
+          },
+          {
+            "od_id": 0,
+            "user_id": 1
+          },
+          {
+            "od_id": 0,
+            "user_id": 2
+          },
+          {
+            "od_id": 1,
+            "user_id": 3
+          }
+        ],
+        "failed": []
+      },
+      "realized": {
+        "income_reservation": 0,
+        "income_random": 233.3015348426519,
+        "charging_cost": 76.90639612679112,
+        "adjustment_cost": 0.0,
+        "reservation_failure_cost": 0.0,
+        "reward": 156.39513871586078
+      },
+      "solve_time_sec": 0.004396000000000011
+    }
+  ],
+  "summary": {
+    "total_income_reservation": 387.2180079670729,
+    "total_income_random": 1978.9344667583923,
+    "total_charging_cost": 1290.4167123992077,
+    "total_adjustment_cost": 0.0,
+    "total_reservation_failure_cost": 0.0,
+    "total_reward": 1075.7357623262576,
+    "total_actual_reservation_swaps": 4,
+    "total_actual_reservation_failures": 0,
+    "total_actual_random_served": 35,
+    "num_accepted_reservations": 4,
+    "num_completed_reservations": 4,
+    "num_failed_reservations": 0,
+    "accepted_reservations": [
+      {
+        "od_id": 0,
+        "user_id": 0
+      },
+      {
+        "od_id": 0,
+        "user_id": 1
+      },
+      {
+        "od_id": 0,
+        "user_id": 2
+      },
+      {
+        "od_id": 1,
+        "user_id": 3
+      }
+    ],
+    "completed_reservations": [
+      {
+        "od_id": 0,
+        "user_id": 0
+      },
+      {
+        "od_id": 0,
+        "user_id": 1
+      },
+      {
+        "od_id": 0,
+        "user_id": 2
+      },
+      {
+        "od_id": 1,
+        "user_id": 3
+      }
+    ],
+    "failed_reservations": []
+  }
+}

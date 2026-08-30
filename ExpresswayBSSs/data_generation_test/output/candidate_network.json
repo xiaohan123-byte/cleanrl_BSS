@@ -1,0 +1,719 @@
+{
+  "schema_version": 1,
+  "generator": "data_generation_test/candidate_network.py",
+  "range_km": 300.0,
+  "min_exit_soc": 0.1,
+  "min_swap_spacing_km": 100.0,
+  "soc_bins": [
+    [
+      0.3,
+      0.5
+    ],
+    [
+      0.5,
+      0.75
+    ],
+    [
+      0.75,
+      1.0
+    ]
+  ],
+  "od_networks": [
+    {
+      "od_index": 0,
+      "od_id": 0,
+      "entry_km": 0.0,
+      "exit_km": 230.0,
+      "nodes": [
+        "entry",
+        0,
+        1,
+        "exit"
+      ],
+      "node_positions_km": {
+        "entry": 0.0,
+        "0": 80.0,
+        "1": 180.0,
+        "exit": 230.0
+      },
+      "bins": [
+        {
+          "soc_bin_index": 0,
+          "soc_lower": 0.3,
+          "soc_upper": 0.5,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [],
+          "candidate_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->0": 80.0,
+            "0->1": 100.0,
+            "0->exit": 150.0,
+            "1->exit": 50.0
+          },
+          "arc_soc_consumption": {
+            "entry->0": 0.26666666666666666,
+            "0->1": 0.3333333333333333,
+            "0->exit": 0.5,
+            "1->exit": 0.16666666666666666
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                "exit"
+              ]
+            ]
+          ]
+        },
+        {
+          "soc_bin_index": 1,
+          "soc_lower": 0.5,
+          "soc_upper": 0.75,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [],
+          "candidate_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->0": 80.0,
+            "entry->1": 180.0,
+            "0->1": 100.0,
+            "0->exit": 150.0,
+            "1->exit": 50.0
+          },
+          "arc_soc_consumption": {
+            "entry->0": 0.26666666666666666,
+            "entry->1": 0.6,
+            "0->1": 0.3333333333333333,
+            "0->exit": 0.5,
+            "1->exit": 0.16666666666666666
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ]
+          ]
+        },
+        {
+          "soc_bin_index": 2,
+          "soc_lower": 0.75,
+          "soc_upper": 1.0,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              "entry",
+              "exit"
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [
+            [
+              "entry",
+              0
+            ]
+          ],
+          "candidate_arcs": [
+            [
+              "entry",
+              1
+            ],
+            [
+              "entry",
+              "exit"
+            ],
+            [
+              1,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->1": 180.0,
+            "entry->exit": 230.0,
+            "1->exit": 50.0
+          },
+          "arc_soc_consumption": {
+            "entry->1": 0.6,
+            "entry->exit": 0.7666666666666667,
+            "1->exit": 0.16666666666666666
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                "exit"
+              ]
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "od_index": 1,
+      "od_id": 1,
+      "entry_km": 0.0,
+      "exit_km": 380.0,
+      "nodes": [
+        "entry",
+        0,
+        1,
+        2,
+        "exit"
+      ],
+      "node_positions_km": {
+        "entry": 0.0,
+        "0": 80.0,
+        "1": 180.0,
+        "2": 280.0,
+        "exit": 380.0
+      },
+      "bins": [
+        {
+          "soc_bin_index": 0,
+          "soc_lower": 0.3,
+          "soc_upper": 0.5,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [],
+          "candidate_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->0": 80.0,
+            "0->1": 100.0,
+            "0->2": 200.0,
+            "1->2": 100.0,
+            "1->exit": 200.0,
+            "2->exit": 100.0
+          },
+          "arc_soc_consumption": {
+            "entry->0": 0.26666666666666666,
+            "0->1": 0.3333333333333333,
+            "0->2": 0.6666666666666666,
+            "1->2": 0.3333333333333333,
+            "1->exit": 0.6666666666666666,
+            "2->exit": 0.3333333333333333
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ]
+          ]
+        },
+        {
+          "soc_bin_index": 1,
+          "soc_lower": 0.5,
+          "soc_upper": 0.75,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [],
+          "candidate_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->0": 80.0,
+            "entry->1": 180.0,
+            "0->1": 100.0,
+            "0->2": 200.0,
+            "1->2": 100.0,
+            "1->exit": 200.0,
+            "2->exit": 100.0
+          },
+          "arc_soc_consumption": {
+            "entry->0": 0.26666666666666666,
+            "entry->1": 0.6,
+            "0->1": 0.3333333333333333,
+            "0->2": 0.6666666666666666,
+            "1->2": 0.3333333333333333,
+            "1->exit": 0.6666666666666666,
+            "2->exit": 0.3333333333333333
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                0
+              ],
+              [
+                0,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ]
+          ]
+        },
+        {
+          "soc_bin_index": 2,
+          "soc_lower": 0.75,
+          "soc_upper": 1.0,
+          "raw_arcs": [
+            [
+              "entry",
+              0
+            ],
+            [
+              "entry",
+              1
+            ],
+            [
+              "entry",
+              2
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "removed_arcs": [
+            [
+              "entry",
+              0
+            ]
+          ],
+          "candidate_arcs": [
+            [
+              "entry",
+              1
+            ],
+            [
+              "entry",
+              2
+            ],
+            [
+              1,
+              2
+            ],
+            [
+              1,
+              "exit"
+            ],
+            [
+              2,
+              "exit"
+            ]
+          ],
+          "arc_distance_km": {
+            "entry->1": 180.0,
+            "entry->2": 280.0,
+            "1->2": 100.0,
+            "1->exit": 200.0,
+            "2->exit": 100.0
+          },
+          "arc_soc_consumption": {
+            "entry->1": 0.6,
+            "entry->2": 0.9333333333333333,
+            "1->2": 0.3333333333333333,
+            "1->exit": 0.6666666666666666,
+            "2->exit": 0.3333333333333333
+          },
+          "complete_paths": [
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                1
+              ],
+              [
+                1,
+                "exit"
+              ]
+            ],
+            [
+              [
+                "entry",
+                2
+              ],
+              [
+                2,
+                "exit"
+              ]
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

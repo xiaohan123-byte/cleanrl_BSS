@@ -1,0 +1,716 @@
+{
+  "schema_version": 1,
+  "seed": 42,
+  "reservations": [
+    {
+      "reservation_id": 0,
+      "submission_order": 0,
+      "od_id": 0,
+      "day_ahead_entry_time": 0.15006453133600162,
+      "day_ahead_entry_soc": 0.49252052285838344,
+      "actual_entry_time": 0.0,
+      "actual_entry_soc": 0.5161676442747847
+    },
+    {
+      "reservation_id": 1,
+      "submission_order": 1,
+      "od_id": 0,
+      "day_ahead_entry_time": 3.542955074694238,
+      "day_ahead_entry_soc": 0.3222478756372485,
+      "actual_entry_time": 3.1834979344866268,
+      "actual_entry_soc": 0.3
+    },
+    {
+      "reservation_id": 2,
+      "submission_order": 2,
+      "od_id": 0,
+      "day_ahead_entry_time": 3.367470377631678,
+      "day_ahead_entry_soc": 0.8012137290456824,
+      "actual_entry_time": 3.9194578380170317,
+      "actual_entry_soc": 0.7931657111418483
+    },
+    {
+      "reservation_id": 3,
+      "submission_order": 3,
+      "od_id": 1,
+      "day_ahead_entry_time": 3.5355941032554523,
+      "day_ahead_entry_soc": 0.8666013196744786,
+      "actual_entry_time": 3.045342242772544,
+      "actual_entry_soc": 0.8971832448577595
+    }
+  ],
+  "predicted_random_requests": [
+    [
+      [
+        {
+          "request_id": "P0_0_2",
+          "arrival_time": 0.09274584338014791,
+          "arrival_soc": 0.2677014637834248
+        },
+        {
+          "request_id": "P0_0_0",
+          "arrival_time": 0.3402505165179919,
+          "arrival_soc": 0.3088356498682471
+        },
+        {
+          "request_id": "P0_0_1",
+          "arrival_time": 0.9572130722067812,
+          "arrival_soc": 0.43561618157883875
+        }
+      ],
+      [
+        {
+          "request_id": "P0_1_0",
+          "arrival_time": 1.603726031366891,
+          "arrival_soc": 0.764989791292066
+        },
+        {
+          "request_id": "P0_1_1",
+          "arrival_time": 1.7297317866938178,
+          "arrival_soc": 0.5753596640182905
+        }
+      ],
+      [
+        {
+          "request_id": "P0_2_0",
+          "arrival_time": 2.0788001980784583,
+          "arrival_soc": 0.40522479698496505
+        },
+        {
+          "request_id": "P0_2_2",
+          "arrival_time": 2.3616350261669767,
+          "arrival_soc": 0.33460201317966193
+        },
+        {
+          "request_id": "P0_2_1",
+          "arrival_time": 2.6286397994944433,
+          "arrival_soc": 0.8198162235557647
+        }
+      ],
+      [],
+      [],
+      [
+        {
+          "request_id": "P0_5_0",
+          "arrival_time": 5.773068340788692,
+          "arrival_soc": 0.8896550644625303
+        }
+      ],
+      [
+        {
+          "request_id": "P0_6_0",
+          "arrival_time": 6.866483666755269,
+          "arrival_soc": 0.4660883575274163
+        }
+      ],
+      [
+        {
+          "request_id": "P0_7_2",
+          "arrival_time": 7.266977822049113,
+          "arrival_soc": 0.8556582113987459
+        },
+        {
+          "request_id": "P0_7_1",
+          "arrival_time": 7.370180967116883,
+          "arrival_soc": 0.3466549215400414
+        },
+        {
+          "request_id": "P0_7_0",
+          "arrival_time": 7.6356844442644,
+          "arrival_soc": 0.455382525279059
+        }
+      ]
+    ],
+    [
+      [],
+      [
+        {
+          "request_id": "P1_1_0",
+          "arrival_time": 1.534139877029708,
+          "arrival_soc": 0.3713676476059984
+        }
+      ],
+      [
+        {
+          "request_id": "P1_2_0",
+          "arrival_time": 2.379455441757648,
+          "arrival_soc": 0.8926663454456167
+        },
+        {
+          "request_id": "P1_2_1",
+          "arrival_time": 2.639999759854093,
+          "arrival_soc": 0.5898648206422523
+        },
+        {
+          "request_id": "P1_2_2",
+          "arrival_time": 2.6846142509898745,
+          "arrival_soc": 0.7899963441328668
+        }
+      ],
+      [],
+      [
+        {
+          "request_id": "P1_4_0",
+          "arrival_time": 4.821802594006808,
+          "arrival_soc": 0.7635320605398501
+        }
+      ],
+      [
+        {
+          "request_id": "P1_5_0",
+          "arrival_time": 5.2677408759757025,
+          "arrival_soc": 0.34768799051042854
+        },
+        {
+          "request_id": "P1_5_2",
+          "arrival_time": 5.314677880798478,
+          "arrival_soc": 0.658807065706416
+        },
+        {
+          "request_id": "P1_5_1",
+          "arrival_time": 5.942909714335054,
+          "arrival_soc": 0.8134573385308681
+        }
+      ],
+      [
+        {
+          "request_id": "P1_6_1",
+          "arrival_time": 6.142871590442063,
+          "arrival_soc": 0.29774122366785444
+        },
+        {
+          "request_id": "P1_6_2",
+          "arrival_time": 6.7449889820916065,
+          "arrival_soc": 0.5772841027671033
+        },
+        {
+          "request_id": "P1_6_0",
+          "arrival_time": 6.884683153886702,
+          "arrival_soc": 0.6499963091402969
+        }
+      ],
+      [
+        {
+          "request_id": "P1_7_1",
+          "arrival_time": 7.219320759157283,
+          "arrival_soc": 0.8982763245465772
+        },
+        {
+          "request_id": "P1_7_2",
+          "arrival_time": 7.509526293676465,
+          "arrival_soc": 0.2636365885216557
+        },
+        {
+          "request_id": "P1_7_0",
+          "arrival_time": 7.897822883602477,
+          "arrival_soc": 0.47958035359827805
+        }
+      ]
+    ],
+    [
+      [],
+      [],
+      [
+        {
+          "request_id": "P2_2_0",
+          "arrival_time": 2.62744604170309,
+          "arrival_soc": 0.7544555550540748
+        }
+      ],
+      [
+        {
+          "request_id": "P2_3_2",
+          "arrival_time": 3.2514141199818134,
+          "arrival_soc": 0.5872581273507013
+        },
+        {
+          "request_id": "P2_3_1",
+          "arrival_time": 3.5958884283611283,
+          "arrival_soc": 0.5276349214492742
+        },
+        {
+          "request_id": "P2_3_0",
+          "arrival_time": 3.596409030731974,
+          "arrival_soc": 0.46933711817215
+        }
+      ],
+      [],
+      [],
+      [
+        {
+          "request_id": "P2_6_1",
+          "arrival_time": 6.293500128647426,
+          "arrival_soc": 0.3107104280412688
+        },
+        {
+          "request_id": "P2_6_0",
+          "arrival_time": 6.768598732657446,
+          "arrival_soc": 0.43812283112173167
+        }
+      ],
+      []
+    ]
+  ],
+  "actual_random_requests": [
+    [
+      [
+        {
+          "request_id": "A0_0_1",
+          "arrival_time": 0.5076816746043252,
+          "arrival_soc": 0.27448757595839346
+        },
+        {
+          "request_id": "A0_0_2",
+          "arrival_time": 0.9263669830081276,
+          "arrival_soc": 0.7940870140900138
+        },
+        {
+          "request_id": "A0_0_0",
+          "arrival_time": 0.9718880988701143,
+          "arrival_soc": 0.7333735393364451
+        }
+      ],
+      [
+        {
+          "request_id": "A0_1_1",
+          "arrival_time": 1.198911101764733,
+          "arrival_soc": 0.46173969681380356
+        },
+        {
+          "request_id": "A0_1_0",
+          "arrival_time": 1.841669348172467,
+          "arrival_soc": 0.5553640173843439
+        }
+      ],
+      [
+        {
+          "request_id": "A0_2_0",
+          "arrival_time": 2.5393790301196257,
+          "arrival_soc": 0.7450385350413908
+        }
+      ],
+      [],
+      [
+        {
+          "request_id": "A0_4_1",
+          "arrival_time": 4.362980767180933,
+          "arrival_soc": 0.8897249652606685
+        },
+        {
+          "request_id": "A0_4_0",
+          "arrival_time": 4.488605708028948,
+          "arrival_soc": 0.27830740772462653
+        }
+      ],
+      [
+        {
+          "request_id": "A0_5_0",
+          "arrival_time": 5.239452310338059,
+          "arrival_soc": 0.36861011471306315
+        },
+        {
+          "request_id": "A0_5_1",
+          "arrival_time": 5.56735694368891,
+          "arrival_soc": 0.25512993380395627
+        }
+      ],
+      [
+        {
+          "request_id": "A0_6_1",
+          "arrival_time": 6.532706169529516,
+          "arrival_soc": 0.28803235806430894
+        },
+        {
+          "request_id": "A0_6_2",
+          "arrival_time": 6.659750822747368,
+          "arrival_soc": 0.8627940757934935
+        },
+        {
+          "request_id": "A0_6_0",
+          "arrival_time": 6.816023253420089,
+          "arrival_soc": 0.8845891455741339
+        }
+      ],
+      [
+        {
+          "request_id": "A0_7_0",
+          "arrival_time": 7.265056628940059,
+          "arrival_soc": 0.8107031287596802
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "request_id": "A1_0_2",
+          "arrival_time": 0.7129489728191218,
+          "arrival_soc": 0.4792946099982004
+        },
+        {
+          "request_id": "A1_0_1",
+          "arrival_time": 0.7552651966358055,
+          "arrival_soc": 0.682907342469735
+        },
+        {
+          "request_id": "A1_0_0",
+          "arrival_time": 0.9643629060074552,
+          "arrival_soc": 0.8502394451015238
+        }
+      ],
+      [
+        {
+          "request_id": "A1_1_1",
+          "arrival_time": 1.1210041958682657,
+          "arrival_soc": 0.3572881359220902
+        },
+        {
+          "request_id": "A1_1_0",
+          "arrival_time": 1.4381000839145042,
+          "arrival_soc": 0.5623030887249134
+        }
+      ],
+      [
+        {
+          "request_id": "A1_2_0",
+          "arrival_time": 2.0210342600070588,
+          "arrival_soc": 0.5877450656971359
+        },
+        {
+          "request_id": "A1_2_1",
+          "arrival_time": 2.588440114410351,
+          "arrival_soc": 0.2050335872895655
+        }
+      ],
+      [],
+      [
+        {
+          "request_id": "A1_4_0",
+          "arrival_time": 4.067400328110308,
+          "arrival_soc": 0.2219890706371127
+        }
+      ],
+      [
+        {
+          "request_id": "A1_5_0",
+          "arrival_time": 5.070857349888653,
+          "arrival_soc": 0.36660324405829664
+        },
+        {
+          "request_id": "A1_5_1",
+          "arrival_time": 5.668977778296281,
+          "arrival_soc": 0.349965765159307
+        }
+      ],
+      [
+        {
+          "request_id": "A1_6_0",
+          "arrival_time": 6.723352565880971,
+          "arrival_soc": 0.8176681525985163
+        }
+      ],
+      [
+        {
+          "request_id": "A1_7_0",
+          "arrival_time": 7.242997242395725,
+          "arrival_soc": 0.5310810600612156
+        },
+        {
+          "request_id": "A1_7_1",
+          "arrival_time": 7.4070599614859365,
+          "arrival_soc": 0.2660280575443176
+        },
+        {
+          "request_id": "A1_7_2",
+          "arrival_time": 7.658982749514663,
+          "arrival_soc": 0.44800829661268765
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "request_id": "A2_0_2",
+          "arrival_time": 0.09841787115195888,
+          "arrival_soc": 0.48183489747158814
+        },
+        {
+          "request_id": "A2_0_0",
+          "arrival_time": 0.467024668036675,
+          "arrival_soc": 0.7103530946218954
+        },
+        {
+          "request_id": "A2_0_1",
+          "arrival_time": 0.6733645472933015,
+          "arrival_soc": 0.8889156479561762
+        }
+      ],
+      [
+        {
+          "request_id": "A2_1_1",
+          "arrival_time": 1.1915900721416541,
+          "arrival_soc": 0.5754000277372411
+        },
+        {
+          "request_id": "A2_1_0",
+          "arrival_time": 1.8005925108616987,
+          "arrival_soc": 0.2764883225713628
+        }
+      ],
+      [
+        {
+          "request_id": "A2_2_0",
+          "arrival_time": 2.421881639834404,
+          "arrival_soc": 0.39498160126685833
+        }
+      ],
+      [
+        {
+          "request_id": "A2_3_0",
+          "arrival_time": 3.87448595407058,
+          "arrival_soc": 0.2527694218620026
+        }
+      ],
+      [],
+      [],
+      [],
+      []
+    ]
+  ],
+  "day_ahead_random_forecast": [
+    [
+      [
+        {
+          "request_id": "D0_0_0",
+          "arrival_time": 0.406414057952472,
+          "arrival_soc": 0.5369508925797277
+        }
+      ],
+      [
+        {
+          "request_id": "D0_1_1",
+          "arrival_time": 1.0021553783514263,
+          "arrival_soc": 0.4732952303114692
+        },
+        {
+          "request_id": "D0_1_0",
+          "arrival_time": 1.9024428655105488,
+          "arrival_soc": 0.3152459849810688
+        },
+        {
+          "request_id": "D0_1_2",
+          "arrival_time": 1.9265180735593335,
+          "arrival_soc": 0.749590549755885
+        }
+      ],
+      [
+        {
+          "request_id": "D0_2_0",
+          "arrival_time": 2.423007485990163,
+          "arrival_soc": 0.8701223486017713
+        },
+        {
+          "request_id": "D0_2_1",
+          "arrival_time": 2.995422689492714,
+          "arrival_soc": 0.5890378263839328
+        }
+      ],
+      [
+        {
+          "request_id": "D0_3_0",
+          "arrival_time": 3.1547968252740644,
+          "arrival_soc": 0.407695477846195
+        },
+        {
+          "request_id": "D0_3_2",
+          "arrival_time": 3.542195201374274,
+          "arrival_soc": 0.7235828922653449
+        },
+        {
+          "request_id": "D0_3_1",
+          "arrival_time": 3.968709364969159,
+          "arrival_soc": 0.6054262035713793
+        }
+      ],
+      [],
+      [],
+      [
+        {
+          "request_id": "D0_6_2",
+          "arrival_time": 6.080111465240587,
+          "arrival_soc": 0.3300774726865062
+        },
+        {
+          "request_id": "D0_6_1",
+          "arrival_time": 6.157432727939483,
+          "arrival_soc": 0.8725452322921152
+        },
+        {
+          "request_id": "D0_6_0",
+          "arrival_time": 6.5028503829195135,
+          "arrival_soc": 0.7969039244337996
+        }
+      ],
+      []
+    ],
+    [
+      [
+        {
+          "request_id": "D1_0_0",
+          "arrival_time": 0.40377555131827747,
+          "arrival_soc": 0.8591172890603624
+        }
+      ],
+      [
+        {
+          "request_id": "D1_1_0",
+          "arrival_time": 1.5789190575072105,
+          "arrival_soc": 0.22781916360234508
+        }
+      ],
+      [],
+      [
+        {
+          "request_id": "D1_3_1",
+          "arrival_time": 3.3163698459767272,
+          "arrival_soc": 0.382535986922543
+        },
+        {
+          "request_id": "D1_3_0",
+          "arrival_time": 3.6573731644725225,
+          "arrival_soc": 0.5956588466908626
+        },
+        {
+          "request_id": "D1_3_2",
+          "arrival_time": 3.669725974769829,
+          "arrival_soc": 0.4199287039569033
+        }
+      ],
+      [
+        {
+          "request_id": "D1_4_1",
+          "arrival_time": 4.299997079798763,
+          "arrival_soc": 0.4213240373902978
+        },
+        {
+          "request_id": "D1_4_0",
+          "arrival_time": 4.395785846791254,
+          "arrival_soc": 0.6701831560719799
+        }
+      ],
+      [],
+      [],
+      [
+        {
+          "request_id": "D1_7_1",
+          "arrival_time": 7.099981248924588,
+          "arrival_soc": 0.5763440828711391
+        },
+        {
+          "request_id": "D1_7_2",
+          "arrival_time": 7.505884694048765,
+          "arrival_soc": 0.29271959925652713
+        },
+        {
+          "request_id": "D1_7_0",
+          "arrival_time": 7.621159255493093,
+          "arrival_soc": 0.5940955519472622
+        }
+      ]
+    ],
+    [
+      [
+        {
+          "request_id": "D2_0_1",
+          "arrival_time": 0.36952708873888396,
+          "arrival_soc": 0.3104227826500624
+        },
+        {
+          "request_id": "D2_0_0",
+          "arrival_time": 0.8808641736864395,
+          "arrival_soc": 0.81548916973918
+        }
+      ],
+      [
+        {
+          "request_id": "D2_1_0",
+          "arrival_time": 1.61167776572595,
+          "arrival_soc": 0.8910631445420529
+        },
+        {
+          "request_id": "D2_1_1",
+          "arrival_time": 1.6539763177107325,
+          "arrival_soc": 0.20547617500651058
+        }
+      ],
+      [
+        {
+          "request_id": "D2_2_1",
+          "arrival_time": 2.878126964973592,
+          "arrival_soc": 0.38512614504098935
+        },
+        {
+          "request_id": "D2_2_0",
+          "arrival_time": 2.9317560394360775,
+          "arrival_soc": 0.27251055134274804
+        }
+      ],
+      [],
+      [
+        {
+          "request_id": "D2_4_0",
+          "arrival_time": 4.272348212314816,
+          "arrival_soc": 0.6233808789211568
+        }
+      ],
+      [
+        {
+          "request_id": "D2_5_0",
+          "arrival_time": 5.203597312327453,
+          "arrival_soc": 0.6439665712195558
+        },
+        {
+          "request_id": "D2_5_1",
+          "arrival_time": 5.263983901630409,
+          "arrival_soc": 0.5419722965045636
+        }
+      ],
+      [],
+      []
+    ]
+  ],
+  "initial_slot_soc": [
+    [
+      1.0,
+      0.9,
+      0.6,
+      0.4,
+      0.2
+    ],
+    [
+      1.0,
+      0.9,
+      0.6,
+      0.4,
+      0.2
+    ],
+    [
+      1.0,
+      0.9,
+      0.6,
+      0.4,
+      0.2
+    ]
+  ],
+  "fcfs_stress_test": {
+    "station": 0,
+    "period": 0,
+    "num_actual_requests": 3,
+    "initial_full_batteries": 1,
+    "description": "站 0 时段 0 实际随机请求数 3 > 初始满电电池数 1，用于验证随机请求严格 FCFS 前缀：只能服务先到站的 1 个请求。"
+  },
+  "timing_workaround": {
+    "min_first_swap_travel_hours": 1.0666666666666667,
+    "decision_period_hours": 1.0,
+    "note": "临时规避条件；一般化时序处理见根目录 note.md"
+  }
+}
