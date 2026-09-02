@@ -1,0 +1,14 @@
+node_idx,city,population,source
+e1,北京,2183,API
+e2,廊坊,547,API
+e3,沧州,723,API
+e4,德州,549,API
+e5,济南,944,API
+e6,济南,944,API
+e7,临沂,1085,API
+e8,临沂,1085,API
+e9,淮安,452,API
+e10,扬州,458,API
+e11,扬州,458,API
+e12,泰州,447,API
+e13,上海,2487,API

@@ -1,0 +1,281 @@
+{
+  "checks": {
+    "all_scenarios_passed": true,
+    "scenario_count": true
+  },
+  "generator": "src.cost_stress_scenarios",
+  "num_stations": 6,
+  "objective_note": "The current accounting model has no monetary waiting-cost term; waiting is reported in hours. Only reservation timeout creates the configured failure cost.",
+  "path_optimization_used": false,
+  "purpose": "Expose positive waiting time and reservation-failure cost in controlled physical executions.",
+  "rl_implemented": false,
+  "run_mode": "SIX_STATION_DETERMINISTIC_MOCK_STRESS",
+  "scenarios": [
+    {
+      "checks": {
+        "all_passed": true,
+        "no_failure_cost": true,
+        "served_before_deadline": true,
+        "six_station_state": true,
+        "wait_is_positive": true,
+        "wait_matches_charging_equation": true
+      },
+      "description": "Station 0 has no full battery at arrival; its slot charges until the request is served.",
+      "events": {
+        "ledger_postings": [
+          {
+            "adjustment_cost": 0.0,
+            "charging_cost": 0.0,
+            "entry": {
+              "amount": 0.0,
+              "arrival_time": null,
+              "deadline": null,
+              "energy_kwh": 10.52631578946,
+              "event_id": "charge:0:0:0:0:0.175438596491:0",
+              "event_type": "charging",
+              "interval": 0,
+              "metadata": {
+                "end_time": 0.175438596491,
+                "power_kw": 60.0,
+                "soc_end": 0.99999999999987,
+                "soc_start": 0.9,
+                "start_time": 0.0
+              },
+              "occurred_at": 0.175438596491,
+              "realized": true,
+              "request_id": null,
+              "slot": 0,
+              "station": 0,
+              "user_key": null
+            },
+            "income_random": 0.0,
+            "income_reservation": 0.0,
+            "reservation_failure_cost": 0.0,
+            "reward_delta": 0.0
+          },
+          {
+            "adjustment_cost": 0.0,
+            "charging_cost": 0.0,
+            "entry": {
+              "amount": 0.0,
+              "arrival_time": 0.0,
+              "deadline": 0.25,
+              "energy_kwh": 0.0,
+              "event_id": "service:reservation:stress:waiting_then_service",
+              "event_type": "reservation_service",
+              "interval": 0,
+              "metadata": {
+                "battery_capacity_kwh": 100.0,
+                "request_event_id": "reservation:stress:waiting_then_service",
+                "return_soc": 0.2,
+                "wait_hours": 0.175438596491
+              },
+              "occurred_at": 0.175438596491,
+              "realized": true,
+              "request_id": "waiting_then_service-reservation",
+              "slot": 0,
+              "station": 0,
+              "user_key": [
+                0,
+                0
+              ]
+            },
+            "income_random": 0.0,
+            "income_reservation": 0.0,
+            "reservation_failure_cost": 0.0,
+            "reward_delta": 0.0
+          },
+          {
+            "adjustment_cost": 0.0,
+            "charging_cost": 0.0,
+            "entry": {
+              "amount": 0.0,
+              "arrival_time": null,
+              "deadline": null,
+              "energy_kwh": 49.47368421054,
+              "event_id": "charge:0:0:0:0.175438596491:1:1",
+              "event_type": "charging",
+              "interval": 0,
+              "metadata": {
+                "end_time": 1.0,
+                "power_kw": 60.0,
+                "soc_end": 0.67000000000013,
+                "soc_start": 0.2,
+                "start_time": 0.175438596491
+              },
+              "occurred_at": 1.0,
+              "realized": true,
+              "request_id": null,
+              "slot": 0,
+              "station": 0,
+              "user_key": null
+            },
+            "income_random": 0.0,
+            "income_reservation": 0.0,
+            "reservation_failure_cost": 0.0,
+            "reward_delta": 0.0
+          }
+        ],
+        "services": [
+          {
+            "event_id": "service:reservation:stress:waiting_then_service",
+            "interval": 0,
+            "kind": "reservation",
+            "occurred_at": 0.175438596491,
+            "request_event_id": "reservation:stress:waiting_then_service",
+            "request_id": "waiting_then_service-reservation",
+            "return_soc": 0.2,
+            "slot": 0,
+            "station": 0,
+            "wait_hours": 0.175438596491
+          }
+        ],
+        "timeouts": []
+      },
+      "expected": {
+        "reservation_failure_cost": 0.0,
+        "service_count": 1,
+        "timeout_count": 0,
+        "wait_hours": 0.17543859649122803
+      },
+      "input": {
+        "arrival_time_hours": 0.0,
+        "battery_capacity_kwh": 100.0,
+        "charging_efficiency": 0.95,
+        "deadline_hours": 0.25,
+        "num_stations": 6,
+        "request_kind": "reservation",
+        "request_station": 0,
+        "reservation_failure_penalty": 1000.0,
+        "return_soc": 0.2,
+        "slots_per_station": 1,
+        "station_0_initial_soc": 0.9,
+        "station_0_power_kw": 60.0
+      },
+      "observed": {
+        "final_waiting_request_ids": [],
+        "financial": {
+          "adjustment_cost": 0.0,
+          "charging_cost": 0.0,
+          "income_random": 0.0,
+          "income_reservation": 0.0,
+          "reservation_failure_cost": 0.0,
+          "reward_delta": 0.0
+        },
+        "maximum_observed_wait_hours": 0.175438596491,
+        "service_count": 1,
+        "service_wait_hours": [
+          0.175438596491
+        ],
+        "station_0_final_soc": 0.67000000000013,
+        "timeout_count": 0,
+        "timeout_wait_hours": [],
+        "waiting_cost": 0.0,
+        "waiting_cost_defined": false
+      },
+      "scenario_id": "waiting_then_service"
+    },
+    {
+      "checks": {
+        "all_passed": true,
+        "failure_cost_is_1000": true,
+        "not_served": true,
+        "one_reservation_timeout": true,
+        "reward_is_minus_failure_cost": true,
+        "six_station_state": true,
+        "timeout_at_deadline": true
+      },
+      "description": "Station 0 has no full battery and receives zero power, so the reservation reaches its deadline.",
+      "events": {
+        "ledger_postings": [
+          {
+            "adjustment_cost": 0.0,
+            "charging_cost": 0.0,
+            "entry": {
+              "amount": 0.0,
+              "arrival_time": 0.0,
+              "deadline": 0.25,
+              "energy_kwh": 0.0,
+              "event_id": "timeout:reservation:stress:reservation_timeout",
+              "event_type": "reservation_timeout",
+              "interval": 0,
+              "metadata": {
+                "request_event_id": "reservation:stress:reservation_timeout",
+                "wait_hours": 0.25
+              },
+              "occurred_at": 0.25,
+              "realized": true,
+              "request_id": "reservation_timeout-reservation",
+              "slot": null,
+              "station": 0,
+              "user_key": [
+                0,
+                0
+              ]
+            },
+            "income_random": 0.0,
+            "income_reservation": 0.0,
+            "reservation_failure_cost": 1000.0,
+            "reward_delta": -1000.0
+          }
+        ],
+        "services": [],
+        "timeouts": [
+          {
+            "event_id": "timeout:reservation:stress:reservation_timeout",
+            "interval": 0,
+            "kind": "reservation",
+            "occurred_at": 0.25,
+            "request_event_id": "reservation:stress:reservation_timeout",
+            "request_id": "reservation_timeout-reservation",
+            "station": 0,
+            "wait_hours": 0.25
+          }
+        ]
+      },
+      "expected": {
+        "reservation_failure_cost": 1000.0,
+        "service_count": 0,
+        "timeout_count": 1,
+        "wait_hours": 0.25
+      },
+      "input": {
+        "arrival_time_hours": 0.0,
+        "battery_capacity_kwh": 100.0,
+        "charging_efficiency": 0.95,
+        "deadline_hours": 0.25,
+        "num_stations": 6,
+        "request_kind": "reservation",
+        "request_station": 0,
+        "reservation_failure_penalty": 1000.0,
+        "return_soc": 0.2,
+        "slots_per_station": 1,
+        "station_0_initial_soc": 0.9,
+        "station_0_power_kw": 0.0
+      },
+      "observed": {
+        "final_waiting_request_ids": [],
+        "financial": {
+          "adjustment_cost": 0.0,
+          "charging_cost": 0.0,
+          "income_random": 0.0,
+          "income_reservation": 0.0,
+          "reservation_failure_cost": 1000.0,
+          "reward_delta": -1000.0
+        },
+        "maximum_observed_wait_hours": 0.25,
+        "service_count": 0,
+        "service_wait_hours": [],
+        "station_0_final_soc": 0.9,
+        "timeout_count": 1,
+        "timeout_wait_hours": [
+          0.25
+        ],
+        "waiting_cost": 0.0,
+        "waiting_cost_defined": false
+      },
+      "scenario_id": "reservation_timeout"
+    }
+  ],
+  "schema_version": 1
+}

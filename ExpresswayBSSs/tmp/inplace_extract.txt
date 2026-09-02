@@ -1,0 +1,854 @@
+ MPC-RL 
+2026  8  30 
+1
+
+
+   MPC RLMPC  RL actor  critic  SOC   
+2
+
+
+
+1 Introduction
+
+4
+
+2 Problem Statement
+
+6
+
+3 MPC Formulation
+
+7
+
+3.1 Offline Candidate networks by SOC Range . . . . . . . . . . . . . . . . . . 8
+
+3.2 Day-Ahead Baseline Path Generation . . . . . . . . . . . . . . . . . . . . . 9
+
+3.3 Optimization Model . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+
+4 RL Formulation
+
+14
+
+4.1 Markov decision process . . . . . . . . . . . . . . . . . . . . . . . . . . . . 14
+
+4.2 RL algorithm . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 16
+
+5 Numerical experiments
+
+17
+
+6 Conclusion
+
+17
+
+A Candidate Events and Effective Arrival Chains
+
+18
+
+B Waiting, Priority, and Timeout Constraints
+
+19
+
+C Continuous Charging and Slot Matching
+
+20
+
+D Publication, Boundary State, and Accounting
+
+21
+
+ MPC-RL 
+1 Introduction
+    
+SOCSOC    SOC    
+  SOC  SOC    SOC    
+ MPC­RL      Model Predictive Control, MPC    SOC Reinforcement Learning, RL   1RL actor  MPC
+4
+
+MPC critic  MPC 
+Figure placeholder
+ 1: MPC­RL   RL critic   MPC   SOC  RL   MPC  critic  SOC   SOC   critic "" RL  MPC    MPC­RL MPC  RL   critic  MPC  SOC   SOC   MPC    2  3  MPC   SOC  4   RL  5  6   A­D   SOC 
+5
+
+ 1""
+2 Problem Statement
+ O-D  O-D  p op  dp   Sp  i   Bi SOC  SOC  1   
+ O-D  SOC    SOC   r  tarrr  t trsw  trarr  trsw  tdrdl  tdrdl = tarrr + t  
+  
+tq = q, Iq = [tq, tq+1), T = {, . . . ,  + H - 1}.
+ t H  T  [t, t+H)     
+   MPC­RL RL   MPC MPC    
+ 1RL  4 
+6
+
+
+
+
+
+ 1: 
+
+
+
+, tq, Iq, T t
+
+ q  [tq, tq+1)  H  
+
+P, p; Sp, S
+
+O-D O-D  p 
+
+Bi, b
+
+ i 
+
+Kfut,p, Kenr,p, Kp
+
+
+
+op, dp, ocur,p,k, socAp,,k O-D  p  SOC
+
+Ap,k
+
+ (p, k) 
+
+tAp,,ki trarr, trddl, trsw
+
+ (p, k)  i   r 
+
+ Dip,j , vip,j , D, sdp ei,q , is,wq , Ei,q EB , i, P i
+Pi,b,q , Pi,b(t), Si,b(t) y¯Ap,,ki,j , yApu,ib,,jp,k , cfail, 
+
+ SOC  SOC  q   RL  SOC   RL 
+
+
+
+yip,,jk, xAp,,ki, dp,k
+sA, fA, A
+zr, rR iS,b, Viout()
+
+    SOC 
+
+3 MPC Formulation
+
+ I t SOC    SOC   H 
+   SOC  actor  actor   Pi,b,q critic  4    
+ 3.1  MPC  3.3   [t, t+H) t+H  SOC  Si,b(t-+H )
+
+
+7
+
+  I  SOC "" 2
+Figure placeholder
+ 2: 
+3.1 Offline Candidate networks by SOC Range
+  expanded network ­ O-D  p op  i1  · · ·  ir  dp i1, . . . , ir    SOC   SOC 
+ O-D  p Vp = {op}  Sp  {dp}  Dip,j  vip,j > 0  i  j  SOC 
+  D > 0  D   SOC  sdp
+ SOC  h  O-D  p Step 1.  SOC  op  j
+ vip,j  1 i  j vip,dp +sdp  1  i  dp
+8
+
+Step 2.  op  dp 
+Step 3.  D   
+Step 4.  Ah,p  Vp  Ah,p 
+ SOC   ocur,p,k   SOC   D   Ap,k 
+3.2 Day-Ahead Baseline Path Generation
+ p, t¯pA,k, socpA,k  SOC 
+  actor    SOC 1   SOC  
+ O-D  p  k
+1.  SOC  socAp,k 1 
+2.  SOC  sdp    t 
+3.   
+9
+
+­   (i, j) y¯Ap,,ki,j = 1 0 
+
+3.3 Optimization Model
+MPC  
+
+Decision variables. 
+
+yip,,jk  {0, 1},
+
+(i, j)  Ap,k, k  Kp.
+
+ O-D  p  k  (i, j) yip,,jk = 1 y    xAp,,ki  dp,k 
+ r  tsrw   A sA fA  A   r zr  rR   1 - zr - rR  SOC  Si,b(t)  
+ Pi,b,q  RL actor  rollout  4   Pi,b(t)  MPC   SOC 1  SOC 
+
+ Big-M  B  C 
+
+Objective function.  MPC   RL 
+ is,wq  0  i  q   SOC    EB(1 - ) 
+
+IMPC = IA + IR,
+
+IA = EB
+
+sw i,q(tsw
+
+)
+
+(1
+
+-
+
+)sA,
+
+iS EiA
+
+(1)
+
+IR = EB
+
+sw i,q(trsw
+
+)
+
+(1
+
+-
+
+sociR,r )zr .
+
+iS rRi
+
+10
+
+ EiA  Ri  i   Aq(t)  t  B  IA IR   SOC  
+
+
+t+H
+
+Cch =
+
+ei(t)Pi,b(t) dt,
+
+(2)
+
+iS bBi t
+
+ ei(t) = ei,qt  Iq ""  C
+ 
+
+Cadj = 
+
+dp,k .
+
+(3)
+
+pP kKp
+
+
+
+
+
+
+
+
+
+
+
+
+
+Cfail = cfail
+
+fA.
+
+(4)
+
+iS EiA
+
+
+
+ fA  RL reward 
+
+
+
+RL  t+H   SOC  t+H   SOC 
+
+ 4  critic V  MPC  
+
+ actor 
+
+ sre+fH SOC critic  SOC 
+
+iS,b
+
+=
+
+V(s) Si,b
+
+,
+s=sre+fH
+
+i  S, b  Bi.
+
+(5)
+
+11
+
+ critic 
+Si,bSi,b(t-+H )  (j, i)  i 
+ SOC  Ap,,kj,i  SOC
+ i  SOC  sre+f,H(i,x)  SOC  x 
+
+Viout() = V sre+f,H(i,) - V sre+f,H(i,1) .
+
+(6)
+
+Viout()  MPC  critic   < 1  critic    SOC  
+ RL 
+
+RL =
+
+iS,bSi,b(t-+H ) +
+
+Vio(u)t()wout,
+
+(7)
+
+iS bBi
+
+E A,out
+
+ EA,out wout   1  SOC  0  D   critic 
+ MPC 
+
+max IMPC - Cch - Cadj - Cfail + RL.
+
+(8)
+
+Constraints. 
+
+ A­D 
+
+1
+
+
+
+1,
+
+ynp,,kj
+{j |(n,j )Ap,k }
+
+-
+
+yjp,,nk
+{j |(j,n)Ap,k }
+
+=
+
+-0,1,
+
+n = op,k, n = dp, ,
+
+p  P, k  Kp, n  Vp,k, (9)
+
+ op,k  op ocur,p,kVp,k   SOC  SOC spd
+
+12
+
+k  (j, i)  i  SOC 
+
+
+
+socAp,k - vopp,i,
+
+j = op, k  Kfut,p,
+
+Ap,,kj,i
+
+=
+
+s1o-cAp,v,kjp,-i,
+
+v , p,k ocur,p,k ,i
+
+j = ocur,p,k, k  Kenr,p, j  Sp,
+
+(j, i)  Ap,k.
+
+(10)
+
+ SOC SOC  SOC 
+
+2
+
+xpA,,ki =
+
+yjp,,ik ,
+
+{j |(j,i)Ap,k }
+
+i  Sp,
+
+(11)
+
+
+
+
+
+xrAe,fi,|p,k
+
+=
+
+x¯pA,,ki, xpAu,ib|,p,k ,
+
+k  Kfut,p, k  Kenr,p,
+
+(12)
+
+ x¯pA,,ki  y¯A xpAu,ib|,p,k   D
+
+
+
+dp,k  xAp,,ki - xAre,fi,|p,k, dp,k  xrAe,fi,|p,k - xpA,,ki,
+
+p  P, k  Kp, i  Sp, p  P, k  Kp, i  Sp.
+
+(13a) (13b)
+
+ dp,k = 1  dp,k = 0
+3// r 
+
+tdrdl = tarrr + t,
+
+(14)
+
+ trarr  trsw  trddl
+
+sA + fA + A = aA,
+
+(15)
+
+ aA  A  zr + rR  1 1 - zr - rR 
+
+ B
+
+4 SOC  t1 < t2  SOC 
+
+
+
+Si,b(t2)
+
+-
+
+Si,b(t1)
+
+=
+
+i EB
+
+t2
+Pi,b(t) dt,
+t1
+
+ Pi,b,q(t), Pi,b(t) = 0,
+
+Si,b(t) < 1, Si,b(t) = 1,
+
+(16)
+
+13
+
+ SOC 1  
+
+0  Pi,b,q  P i,
+
+ Pi,b,q  Ei,q,
+
+i  S, q  T.
+
+(17)
+
+bBi
+
+ SOC 1
+
+ SOC  SOCSi,b (tsrw)+ = r b  
+
+ SOC 1 MILP  C 5
+
+
+
+
+
+
+
+
+ indicator/Big-M  B  C
+
+6 SOC 
+
+
+
+Si,b(t) = Sio,bbs(t), i  S, b  Bi.
+
+(18)
+
+ Si,b(t-+H) 
+
+yip,,jk, dp,k, sA , fA, A, zr, rR  {0, 1},
+
+trsw  [t, t+H ),
+
+0  Si,b(t)  1;
+
+ pending  B  D (7)
+
+4 RL Formulation
+RL  critic  MPC  SOC  RL 
+4.1 Markov decision process
+State.  tRL agent  s SOC  SOC   Krem,p   t  y¯Ap,k 
+
+14
+
+ypAub,p,k 
+
+ZA = p, k, t¯Ap,k, socpA,k, y¯pA,k : k  Krem,p  p, k, ocur,p,k, socpA,,k, ypAub,p,k : k  Kenr,p .
+
+(19)
+
+ W = {(r, i, trarr, trddl)}  ZA  W  fAfW   fBfRact  fRpred  SOC 
+
+s = fB {Sio,bbs(t)}iS,bBi , fA(ZA), fW (W), fRact {(i, u, tiR,u, socRi,u, zRac,tu,i) : u  Ria,ct-1}iS , fRpred {(i, , tiR, , socRi, ) :   Ri,q}iS,qT , {ei,q}iS,qT ,  .
+
+(20)
+
+  Ria,ct-1  zRac,tu,i fRact SOC fRpred  t 
+fB  critic actor 
+ rollout 
+
+Action. RL 
+
+a = {Pi,b,}iS,bBi .
+
+(21)
+
+actor (17)  sigmoid   PPO  P  
+
+Reference rollout.  MPC  H  sref = s   actor  rollout
+
+{Pi,b,q}i,b = µ(sqref), q  T,
+
+(22)
+
+ µ  3   actor rollout critic  SOC  sqref  y  z   q 
+
+15
+
+fRnom fRact  fRpred   H  MPC 
+ Pi,b, 
+
+Transition.  s  MPC {yip,,jk}    I  Exec   SOC  SOC 
+
+(Sobs(t+1), W+1, zRac,t, faAc,t) = Exec Sobs(t), W, {Pi,b,}i,b, {yip,,jk}, {(u, tiR,u, sociR,u) : u  Rai,ct}iS .
+
+(23)
+
+ 
+
+s+1  P · | s, a, MPC(s, P) ,
+
+(24)
+
+ P P = {Pi,b,q : i  S, b  Bi, q  T} MPC ""
+
+Reward. RL reward 
+
+
+
+r = Iact - Cch, - Cadj, - Cfail,.
+
+(25)
+
+ IactCch,Cadj,Cfail,  I   DMPC 
+
+ reward
+
+ reward  reward  actor 
+
+
+
+4.2 RL algorithm
+  Proximal Policy Optimization (PPO)  RL PPO  actor-critic actor (at | st) critic V(st)   PPO  critic  state value function (5) SOC  MPC
+16
+
+PPO  critic 
+
+LV () = Et V(st) - G^t 2 ,
+
+(26)
+
+ G^t actor  clipped surrogate objective  
+
+wtIS()
+
+=
+
+(at | st) , old (at | st)
+
+(27)
+
+
+
+LCLIP() = Et min wtIS()A^t, clip(wtIS(), 1 - , 1 + )A^t ,
+
+(28)
+
+ A^t   clip Generalized Advantage Estimation, GAE
+
+
+A^t = ()netT+Dn,
+n=0
+
+etTD = rt + V(st+1) - V(st),
+
+(29)
+
+    GAE  RL   
+actor (22) MPC critic  sre+fH  V(s)  SOC  Si,b (6) RL RL  MPC  SOC MPC  
+
+5 Numerical experiments
+6 Conclusion
+ MPC­RL  MPC     SOC   t  SOC 1   RL actor  MPC critic  SOC
+17
+
+ MPC  actor rollout  critic  MPC  
+   critic   
+
+A Candidate Events and Effective Arrival Chains
+
+ MPC   r  = (p, k, j, i) (j, i)   SOC
+ i q  T 
+
+EiA,q = (p, k, j, i) : p  P, k  Kp, (j, i)  Ap,k, q(tAp,,ki) = q ,
+
+(30)
+
+ tAp,,ki   y = 1
+
+
+
+EiA,,wait EiR,,wait  T  EiR,q = Ri,q 
+
+Ei,q = EiA,q  EiR,q  EiA,,wait  EiR,,wait,
+
+q  T.
+
+ SOC 
+
+
+
+(,
+
+)
+
+=
+
+(yjp,,ik, pA,,kj,i), (1, rec),
+
+ = (p, k, j, i)  EiA,q,   EiA,,wait,
+
+(31)
+
+ Ap,,kj,i (10) rec  SOC  1 zr 
+  aA  {0, 1} op,k  aA = yjp,,ikj = op,k
+
+18
+
+ aA = 1 (j, i)  j 
+
+aA  yjp,,ik,
+
+aA 
+
+sA ,
+
+ E A (p,k,j )
+
+aA  yjp,,ik +
+
+sA - 1,
+
+ E A (p,k,j )
+
+(32a) (32b)
+(32c)
+
+ EA(p, k, j)  j   1   sA = fA = A = 0
+
+B Waiting, Priority, and Timeout Constraints
+
+ r
+  trarr trddl = trarr + t  tsrw (15) zr + rR  1 1 - zr - rR  tdrdl < t+H r = 0  trddl  t+H fr = 0 r = 1  t+H 
+
+
+trsw  tarrr - M (1 - r), trsw  tdrdl + M (1 - r), trsw  t+H + M (1 - r),
+
+(33a) (33b) (33c)
+
+ r  sA  zrM  Big-M  M = t+H  r = 1  tsrw  [trarr, trddl]  
+trarr  t t  tdrdl 
+ r  r r,r  {0, 1} 
+
+tsrw - tsrw  -M (1 - r,r) - M (2 - r - r), trsw - tsrw  -M r,r - M (2 - r - r) + tarrr - trarr - t,
+
+(34a) (34b)
+
+19
+
+"
+
+"
+
+sA  sA + 1 - aA ,
+
+  ,
+
+(35)
+
+
+
+ t trarr  t  C  
+
+
+
+
+
+C Continuous Charging and Slot Matching
+
+ MILP  i  b  m  ti,b,m t  ti,b,1  ti,b,2  · · ·  t+H  m  SOC   Si-,b,m Si+,b,m Si+,b,0 = Sio,bbs(t)
+SOC 
+
+Si-,b,m+1
+
+=
+
+Si+,b,m
+
++
+
+i EB
+
+Pi,b,qi,b,m
+
+(ti,b,m+1
+
+-
+
+ti,b,m
+
+-
+
+ui,b,m) ,
+
+0  Si-,b,m+1  1,
+
+(36a) (36b)
+
+ qi,b,m  m Pi,b,q ui,b,m  
+
+Si-,b,m+1 = 1 = ui,b,m  0 ,
+
+Si-,b,m+1 < 1 = ui,b,m = 0.
+
+(37)
+
+ indicator  Big-M ui,b,m  M (1 - gi,b,m)Si-,b,m+1  1 - M gi,b,m gi,b,m  {0, 1}  m + 1   SOC 1   SOC   SOC 1
+ i,b,r  {0, 1} i,b,r = 1  i  b  r
+
+i,b,r = r,
+bBi
+i,b,r  gi,b,m(r), tsrw = ti,b,m(r)  i,b,r = 1,
+
+r  Ei,
+r  Ei, b  Bi, r  Ei, b  Bi,
+
+(38a)
+(38b) (38c)
+
+20
+
+ m(r)  r  Big-M |trsw - ti,b,m(r)|  M (1 - i,b,r)  b < b ti+,b,m  trsw   i,b,r = 0 SOC  SOC
+
+i,b,r = 1 = Si+,b,m(r) = r.
+
+(39)
+
+(36)  SOC 1(17)  0  SOC  
+
+D Publication, Boundary State, and Accounting
+
+
+(12)  x¯pA,,ki = {j|(j,i)A¯p,k} y¯Ap,,kj,i  yApub,p,k  xpAu,ib|,p,k 
+  yApub,p,k dp,k = 0  y¯A 
+ SOC Sio,bbs(t+1)  W+1    EA,out Aubd  {0, 1} u = (p, k)  EuA,in  u  
+
+Abud  1 -
+
+fA,
+
+EuA,in
+
+Aubd  1 - fA,
+
+  EuA,in,
+
+(40a) (40b)
+
+ Abud = 1  Abud = 1  y 
+
+wout  y, wout  y + Aubd() - 1.
+
+wout  Aubd(),
+
+(41a) (41b)
+
+21
+
+ wout = 1   SOC  EA,out   pending  0 SOC 
+ I  
+
+IA,act = EB
+
+is,w (1 - arct),
+
+iS r: , i(r)=i, trsw,act I
+
+IR,act = EB
+
+is,w (1 - sociR,u),
+
+iS uRiact: tusw,act I
+
+Cch, =
+
+ei, Pia,bct(t) dt,
+
+iS bBi
+
+I
+
+Cadj, = 
+
+I k  ,
+
+pP kKenr,p
+
+Cfail, = cfail
+
+fract,
+
+iS r: , i(r)=i, trddl I
+
+(42) (43)
+(44) (45) (46)
+
+ tsrw,actarct  fract  SOC    (25) 
+
+22
+
+

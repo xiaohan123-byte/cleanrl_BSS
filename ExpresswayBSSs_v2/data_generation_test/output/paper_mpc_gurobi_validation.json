@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "generator": "src.paper_mpc.solve_paper_mpc",
+  "model_reference": "paper/main.tex",
+  "solver_backend": "gurobi",
+  "solver_version": "12.0.1",
+  "license_id": 2791221,
+  "num_stations": 6,
+  "fixed_mock_power": true,
+  "rl_training_implemented": false,
+  "scenarios": [
+    {
+      "scenario_id": "joint_shared_inventory_reroute",
+      "status": "OPTIMAL",
+      "mip_gap": 0.0,
+      "objective_total": 255.0,
+      "selected_station_sequences": {
+        "0:100": [1],
+        "0:101": [0, 2]
+      },
+      "path_adjusted": {
+        "0:100": true,
+        "0:101": false
+      },
+      "adjustment_cost": 1.0,
+      "reservation_failure_cost": 0.0,
+      "reservation_services": 3,
+      "variable_count": 101,
+      "constraint_count": 166,
+      "selected_pattern_replay_validated": true
+    },
+    {
+      "scenario_id": "positive_wait_then_service",
+      "requested_power_kw": 60.0,
+      "initial_station_0_slot_0_soc": 0.9,
+      "status": "OPTIMAL",
+      "objective_total": 142.842105263159,
+      "request_outcome": "served_in_horizon",
+      "service_time_hours": 0.175438596491,
+      "wait_time_hours": 0.175438596491,
+      "reservation_failure_cost": 0.0,
+      "variable_count": 58,
+      "constraint_count": 86,
+      "selected_pattern_replay_validated": true
+    },
+    {
+      "scenario_id": "zero_power_reservation_failure",
+      "requested_power_kw": 0.0,
+      "initial_station_0_slot_0_soc": 0.9,
+      "deadline_hours": 0.25,
+      "status": "OPTIMAL",
+      "objective_total": -1000.0,
+      "request_outcome": "failed_in_horizon",
+      "timeout_time_hours": 0.25,
+      "reservation_failure_cost": 1000.0,
+      "downstream_outcome": "inactive",
+      "failure_count": 1,
+      "variable_count": 58,
+      "constraint_count": 86,
+      "selected_pattern_replay_validated": true
+    }
+  ],
+  "checks": {
+    "all_scenarios_optimal": true,
+    "joint_route_adjustment_observed": true,
+    "positive_wait_observed": true,
+    "reservation_failure_cost_observed": true,
+    "downstream_double_failure_prevented": true,
+    "all_selected_patterns_replayed": true
+  }
+}

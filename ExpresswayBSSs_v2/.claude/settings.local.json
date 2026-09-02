@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python data_generation_rl/random_single_day_demand.py)"
+    ]
+  }
+}
