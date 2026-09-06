@@ -1,0 +1,1134 @@
+% !LW recipe = latexmk (xelatex)
+\documentclass[12pt,a4paper,UTF8]{ctexart}
+\usepackage{SJTUReport}
+\usepackage{booktabs} % 三线表
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+%%-------------------------------正文开始---------------------------%%
+\begin{document}
+
+% %-----------------------封面--------------------%%
+\cover
+
+%------------------摘要-------------%%
+\newpage
+\begin{abstract}
+
+面向高速公路长途出行场景，本文研究沿线换电站网络中预约与随机两类异质用户的实时运营优化问题。长途电动汽车在一次行程中可能需要多次换电，每次换电在取走满电电池的同时退回一块低电量电池，使用户的换电站序列选择与沿线各站的电池库存形成时空耦合。为此，本文构建模型预测控制（MPC）与强化学习（RL）相结合的分层协同框架：MPC 在滚动预测域内联合优化预约用户的剩余换电站序列与站内连续服务事件安排，RL actor 为各站逐槽电池生成请求充电功率，critic 则采用分段线性价值网络，统一评价预测期末电池库存和未完成请求对后续运营净收益的影响；网络参数在每轮求解中固定，终端状态由本轮路径与服务决策决定。模型以连续时间刻画到站、等待、超时、充电完成与瞬时换电事件，允许未决等待请求跨滚动边界携带，并按真实发生时刻对服务、违约与路径发布结算一次。
+
+\end{abstract}
+\newpage
+
+\thispagestyle{empty} % 首页不显示页码
+
+%%--------------------------目录页------------------------%%
+\newpage
+\tableofcontents
+
+%%------------------------正文页从这里开始-------------------%
+\newpage
+
+%可选择这里也放一个标题
+\begin{center}
+   \title{ \Huge \textbf{{考虑异质用户的高速公路换电站运营 MPC-RL 分层协同优化}}}
+\end{center}
+
+
+\section{Introduction}
+随着电动汽车在高速公路中长距离出行场景中的普及，沿线补能设施的运营能力逐渐成为影响用户出行可靠性与系统运行效率的关键因素。相比传统充电方式，换电模式可以缩短车辆补能时间。在高速公路场景下，长途出行的电动汽车往往需要沿行程多次换电：车辆沿道路单向行驶且不能折返，前一次换电的站点选择直接改变后续可达站点集合与剩余换电站序列，各次换电决策因此相互关联。
+
+与此同时，不同车辆到达时的电池荷电状态（SOC）各不相同：SOC 通过影响剩余续航里程，决定车辆首个可达换电站以及整条换电站序列；而每次换电在换出满电电池的同时退回一块低 SOC 电池，退回电池须经重新充电后才能再次服务。因此，一位用户的站点选择不仅影响自身后续行程，还会改变相关站点未来的电池库存状态，使用户路径与多站点电池库存产生时空耦合。高速公路换电站运营由此成为一个具有用户车辆电池状态和多站点电池状态时空耦合、动态演化特征的序贯决策问题。
+
+实际运营中存在两类异质用户：预约用户和随机到达用户。预约用户在运营日前提交计划到达高速入口的时间、行程起点和终点以及到达 SOC，运营者据此完成接纳决策并发布日前换电路径；随机用户直接到站提出请求，其到达时刻与 SOC 只能预测。预约用户的实际到达信息可能偏离预约内容；车辆进入高速公路后，其未执行的剩余换电站序列需要随实时位置、实时 SOC 和预计到达时间不断更新；到站时若暂无满电电池可用，用户在站内等待，超过其等待耐心后流失。考虑到分时电价使站内充电成本随时间变化，如何协调预约用户履约、随机用户接纳以及站内电池充电调度，是高速公路换电网络运营中的核心问题。
+
+针对上述问题，本文构建 MPC--RL 分层协同优化框架。换电站的实时运营中存在两类性质不同但相互耦合的决策：一类是预约用户剩余换电路径的动态调整决策，即在有限预测域内根据未到用户的预约信息和在途用户的实时状态调整其未执行的换电站序列；另一类是各站逐槽电池的充电功率决策。剩余路径调整具有离散组合结构，并同时受到车辆续航、路径连通性、预约履约和多站点库存约束；随机需求预测与实际到达又随时间不断更新。模型预测控制（Model Predictive Control, MPC）能够在有限预测域内联合评估这些约束和未来库存影响，并在每次获得新观测后重新优化而只执行当前外层区间，因而适合处理该类动态路径调整问题。充电功率的影响则具有明显的跨时段累积性：当前功率不仅决定当期充电成本，还会改变未来各站逐槽电池的 SOC、满电电池供给能力和后续服务水平。本文采用强化学习（Reinforcement Learning, RL）学习逐槽充电功率控制策略，使其能够在长期交互过程中根据需求、电价和电池状态自适应调整充电行为。如\autoref{fig:MPC-RL}所示，RL actor 输出预测域内的逐槽请求充电功率并作为 MPC 的已知参数，MPC 在给定功率下联合优化剩余路径与站内连续服务事件安排，critic 向 MPC 提供预测域之外的长期价值信息。
+
+\begin{figure}[!htbp]
+  \centering
+  % FIGURE_PROMPT_BEGIN: fig:MPC-RL
+  % 绘制一张适用于运筹优化与智能交通学术论文的 MPC–RL 协同框架图。白色背景，扁平化矢量风格，横向 16:9，配色仅使用深蓝、青绿色、橙色和中性灰，无渐变、阴影、3D 或装饰图标。
+  % 图中从左到右展示：当前观测状态（逐槽电池 SOC、预约与随机等待队列及剩余耐心、未到和在途预约信息、实时位置与 ETA、电价和随机需求预测）；基于已知信息预先确定的参考路径与参考执行轨迹；RL actor 输出预测域内逐槽请求功率，critic 以固定参数的分段线性网络评价本轮决策对应的终端库存与未完成请求；MPC 在给定 RL 信息后优化预约用户剩余路径和站内连续事件安排；执行器落实 MPC 选定的服务对象与槽位匹配，并按真实到站、充电完成、换电和超时事件连续推进；预测偏差触发固定路径和功率下的服务与匹配重优化；输出实际 reward、更新后的电池状态、等待队列和已发布剩余路径，并反馈至下一轮。
+  % 明确区分外层固定间隔决策与区间内部连续事件，强调参考路径先确定、随后 actor rollout、最后 MPC 求解，不出现 RL–MPC 内循环。所有文字使用简洁中文，字体统一，箭头方向明确，模块不超过六个，适合缩放后在 A4 论文中阅读。输出优先为可编辑 SVG/PDF 或高分辨率透明背景图片。
+  % FIGURE_PROMPT_END: fig:MPC-RL
+  \fbox{\parbox[c][0.52\textwidth][c]{0.92\textwidth}{%
+    \centering\small Figure placeholder}}
+  \caption{MPC--RL 协同决策、连续事件执行与状态反馈框架}
+  \label{fig:MPC-RL}
+\end{figure}
+
+进一步地，本文利用 RL critic 提供预测时域之外的长期价值信息，以缓解有限预测时域导致的末端效应。传统 MPC 通常通过设置固定终端库存下界避免时域末端过度消耗满电电池，但难以同时反映电池 SOC 分布和未来请求到站时刻的差异。本文通过预测期结束后的运营净回报训练分段线性状态价值函数，统一评价期末电池库存和未完成请求的长期影响。尚未完成的请求保留到站时刻、等待截止时刻和退回 SOC，只有在实际服务时才消耗满电电池。每轮 MPC 求解时，价值网络及状态特征提取的参数保持固定，输入的预测终端状态则随本轮路径、服务与槽位匹配决策变化；网络中的 ReLU 单元通过混合整数线性约束嵌入 MPC。
+
+因此，本文提出的 MPC--RL 框架基于决策属性进行分层：MPC 负责处理强约束、组合结构明显且需要可解释性的预约用户剩余路径动态调整问题；RL 负责学习具有长期影响的逐槽充电功率策略，并通过 critic 向 MPC 提供终端库存与未完成请求的长期价值函数。二者通过逐槽 SOC 状态、逐槽请求充电功率、在途预约履约事件和终端价值项相互连接，从而在保证预约用户服务质量要求和运营约束可行性的同时，使有限时域 MPC 能够近似感知预测时域之外的长期影响。
+
+% CONTRIBUTIONS_PLACEHOLDER_BEGIN
+% 待作者补充本文贡献
+% CONTRIBUTIONS_PLACEHOLDER_END
+
+本文其余部分安排如下：第 2 节给出问题描述；第 3 节建立滚动时域下的 MPC 模型，包括基于 SOC 分档的离线候选网络、日前基准路径生成和在线优化模型；第 4 节建立充电控制的马尔可夫决策过程并介绍 RL 算法；第 5 节给出数值实验；第 6 节总结全文。附录 A--D 分别给出候选事件构造与有效到达链、等待与优先级约束、连续充电与槽位匹配、路径发布与边界记账的实现细节。全文将站点规定的服务就绪 SOC 归一化为 $1$；因此，“满电”表示达到该运营目标值，并不要求等于电芯的电化学上限。
+
+
+
+
+
+
+\section{Problem Statement}
+
+考虑由多个 O-D 对及沿线换电站构成的单向高速公路换电网络。对于任一 O-D 对 $p$，车辆从入口 $o^p$ 进入高速公路后沿下游方向顺序行驶且不能折返，最终从出口 $d^p$ 离开；一次长途行程可能需要在沿线换电站集合 $\mathcal S^p$ 中的多个站点换电。站点 $i$ 配备槽位集合 $\mathcal B_i$，槽位中的电池以归一化 SOC 刻画电量状态。每次换电从站点取走一块 SOC 为 $1$ 的满电电池，并退回一块带有剩余电量的电池，退回电池入槽充电后可再次服务。因此，某位用户的站点选择不仅决定其后续可达站点，还会改变相关站点未来的电池库存，使用户路径与多站点库存产生时空耦合。
+
+系统服务预约用户和随机到达用户。预约用户在运营日前提交预约信息，包括 O-D 对、预计进入高速公路的时刻及进入时的 SOC，运营者据此决定是否接纳预约，并为已接纳用户制定和发布日前换电路径。随机用户在到达换电站时提出请求，运营者只掌握其预测到达信息。按运行状态，已接纳预约用户分为两类：尚未进入高速公路的未到用户，以及已进入高速公路的在途用户；已经迟于预约入口时刻但尚未实际进入的用户仍属于未到集合，不能仅按原预约时刻将其删除。未到用户的有效入口 SOC 记为 $\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$，其初值为预约入口 SOC，并在获得新的入口前观测后更新；用户实际进入后，系统改用其实时位置、实时 SOC 和到达下游节点的预计到达时间。到站时若暂无满电电池可用，用户在站内等待：任一请求 $r$ 自其到站时刻 $t_r^{\mathrm{arr}}$ 起最长等待 $\Delta t$，开始服务时刻 $t_r^{\mathrm{sw}}$ 须满足 $t_r^{\mathrm{arr}}\le t_r^{\mathrm{sw}}\le t_r^{\mathrm{ddl}}$，其中 $t_r^{\mathrm{ddl}}=t_r^{\mathrm{arr}}+\Delta t$ 为等待截止时刻；截止时刻仍未获得服务的预约记为一次预约失败，随机请求则流失。换电视为瞬时事件。
+
+系统以固定长度 $\sigma$ 的外层区间组织运营。以运营日统一时间原点，记
+\[
+t_q=q\sigma,
+\qquad
+\mathcal I_q=[t_q,t_{q+1}),
+\qquad
+\mathcal T_\ell=\{\ell,\ldots,\ell+H-1\}.
+\]
+在每个区间起点 $t_\ell$，系统以未来 $H$ 个区间为预测域，即 $\mathcal T_\ell$ 对应连续时间范围 $[t_\ell,t_{\ell+H})$。预约与随机请求的到站时刻均为外生连续值，区间索引只用于请求归组、电价与站级充电能量限额等分段常数数据。服务顺序遵循两条规则：预约请求优先于随机请求；同类请求内部按原到站时刻先后服务，同类且同刻到站的请求具有相同优先级，由 MPC 在库存不足时选择服务对象。用户编号仅用于标识请求，不决定优先级。系统不为尚未到站的请求扣留当前可用电池；等待请求跨滚动边界携带，保留其请求标识、原到站时刻与原截止时刻，不重新计时。
+
+运营者需要协调预约用户的剩余换电站序列与各站逐槽电池的充电功率，从而在履行已接纳预约的前提下，权衡换电收益、购电成本、路径调整成本和长期库存价值。本文采用分层 MPC--RL 框架：RL 根据需求、电价和库存状态生成预测域内的逐槽请求充电功率，并向 MPC 提供参数固定的分段线性终端价值网络；MPC 在给定请求功率下联合优化剩余路径与站内连续服务事件安排。每轮优化后，系统发布发生变化的在途用户剩余站序，只执行首个外层区间内的充电与服务安排，随后根据真实到站、充电完成、换电和超时事件更新状态并进入下一轮求解。
+
+\autoref{tab:notation}列出正文反复使用的核心符号；仅在附录使用的符号在各附录中就近说明。RL 的状态、动作和算法符号在第 4 节定义。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{正文主要符号}
+  \label{tab:notation}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \renewcommand{\arraystretch}{0.98}
+  \begin{tabular}{@{}lp{11cm}@{}}
+    \toprule
+    \textbf{符号} & \textbf{含义} \\
+    \midrule
+    \multicolumn{2}{l}{\textit{集合与索引}} \\
+    $\sigma,t_q,\mathcal I_q,\mathcal T_\ell,\Delta t$ & 外层区间长度与起点、半开区间、含 $H$ 个区间的预测域索引集，以及最大等待时间 \\
+    $\mathcal P,p;\ \mathcal S^p,\mathcal S;\ \mathcal B_i,b$ & O-D 对、沿线与全系统站点、库存槽位的集合和索引；槽位不是永久电池编号 \\
+    $\mathcal K_\ell^{\mathrm{fut},p},\mathcal K_\ell^{\mathrm{enr},p},\mathcal K_\ell^p$ & 未到、在途预约用户集合及其并集；迟到但尚未实际进入者仍属于未到集合 \\
+    $o^p,d^p,o_\ell^{\mathrm{cur},p,k},\widetilde{\mathrm{soc}}_{A,\ell}^{p,k},\mathrm{soc}_{A,\ell}^{p,k}$ & 入口、出口、实时虚拟起点、未到用户有效入口 SOC 与在途用户实时 SOC \\
+    $\mathcal A^{p,k},t_{A,i}^{p,k},t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}},t_r^{\mathrm{sw}}$ & 个体剩余候选弧集、连续 ETA，以及请求的到站、截止和开始服务时刻 \\
+    \midrule
+    \multicolumn{2}{l}{\textit{参数与状态}} \\
+    $D_{i,j}^{p},v_{i,j}^{p},\underline D,\underline s_d^p$ & 节点间距离与 SOC 消耗、最小换电间距和出口最低 SOC \\
+    $e_{i,q},\pi_{i,q}^{\mathrm{sw}},\overline E_{i,q},\overline P_i$ & 购电价、服务价格、站级区间充电能量上限和单槽功率上限 \\
+    $E_B,\eta_i,\widehat P_{i,b,q},P_{i,b}(t),S_{i,b}(t)$ & 电池额定能量、充电效率、RL 请求功率、实际功率和槽位 SOC \\
+    $\bar{\mathbf y}_{A}^{p,k},\mathbf y_{A}^{\mathrm{pub},p,k}$ & 日前初始发布路径与最近一次实际发布的剩余路径 \\
+    $\kappa,c^{\mathrm{fail}},\beta$ & 单次路径调整成本、单次预约失败成本与 RL 终端价值权重 \\
+    \midrule
+    \multicolumn{2}{l}{\textit{决策变量与主要辅助量}} \\
+    $y_{i,j}^{p,k},x_{A,i}^{p,k},d_{p,k}$ & 剩余路径、站点访问量与路径差异指示量 \\
+    $s_\varepsilon^A,f_\varepsilon^A,\omega_\varepsilon^A,z_r,\omega_r^R$ & 预约和随机请求的服务、超时或流失、跨边界未决结果 \\
+    $s_{\ell+H},\Phi^{\mathrm{RL}},w_h^{\mathrm{pend}}$ & 预测终端状态、后续运营价值与预约交付未决指示量 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\section{MPC Formulation}
+
+设当前决策区间为 $\mathcal I_\ell$。在时刻 $t_\ell$，系统读取：各站逐槽电池的观测 SOC 与正在充电的状态；自上一轮携带而来、仍未超时的站内等待请求（保留其原请求标识、原到站时刻与原截止时刻）；在途预约用户的实时位置、实时 SOC 与到达下游节点的预计到达时间；已发布且尚未执行的剩余路径；以及未来 $H$ 个区间的随机需求预测与电价。
+
+随后，系统按固定顺序构造本轮求解输入。首先确定参考路径：在途用户取最近一次实际发布路径的未执行站序；未到用户优先沿用上一轮保留的内部参考路径，该路径不存在或在当前信息下不再满足几何与续航可行性时，以日前初始发布路径为基准修复。参考路径修复只使用求解前已知的位置、SOC、预计到达时间和候选网络，不依赖尚未生成的 actor 功率或本轮优化变量。其次，以同一 actor 的均值策略沿参考执行轨迹滚动生成预测域内的逐槽请求充电功率 $\widehat P_{i,b,q}$，并固定本轮使用的 critic 与状态特征提取参数（第 4 节）。参考执行满足与实际执行相同的预约优先、类内先到先服务、及时服务、等待、超时和充电约束，并允许预约软失败；其中同优先级请求的选择与满电槽位匹配由求解前给定的参考策略 $\pi^{\mathrm{ref}}$ 生成（第 4 节），不限定本轮 MPC 的匹配决策。因此，请求功率序列与网络参数在求解前已确定，不依赖本轮待求的路径、服务和匹配变量；终端状态及其价值在 MPC 内随这些决策计算，不参与求解前的功率生成。
+
+在此基础上，系统为每位预约用户构造本轮剩余候选网络（第 3.1 节），并由 MPC 在给定请求功率下联合优化剩余路径与站内连续事件安排（第 3.3 节）。模型采用半开预测域 $[t_\ell,t_{\ell+H})$：恰好发生在 $t_{\ell+H}$ 的到站、充满、服务或超时事件由下一轮处理；终端 SOC 取事件前快照 $S_{i,b}(t_{\ell+H}^{-})$，端点事件不跨轮重复执行或结算。
+
+求解后，系统立即发布发生变化的在途用户剩余站序并结算一次路径调整成本，新站序作为下一轮的调整基准；未到用户的内部优化路径不发布、不覆盖日前路径，也不进入当前实际收益。系统只执行首个外层区间 $\mathcal I_\ell$：区间内按真实到站、充电完成、换电和超时事件连续推进；区间结束时，逐槽 SOC、仍未超时的等待队列与已发布剩余路径进入下一轮。这一机制可概括为“滚动时域优化、连续事件执行”，如\autoref{fig:rolling_horizon}所示。
+
+\begin{figure}[!htbp]
+  \centering
+  % FIGURE_PROMPT_BEGIN: fig:rolling_horizon
+  % 绘制一张适用于学术论文的横向滚动时域示意图。白色背景、简洁矢量风格，宽高比约 2:1，使用深蓝表示预测域、橙色表示当前执行区间、绿色表示跨边界携带状态、灰色表示已执行历史。
+  % 顶部为时间轴，清晰标出 $t_{\ell-1}$、$t_\ell$、$t_{\ell+1}$ 和 $t_{\ell+H}$，预测域采用半开区间 $[t_\ell,t_{\ell+H})$，突出只执行首个外层区间。下方设置三条泳道：第一条为未到预约用户，显示其内部路径可滚动优化但仍相对初始发布路径评价；第二条为在途预约用户，显示从实时虚拟起点重优化剩余站序，路径变化后发布并更新比较基准；第三条为站内等待队列，显示原始到站时刻和截止时刻跨滚动边界保持不变。
+  % 当前执行区间内部使用少量时间标记展示连续到站、充电完成、立即换电和超时事件；预测终点处显示尚未截止的请求作为未决状态传入下一轮。不得出现“已发布路径固定不再优化”“整时段统一换电”或“随机用户必须当期完成”等旧逻辑。文字精炼、层级清楚、无大段说明，适合 A4 论文单栏宽度阅读。输出优先为可编辑 SVG/PDF 或高分辨率图片。
+  % FIGURE_PROMPT_END: fig:rolling_horizon
+  \fbox{\parbox[c][0.46\textwidth][c]{0.92\textwidth}{%
+    \centering\small Figure placeholder}}
+  \caption{滚动时域中的剩余路径优化、连续事件执行与等待请求携带}
+  \label{fig:rolling_horizon}
+\end{figure}
+
+
+\subsection{Offline Candidate networks by SOC Range}
+
+在每个决策时刻，需要安排预测域内每位预约用户的剩余换电站序列。如何高效、清晰地表示解的结构并设计决策变量是首要问题。本文借鉴加油站选址模型中 expanded network 的思路，用一条入口--出口路径表示该序列：对于 O-D 对 $p$，若路径为
+$o^p\rightarrow i_1\rightarrow\cdots\rightarrow i_r\rightarrow d^p$，则用户依次在换电站 $i_1,\ldots,i_r$ 换电，一条弧跨过的沿线站点均不被访问。为避免在每个滚动时刻重复枚举全部下游组合，本文在运营前先生成候选路径网络。不同的用户出发 SOC 会影响车辆的续航里程，从而影响可达的换电站集合。我们将用户出发 SOC 划分为若干个离线区间，并在每个区间上生成相应的候选网络。
+
+对每个 O-D 对 $p$，节点集合为
+$\mathcal V^p=\{o^p\}\cup\mathcal S^p\cup\{d^p\}$，所有节点均按高速公路下游方向排列。参数 $D_{i,j}^p$ 和 $v_{i,j}^p>0$ 分别表示从 $i$ 到下游节点 $j$ 的行驶距离和 SOC 消耗。
+
+考虑到现实场景中为用户安排两个距离过近的连续站点换电并不合理，同时也为了减少网络规模，给定最小换电间距 $\underline D>0$，生成的网络在保证方案可行性的基础上，尽量排除从出发位置到首个换电站以及任意两个连续访问换电站之间距离小于 $\underline D$ 的方案。指向出口的末段行程不受该间距约束，但车辆到达出口时的 SOC 不得低于 $\underline s_d^p$。
+
+对每个 SOC 区间 $h$ 和 O-D 对 $p$，离线网络按以下步骤生成。
+
+\begin{enumerate}
+  \item[\textbf{Step 1.}] \textbf{生成原始弧。}若车辆以该 SOC 区间的上限电量能够从入口 $o^p$ 到达下游换电站 $j$，则连接二者；若 $v_{i,j}^p\le1$，则连接两个依次位于下游的换电站 $i$ 和 $j$；若 $v_{i,d^p}^p+\underline s_d^p\le1$，则连接换电站 $i$ 与出口 $d^p$。
+
+  \item[\textbf{Step 2.}] \textbf{生成完整可行路径。}在原始网络中枚举所有从 $o^p$ 到 $d^p$ 的完整路径。
+
+  \item[\textbf{Step 3.}] \textbf{剪枝过近换电弧。}从上述完整路径中找出距离小于 $\underline D$ 的首段弧和站间弧，并按距离从小到大排序。依次考察每条过近弧，如果现有的完整路径中仍存在至少一条不包含该弧的方案，则删除该弧，否则保留。
+
+  \item[\textbf{Step 4.}] \textbf{形成候选网络。}将最终保留的完整路径所包含的弧合并为 $\mathcal A^{h,p}$，候选网络由节点集 $\mathcal V^p$ 和弧集 $\mathcal A^{h,p}$ 组成。
+\end{enumerate}
+
+离线分档网络提供下游站间连接骨架。在线使用时，未到用户以其有效入口 SOC $\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$ 所在区间对应的离线网络为基础；对在途用户，系统删除其已经经过的节点和弧，并从实时虚拟起点 $o_\ell^{\mathrm{cur},p,k}$ 向下游节点补建首段弧。虚拟首段依据求解前已知的实时位置、实时 SOC 和连续预计到达时间筛选可达性，本文不为此建立随机交通模型。最小换电间距 $\underline D$ 始终以入口或最近一次真实换电位置为基准解释，不因为虚拟起点随滚动前移而把用户视为刚刚完成一次换电。由此得到的个体剩余候选弧集记为 $\mathcal A^{p,k}$；已执行的路径前缀不进入本轮决策。
+
+
+\subsection{Day-Ahead Baseline Path Generation}
+
+用户提交预约信息
+$\left(p,\bar t_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}\right)$
+后，运营者依据其行程、预计入口时刻和入口 SOC 检查能否提供服务，并为可接纳的请求生成日前基准路径。
+
+预约请求按提交顺序处理。处理当前请求前，算法根据已接纳预约和日前随机需求预测，递推估计各站未来各时段的槽位库存。日前充电功率由训练完成的同一 actor 的均值策略在日前预测状态上逐区间生成；库存递推采用与在线模型一致的连续充电规则：电池未满时按当前区间的请求功率充电，达到 SOC $1$ 后立即停止充电，换电退回的低 SOC 电池入槽后立即恢复充电；预计换电事件按预计服务时刻扣减满电库存。站内同优先级请求的选择与满电槽位匹配采用第 4 节的参考策略 $\pi^{\mathrm{ref}}$。给定初始库存、需求预测、参考策略的随机种子和下述选站规则，日前库存递推与预约接纳结果可以复现。
+
+对 O-D 对 $p$ 的预约用户 $k$，基准路径按以下规则生成：
+\begin{enumerate}
+  \item 车辆从入口出发时的 SOC 为 $\overline{\mathrm{soc}}_A^{p,k}$，每次换电后恢复为 $1$。下一节点沿候选弧集选择，因此首段和站间行程均满足续航要求。
+  \item 若车辆能够从当前位置直接到达出口，且到达 SOC 不低于 $\underline s_d^p$，则下一站选择出口；否则，仅保留预计到站时刻已经有满电电池可用、并且仍存在可行下游延续路径的候选站。该接纳标准是严格的：预计到达时必须已经存在满电电池，不利用等待时间 $\Delta t$ 扩大接纳量。
+  \item 候选站按预计满电电池余量从高到低排序，余量相同时优先选择更靠近出口的站点。选定站点后，在相应时段为该用户预留一块满电电池，并更新该站后续时段的预计库存；随后重复上述过程。
+\end{enumerate}
+
+若任一步不存在满足库存与下游可达性要求的候选站，即不能生成完整入口--出口路径，则拒绝该请求；只有成功生成完整路径的用户才进入已接纳集合。对已接纳用户，若基准路径经过弧 $(i,j)$，则令 $\bar y_{A,i,j}^{p,k}=1$，否则为 $0$。该路径随预约结果一并发布，既作为用户的初始发布路径，也作为其未到阶段路径调整的固定比较基准。
+
+
+\subsection{Optimization Model}
+
+给定参考路径、逐槽请求充电功率、价值网络及状态特征提取参数与个体剩余候选网络，MPC 在预测域内联合优化预约用户的剩余路径与站内连续服务事件安排。
+
+\paragraph{Decision variables.}
+路径决策变量为
+\[
+y_{i,j}^{p,k}\in\{0,1\},
+\qquad
+(i,j)\in\mathcal A^{p,k},
+\quad
+k\in\mathcal K_\ell^p.
+\]
+若 O-D 对 $p$ 的预约用户 $k$ 经过弧 $(i,j)$，则 $y_{i,j}^{p,k}=1$；一组满足流平衡的 $y$ 变量唯一确定该用户剩余行程中依次访问的换电站序列。路径变量属于本轮子问题，不随滚动轮次增加下标。辅助变量 $x_{A,i}^{p,k}$ 和 $d_{p,k}$ 分别表示站点访问量和路径差异指示量。
+
+站内服务以通用请求索引 $r$ 描述。每个请求携带连续的开始服务时刻 $t_r^{\mathrm{sw}}$；对预约候选事件 $\varepsilon$（定义见附录 A），二元变量 $s_\varepsilon^A$、$f_\varepsilon^A$ 和 $\omega_\varepsilon^A$ 分别表示其在预测域内获得服务、等待超时和跨边界未决；对随机请求 $r$，二元变量 $z_r$ 和 $\omega_r^R$ 分别表示其获得服务和跨边界未决，随机流失由 $1-z_r-\omega_r^R$ 派生，不单独设变量。槽位 SOC 轨迹 $S_{i,b}(t)$ 为连续时间状态量。预测终端状态 $s_{\ell+H}$ 由本轮路径、服务与槽位匹配结果确定；价值网络和状态特征提取的参数在本轮求解中保持固定，ReLU 输出及其激活指示量作为辅助变量加入模型。
+
+逐槽请求充电功率 $\widehat P_{i,b,q}$ 是 RL actor 经参考 rollout 生成的已知参数（第 4 节）。实际充电功率 $P_{i,b}(t)$ 不是 MPC 自由选择的变量，而由确定性充电规则派生：电池未满时等于当前区间的请求功率，达到 SOC $1$ 后立即停止充电；同一槽位换入低 SOC 电池后，立即恢复当前区间的同一请求功率。附录 B--C 以站级物理时刻 $m$ 展开队列与槽位状态；$x_{i,r,m}$ 和 $\alpha_{i,b,r,m}$ 分别表示请求在该时刻获得服务及其槽位匹配，服务对象与槽位匹配由 MPC 选择；给定这些选择后，槽位 SOC 和下一充满时刻按物理规则递推，不能任意延迟。匹配改变退回电池所继承的槽位功率，因此后续事件时刻也随匹配决策变化。
+
+\paragraph{Objective function.}
+本轮 MPC 的目标按服务收益、连续充电成本、路径调整成本、预约超时成本和 RL 终端价值依次定义。
+
+\textbf{换电服务收益。}令 $\pi_{i,q}^{\mathrm{sw}}\ge0$ 表示站点 $i$ 在区间 $q$ 的单位换电电量服务价格。用户获得满电电池并退回 SOC 为 $\rho$ 的电池时，本次换电的服务电量为 $E_B(1-\rho)$。服务收益按预测服务时刻所在价格区间取值：
+\begin{equation}
+I^{\mathrm{MPC}}
+=E_B\sum_{i\in\mathcal S}
+\sum_{r\in\mathcal E_i}
+\sum_{q\in\mathcal T_\ell}
+\pi_{i,q}^{\mathrm{sw}}(1-\rho_r)\gamma_{i,r,q},
+\label{eq:income}
+\end{equation}
+其中 $\mathcal E_i$ 为站点 $i$ 的预约、随机及携带请求记录集合，$\rho_r$ 为其退回 SOC；$\gamma_{i,r,q}=1$ 当且仅当请求 $r$ 在半开区间 $\mathcal I_q$ 内获得服务，其事件位置线性化见附录 B。将请求集合按类别拆分即可得到 $I^{\mathrm{MPC}}=I^A+I^R$；$I^A$ 只计入由站内满电库存实际履约的预约换电，$I^R$ 使用当前预测到站信息，因而是前瞻收益。个体候选网络已规定车辆一旦能够满足出口 SOC 要求便直接驶向出口，因此正的服务收益不会诱导可避免的额外换电。
+
+\textbf{连续充电成本。}预测域内的购电成本按实际功率积分计算：
+\begin{equation}
+C_{\mathrm{ch}}
+=
+\sum_{i\in\mathcal S}
+\sum_{b\in\mathcal B_i}
+\int_{t_\ell}^{t_{\ell+H}}
+e_i(t)P_{i,b}(t)\,\mathrm dt,
+\label{eq:chargingcost}
+\end{equation}
+其中 $e_i(t)=e_{i,q}$（$t\in\mathcal I_q$）为分段常数电价。给定请求功率后，相邻事件之间的充电能量是“已知功率系数乘以连续持续时间”，不产生两个自由连续变量的乘积；事件级展开见附录 C。
+
+\textbf{路径调整成本。}若预约用户的剩余换电站序列不同于其比较基准，则在发布时产生一次调整成本：
+\begin{equation}
+C_{\mathrm{adj}}
+=
+\kappa
+\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^p}
+d_{p,k}.
+\label{eq:adjustment_cost}
+\end{equation}
+每名用户无论改变一个还是多个换电站均只计一次惩罚。未到用户的比较基准是日前初始发布路径，在途用户的比较基准是最近一次实际发布路径的未执行站序；虚拟起点随滚动前移而剩余站序不变时不产生调整成本。未到用户的调整成本是前瞻评价；只有本轮真实发布调整的在途用户产生实际支出。
+
+\textbf{预约超时成本。}当有效预约事件在其等待截止时刻仍未获得服务时，记一次预约失败：
+\begin{equation}
+C_{\mathrm{fail}}
+=
+c^{\mathrm{fail}}
+\sum_{i\in\mathcal S}
+\sum_{\varepsilon\in\mathcal E_{i}^{A}}
+f_\varepsilon^A.
+\label{eq:reservation_failure_cost}
+\end{equation}
+该项以预约换电事件为结算单位，失败成本按截止时刻所在的执行区间结算。预测域内的 $f_\varepsilon^A$ 表示当前信息下的超时风险并进入本轮目标；只有真实发生的超时才进入 RL reward 和全天实际汇总，重叠滚动窗口中的预测风险不重复结算。模型不设置等待时间成本，也不设置随机流失成本。
+
+\textbf{RL 终端价值。}有限预测域截断了两类长期影响：期末剩余库存对后续运营的影响，以及期末未完成换电请求在未来服务时对库存和收益的影响。本文采用第 4 节训练的状态价值函数 $V_\theta$，通过期末之后的运营净回报统一衡量这两类影响。
+
+记本轮路径与服务决策对应的预测终端状态为 $s_{\ell+H}$，其包含期末电池 SOC、未完成请求及其到达时间、截止时间和退回 SOC，以及期末时间、电价和后续需求预测。终端 SOC 取半开预测域的事件前快照 $S_{i,b}(t_{\ell+H}^{-})$，恰在边界发生的事件由下一轮处理；状态的完整构造与请求去重见本节约束（6）及附录 D。
+
+进入目标的终端价值为
+\begin{equation}
+\Phi^{\mathrm{RL}}
+=V_\theta\!\left(s_{\ell+H}\right).
+\label{eq:rl_terminal_value}
+\end{equation}
+$V_\theta$ 采用含 $M$ 个 ReLU 单元的分段线性结构：
+\begin{equation}
+V_\theta(s)
+=\boldsymbol a^\top s+b
++\sum_{m=1}^{M}c_m
+\max\{0,\boldsymbol w_m^\top s+d_m\}.
+\label{eq:pwl_critic}
+\end{equation}
+系数 $\theta=(\boldsymbol a,b,\{c_m,\boldsymbol w_m,d_m\}_{m=1}^{M})$ 由第 4 节的 RL 训练得到，与状态特征提取参数在每轮求解中固定为常数。网络输入随本轮决策变化，式\eqref{eq:pwl_critic_embedding}给出其混合整数线性表示。期末之后的服务收入、充电与路径调整费用及预约超时损失由该价值估计，域内已结算项目不重复计入。$\beta\ge0$ 为终端价值权重。
+
+综合上述各项，本轮 MPC 的目标为最大化综合运营价值：
+\begin{equation}
+\max\quad
+I^{\mathrm{MPC}}-C_{\mathrm{ch}}-C_{\mathrm{adj}}-C_{\mathrm{fail}}
++\beta\Phi^{\mathrm{RL}}.
+\label{eq:objective}
+\end{equation}
+
+\paragraph{Constraints.}
+正文给出六组代表性关系；候选事件枚举、有效到达链、等待与优先级、槽位匹配和边界条件的实现级展开分别在附录 A--D 给出。
+
+（1）\textbf{剩余路径流平衡与续航可达。}每位预约用户满足流平衡约束：
+\begin{equation}
+\sum_{\{j\mid(n,j)\in\mathcal A^{p,k}\}}
+y_{n,j}^{p,k}
+-
+\sum_{\{j\mid(j,n)\in\mathcal A^{p,k}\}}
+y_{j,n}^{p,k}
+=
+\begin{cases}
+1,&n=o_\ell^{p,k},\\
+-1,&n=d^p,\\
+0,&\text{其余节点},
+\end{cases}
+\quad
+p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ n\in\mathcal V^{p,k},
+\label{eq:flow}
+\end{equation}
+其中本轮起点 $o_\ell^{p,k}$ 对未到用户为入口 $o^p$，对在途用户为实时虚拟起点 $o_\ell^{\mathrm{cur},p,k}$；$\mathcal V^{p,k}$ 为该用户剩余候选网络的节点集。续航可达性由候选网络构造保证：首段弧按有效入口 SOC（未到用户）或实时 SOC（在途用户）筛选，站间弧以满电出发，出口弧满足 $\underline s_d^p$。用户 $k$ 沿入弧 $(j,i)$ 到达站点 $i$ 时，退回电池的 SOC 为
+\begin{equation}
+\rho_{A,j,i}^{p,k}
+=
+\begin{cases}
+\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}-v_{o^p,i}^{p},
+&j=o^p,\ k\in\mathcal K_\ell^{\mathrm{fut},p},\\[2pt]
+\mathrm{soc}_{A,\ell}^{p,k}
+-v_{o_\ell^{\mathrm{cur},p,k},i}^{p,k},
+&j=o_\ell^{\mathrm{cur},p,k},\ k\in\mathcal K_\ell^{\mathrm{enr},p},\\[2pt]
+1-v_{j,i}^{p},
+&j\in\mathcal S^p,
+\end{cases}
+\quad (j,i)\in\mathcal A^{p,k}.
+\label{eq:return_soc}
+\end{equation}
+即未到用户首段使用当前有效入口 SOC，在途用户首段使用实时 SOC，后续站间弧使用上一站成功换得的满电 SOC。站内等待中的在途用户保留其当前请求与当前站点，路径重优化不能取消该等待请求。
+
+（2）\textbf{按用户状态区分基准的路径调整识别。}定义当前路径的站点访问量
+\begin{equation}
+x_{A,i}^{p,k}
+=
+\sum_{\{j\mid(j,i)\in\mathcal A^{p,k}\}}y_{j,i}^{p,k},
+\qquad i\in\mathcal S^p,
+\label{eq:station_visit_indicator}
+\end{equation}
+以及参考访问量
+\begin{equation}
+x_{A,i\mid\ell}^{\mathrm{ref},p,k}
+=
+\begin{cases}
+\bar x_{A,i}^{p,k},
+&k\in\mathcal K_\ell^{\mathrm{fut},p},\\
+x_{A,i\mid\ell}^{\mathrm{pub},p,k},
+&k\in\mathcal K_\ell^{\mathrm{enr},p},
+\end{cases}
+\label{eq:reference_visit_indicator}
+\end{equation}
+其中 $\bar x_{A,i}^{p,k}$ 由日前初始发布路径 $\bar y_A$ 汇总，$x_{A,i\mid\ell}^{\mathrm{pub},p,k}$ 由最近一次实际发布路径的未执行站序汇总（附录 D）。比较范围为当前候选实体站点与参考未执行站点的并集，缺失访问量补零；已执行的历史前缀不参与比较。路径差异指示量满足
+\begin{subequations}
+\label{eq:path_adjustment_indicator}
+\begin{align}
+d_{p,k}
+&\ge x_{A,i}^{p,k}-x_{A,i\mid\ell}^{\mathrm{ref},p,k},
+&&p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ i\in\mathcal S^p,\\
+d_{p,k}
+&\ge x_{A,i\mid\ell}^{\mathrm{ref},p,k}-x_{A,i}^{p,k},
+&&p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ i\in\mathcal S^p.
+\end{align}
+\end{subequations}
+只要剩余站序相对其基准增加或删除任意换电站，就有 $d_{p,k}=1$；与基准一致时，在目标函数中的正调整成本作用下有 $d_{p,k}=0$。
+
+（3）\textbf{请求服务窗与服务/超时/未决守恒。}通用请求 $r$ 的等待截止时刻为
+\begin{equation}
+t_r^{\mathrm{ddl}}
+=
+t_r^{\mathrm{arr}}+\Delta t,
+\label{eq:waiting_deadline}
+\end{equation}
+获得服务的请求满足 $t_r^{\mathrm{arr}}\le t_r^{\mathrm{sw}}\le t_r^{\mathrm{ddl}}$。预约候选事件满足守恒关系
+\begin{equation}
+s_\varepsilon^A+f_\varepsilon^A+\omega_\varepsilon^A=a_\varepsilon^A,
+\label{eq:reservation_conservation_main}
+\end{equation}
+其中 $a_\varepsilon^A$ 为考虑上游服务链后的有效到达量（附录 A）：上游预约超时后，下游预约事件失活，只结算真实发生的一次失败。对随机请求令 $h_r^T=\mathbb I\{t_r^{\mathrm{ddl}}\ge t_{\ell+H}\}$，并施加 $\omega_r^R\le h_r^T$、$z_r+\omega_r^R\le1$ 和 $z_r+\omega_r^R\ge h_r^T$；因此，等待窗跨预测终点时，请求只能在域内服务或保持未决，不能提前流失，完整等待窗位于域内时才由 $1-z_r-\omega_r^R$ 派生流失。跨边界携带的请求保留原请求标识、原到站时刻与原截止时刻。服务窗、守恒与边界条件的完整约束见附录 B。
+
+（4）\textbf{连续 SOC 积分与换电跳变。}在相邻槽位事件时刻 $t_1<t_2$ 之间，槽位 SOC 满足
+\begin{equation}
+S_{i,b}(t_2)-S_{i,b}(t_1)
+=
+\frac{\eta_i}{E_B}
+\int_{t_1}^{t_2}P_{i,b}(t)\,\mathrm dt,
+\qquad
+P_{i,b}(t)=
+\begin{cases}
+\widehat P_{i,b,q(t)},&S_{i,b}(t)<1,\\
+0,&S_{i,b}(t)=1,
+\end{cases}
+\label{eq:event_charging_transition}
+\end{equation}
+即电池未满时按当前区间请求功率充电，达到 SOC $1$ 后立即停止。请求功率的可行投影为
+\begin{equation}
+0\le \widehat P_{i,b,q}\le\overline P_i,
+\qquad
+\sigma\sum_{b\in\mathcal B_i}\widehat P_{i,b,q}
+\le\overline E_{i,q},
+\qquad i\in\mathcal S,\ q\in\mathcal T_\ell.
+\label{eq:power_projection}
+\end{equation}
+服务就绪阈值严格为 SOC $1$；求解器数值容差不进入能量、收入或续航公式。换电为瞬时事件，服务完成后槽位 SOC 立即写入退回 SOC：$S_{i,b}\big((t_r^{\mathrm{sw}})^+\big)=\rho_r$；槽位 $b$ 是库存槽位而非永久电池编号，同一槽位在一个外层区间内可多次服务，但任意两次交付之间必须重新达到 SOC $1$。包含全部区间边界的站级物理时刻递推、严格满电标记和线性槽位匹配见附录 C。
+
+（5）\textbf{预约优先、类内顺序与服务就绪。}在每个服务时刻，只对已到站、仍在等待且未超时的请求分配满电电池：预约请求优先于随机请求，同类请求内部按原到站时刻先后服务；同类且同刻到站的请求具有相同优先级，库存不足时由 MPC 选择服务对象。每个获服务请求使用哪个满电槽位由 MPC 决定，用户与槽位编号均不构成服务优先规则。不为尚未到站的预约请求扣留当前可用电池，也不允许在存在合格等待请求和可用满电电池时主动延迟服务。同一时刻的处理顺序为：充电完成、登记到站、队列分配、对仍未服务者判超时；截止时刻恰好有电池充满时，先允许服务再判定超时。附录 B 以队列流、严格优先关系和功守恒约束保证服务纪律，附录 C 给出满电条件、并行槽位容量和换电后的状态更新。
+
+（6）\textbf{终端未决、初始状态与变量范围。}本轮初始槽位 SOC、正在充电的状态和携带队列均取真实观测；初始条件、SOC 范围和槽位事件域在附录 C 给出，请求结果与半开服务域在附录 B 给出。预测终端状态 $s_{\ell+H}$ 包含事件前快照 $\{S_{i,b}(t_{\ell+H}^{-})\}_{i,b}$、$\omega_r=1$ 的等待请求（通用指标见附录 B）、$w_h^{\mathrm{pend}}=1$ 的未完成预约交付，以及期末时间、电价和后续需求预测，并采用与 RL 训练相同的状态编码。候选交付集 $\overline{\mathcal D}_{\ell}^{A}$、用户边界存活与未决指示量的约束见附录 D。期末仍在等待的预约请求同时属于未决交付和等待队列，只记录一次；尚未到站的交付保留预计到站时刻、截止时刻、退回 SOC 和前序换电关系，不作为已到站请求进入等待队列。模型不设置预测域末端的满电电池数量下界，域外长期影响统一通过式\eqref{eq:rl_terminal_value}进入综合目标；价值网络及状态特征提取中的 ReLU 按式\eqref{eq:pwl_critic_embedding}展开。
+
+
+
+\section{RL Formulation}
+
+RL 层用于学习逐槽充电功率控制策略，并通过分段线性 critic 估计 MPC 预测期末之后的运营净收益。本节将充电功率控制问题建模为马尔可夫决策过程，并给出本文采用的 RL 算法。
+
+\subsection{Markov decision process}
+
+\paragraph{State.}
+在滚动决策时刻 $t_\ell$，RL agent 观测系统状态 $s_\ell$。除各站逐槽电池的 SOC、电价和时间特征外，状态包含：未到与在途预约用户信息（在途用户含实时位置、实时 SOC 和最近发布的剩余站序）、站内预约与随机等待队列（含原到站时刻与剩余耐心）、最近一个外层区间的真实随机到达记录，以及未来逐请求随机需求预测。令
+$\mathcal K_\ell^{\mathrm{rem},p}$ 表示时刻 $t_\ell$ 尚未进入高速公路的已接纳预约用户集合（覆盖范围超出当前预测域），用 $\bar{\mathbf y}_A^{p,k}$ 和 $\mathbf y_A^{\mathrm{pub},p,k}$ 分别汇集日前初始发布路径与最近实际发布路径的弧指示量，则预约信息集合为
+\begin{equation}
+\begin{aligned}
+\mathcal Z_{A}
+={}&
+\left\{
+\left(p,k,\bar t_A^{p,k},
+\overline{\mathrm{soc}}_A^{p,k},
+\bar{\mathbf y}_A^{p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{rem},p}
+\right\}\\
+&\cup
+\left\{
+\left(p,k,o_\ell^{\mathrm{cur},p,k},\mathrm{soc}_{A,\ell}^{p,k},
+\mathbf y_A^{\mathrm{pub},p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{enr},p}
+\right\}.
+\end{aligned}
+\label{eq:rl_reservation_information}
+\end{equation}
+站内等待队列记为
+$\mathcal W_\ell=\{(r,i,t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}})\}$，
+其中元素为仍未服务且未超时的预约与随机请求，每条记录还关联其退回 SOC、用户类别和前序换电信息。由于 $\mathcal Z_{A}$ 与 $\mathcal W_\ell$ 的元素数量随滚动时刻变化，分别使用 $f_A$、$f_W$ 将其编码为固定维度特征。再令 $f_B$、$f_R^{\mathrm{act}}$ 和 $f_R^{\mathrm{pred}}$ 分别编码逐槽 SOC、真实随机到达记录和预测随机请求，则状态表示为
+\begin{equation}
+\begin{aligned}
+s_\ell=\Big(&
+f_B\!\left(\{S_{i,b}^{\mathrm{obs}}(t_\ell)\}_{i\in\mathcal S,b\in\mathcal B_i}\right),
+f_A(\mathcal Z_{A}),
+f_W(\mathcal W_\ell),\\
+&
+f_R^{\mathrm{act}}\!\left(
+\{(i,r,t_R^{i,r},\mathrm{soc}_R^{i,r},z_{R,r,i}^{\mathrm{act}}):
+r\in\mathcal R_{i,\ell-1}^{\mathrm{act}}\}_{i\in\mathcal S}
+\right),\\
+&
+f_R^{\mathrm{pred}}\!\left(
+\{(i,\nu,t_{R}^{i,\nu},\mathrm{soc}_{R}^{i,\nu}):
+\nu\in\mathcal R_{i,q}\}_{i\in\mathcal S,q\in\mathcal T_\ell}
+\right),
+\{e_{i,q}\}_{i\in\mathcal S,q\in\mathcal T_\ell},
+\xi_\ell
+\Big).
+\end{aligned}
+\label{eq:rl_state}
+\end{equation}
+其中 $\xi_\ell$ 表示时段、节假日或交通高峰等外生特征；$\mathcal R_{i,\ell-1}^{\mathrm{act}}$ 为上一区间真实到站的随机请求记录，$z_{R,r,i}^{\mathrm{act}}$ 为其实际服务结果。$f_R^{\mathrm{act}}$ 使用真实的到达时刻、SOC 和服务结果，$f_R^{\mathrm{pred}}$ 仅使用时刻 $t_\ell$ 可得的预测量，两者不共享数据字段。由于同一站点的槽位标签没有物理意义，$f_B$ 对各槽位 SOC 使用共享的分段线性函数，再在站内求和，以描述电池 SOC 分布；actor 的逐槽输出采用相应的置换等变解码。参考 rollout 采用参考策略 $\pi^{\mathrm{ref}}$ 生成可行服务与匹配；MPC 中的槽位匹配由 $\alpha_{i,b,r,m}$ 优化。对槽位重编号时须同时置换其 SOC、功率及相关变量；这不意味着在功率已固定且彼此不同的槽位之间交换退回电池具有相同运营结果。价值网络的状态特征提取仅使用仿射变换、整流线性单元（ReLU）和求和，使从原始状态到价值输出的映射保持分段线性。
+
+请求特征保留相对于当前状态时刻的到站时间、截止时间、退回 SOC、用户类别以及同一用户多次换电的先后关系。同一次换电只计入一次，已在等待队列中的请求不再通过预约信息重复计入。在 MPC 中，先计算候选请求的已知属性特征，再由 $w_h^{\mathrm{pend}}$、$\omega_r$ 和路径变量决定是否将其计入终端状态；电池 SOC 和预测服务结果则随本轮决策更新。训练与终端价值计算使用相同的特征定义和相对时间基准；在预测终端状态中，以 $t_{\ell+H}$ 为时间基准，需求预测覆盖该时刻之后的时段。未完成请求的到站时间和截止时间须保留，不能只用请求总量代替。
+
+\paragraph{Action.}
+RL 的动作是各站点、各槽位在当前外层区间的连续请求充电功率：
+\begin{equation}
+a_\ell=
+\{\widehat P_{i,b,\ell}\}_{i\in\mathcal S,b\in\mathcal B_i}.
+\label{eq:rl_action}
+\end{equation}
+actor 先生成无约束逐槽请求，再将其欧氏投影到式\eqref{eq:power_projection}所定义的闭凸集上，并以该唯一投影作为动作 $\widehat P$；该确定映射同时满足单槽功率上限和站级区间充电能量上限。策略概率密度及 PPO 比率均针对这一固定投影参数化所诱导的请求动作分布计算。
+
+\paragraph{Reference rollout.}
+为向 MPC 提供未来 $H$ 个区间的请求功率，系统从
+$s_{\ell}^{\mathrm{ref}}=s_\ell$ 出发，利用同一 actor 的均值动作和参考状态递推进行策略 rollout：
+\begin{equation}
+\{\widehat P_{i,b,q}\}_{i,b}
+=
+\mu_\phi(s_{q}^{\mathrm{ref}}),
+\quad q\in\mathcal T_\ell,
+\label{eq:rl_power_rollout}
+\end{equation}
+其中 $\mu_\phi$ 表示策略分布的均值。参考轨迹遵循固定的调用顺序：先按第 3 节规则确定参考路径，再进行 actor rollout，最后将整段请求功率序列与参数固定的价值网络交给 MPC。参考路径的确定只使用求解前已知的位置、SOC、预计到达时间和候选网络；参考执行满足与实际执行相同的物理和服务优先约束，并允许预约软失败，但其服务对象和槽位匹配由 $\pi^{\mathrm{ref}}$ 选择，不调用本轮 MPC 尚未得到的解。因此，参考状态 $s_q^{\mathrm{ref}}$ 与本轮待求的 $y$、$\alpha$ 和 $z$ 无关，请求序列生成与本轮路径优化之间不存在循环依赖。构造后续参考状态时，区间 $q$ 的预测请求及其名义服务结果进入独立的名义历史编码器 $f_R^{\mathrm{nom}}$；该编码器与 $f_R^{\mathrm{act}}$ 输出维度相同，但不共享输入字段或语义，且只用于参考状态和预测终端状态，不写回真实状态。$f_R^{\mathrm{pred}}$ 所需的后续预测窗口由同一需求预测器的条件均值补齐，超出当前 $H$ 步输入的部分采用固定终端预测先验。整条请求功率序列作为本轮 MPC 参数；只有首项请求 $\widehat P_{i,b,\ell}$ 进入真实执行，下一滚动时刻重新生成序列。
+
+参考策略 $\pi^{\mathrm{ref}}$ 在每个预测事件时刻，按用户类别和原到站时刻依次处理优先级组，服务当前满电库存能够覆盖的请求；若最后一个可服务组只能部分覆盖，则在该组内均匀抽取所需数量的请求，再将所有已选请求与当前满电槽位作均匀随机的一一匹配。随机种子在本轮 rollout 前固定，选择仅使用该参考事件时刻已生成的状态，不使用用户或槽位编号作为优先级。该策略用于日前库存预测和求解前的功率生成，不作为 MPC 的业务约束或实际执行的分配规则。参考预测与本轮优化可以得到不同的匹配及后续库存；本轮终端价值始终由优化决策对应的状态计算。
+
+\paragraph{Transition.}
+给定 $s_\ell$ 和请求功率序列后，系统求解 MPC，得到逐用户最优路径 $\{y_{i,j}^{p,k*}\}$，以及由事件时刻、服务量 $x_{i,r,m}^*$ 和槽位匹配 $\alpha_{i,b,r,m}^*$ 构成的服务计划 $\mathcal U_\ell^*$。服务计划使用请求标识、槽位和计划事件时刻与实际记录对齐，事件索引 $m$ 本身不作为跨预测与实际轨迹的固定标识。在途用户中剩余站序发生变化的路径在本轮边界立即发布并结算一次路径调整成本，新站序作为下一轮参考；未到用户的路径只用于当前预测，不对用户发布。为避免内部预测路径进入真实执行，定义边界后的执行路径：在途用户使用本轮已经发布的最优剩余站序，未到用户仍使用日前发布路径 $\bar{\mathbf y}_{A}^{p,k}$；若后者在 $\mathcal I_\ell$ 内实际进入高速公路，仍先按该已发布路径执行，下一边界再作为在途用户更新。记两类用户在 $\mathcal I_\ell$ 内的真实到站记录分别为 $\mathcal H_{A,\ell}^{\mathrm{act}}$ 和 $\mathcal H_{R,\ell}^{\mathrm{act}}$，每条记录携带请求标识、站点、真实到站时刻和真实退回 SOC。
+
+环境随后只在首个外层区间 $\mathcal I_\ell$ 内执行。连续事件执行算子 $\operatorname{Exec}_\ell$ 接收真实到站记录、携带等待队列、边界后已发布的执行路径、当前请求功率、观测 SOC，以及 MPC 服务计划 $\mathcal U_\ell^*$ 和重优化规则 $\mathcal R_\ell$。给定所选服务与匹配后，物理状态按充电完成、登记到站、队列分配、超时判定的同时刻顺序连续推进：
+\begin{equation}
+\begin{aligned}
+(\mathbf S^{\mathrm{obs}}(t_{\ell+1}),\mathcal W_{\ell+1},
+\mathbf s_{A,\ell}^{\mathrm{act}},\mathbf z_{R,\ell}^{\mathrm{act}},
+\mathbf f_{A,\ell}^{\mathrm{act}})
+=\operatorname{Exec}_\ell\!\Big(&
+\mathbf S^{\mathrm{obs}}(t_\ell),\mathcal W_\ell,
+\{\widehat P_{i,b,\ell}\}_{i,b},\\
+&\{\mathbf y_{A,\ell}^{\mathrm{exec},p,k}\}_{p,k},
+\mathcal U_\ell^*,\mathcal R_\ell,\\
+&\mathcal H_{A,\ell}^{\mathrm{act}},\mathcal H_{R,\ell}^{\mathrm{act}}
+\Big).
+\end{aligned}
+\label{eq:actual_execution_operator}
+\end{equation}
+其中 $\mathcal R_\ell$ 按以下方式处理预测偏差。若边界后实际执行路径与内部预测路径不同，则在区间开始执行前先固定实际执行路径重算服务计划；区间内若当前观测到的到站时刻、请求属性、等待队列或槽位状态偏离计划，则在该事件时刻 $\tau$ 固定已经执行的历史、已发布的执行路径、本轮逐槽请求功率序列和价值网络参数，以当前观测状态为初始条件，在剩余预测域 $[\tau,t_{\ell+H})$ 重新优化服务对象与槽位匹配。目标沿用式\eqref{eq:objective}中尚未发生的收益、成本和终端价值，已结算项不再计入；未来请求仅使用当时可得的预测。修正后的计划替代旧计划，并立即执行当前事件的可行分配，继续满足预约优先、类内先到先服务和功守恒约束。该过程不调用 actor 重新生成当前区间功率，也不重新发布路径；下一外层边界再恢复完整的路径与功率更新。这里沿用瞬时决策假设，重优化耗时对实际服务的影响需在实现与实验中评估。
+其中 $\mathbf y_{A,\ell}^{\mathrm{exec},p,k}=\mathbf y_A^{p,k*}$ 对在途用户成立，而对未到用户固定为 $\bar{\mathbf y}_{A}^{p,k}$。实际执行事件只来自两类真实到站记录和携带队列，记录按真实发生时刻逐条进入执行器；预测集合不触发实际服务，重优化不读取尚未发生的真实到站信息。状态与计划一致时执行 MPC 选定的服务对象和槽位；发生偏差时按 $\mathcal R_\ell$ 更新计划，不要求预测与实际终态相等。服务选择和匹配可以存在多个同目标值的最优解，执行器落实并记录求解器返回的可行最优方案，不额外按编号改变它。状态转移可表示为
+\begin{equation}
+s_{\ell+1}
+\sim
+\mathbb P\!\left(
+\cdot\mid
+s_\ell,a_\ell,
+\mathrm{MPC}(s_\ell,\widehat{\mathbf P})
+\right),
+\label{eq:rl_transition}
+\end{equation}
+其中 $\mathbb P$ 表示随机到达与下一轮预测更新共同诱导的环境状态转移核，$\widehat{\mathbf P}=\{\widehat P_{i,b,q}:i\in\mathcal S,b\in\mathcal B_i,q\in\mathcal T_\ell\}$。转移核也包含参考策略的采样、MPC 服务与匹配选择以及规则 $\mathcal R_\ell$ 的执行结果。外层仍按固定步长 $\sigma$ 决策，区间内的偏差修正仅更新服务与匹配。
+
+\paragraph{Reward.}
+RL reward 使用当前实际执行区间的已实现运营收益，并计入本轮实际发布路径产生的调整成本：
+\begin{equation}
+r_\ell
+=
+I_\ell^{\mathrm{act}}
+-C_{\mathrm{ch},\ell}
+-C_{\mathrm{adj},\ell}
+-C_{\mathrm{fail},\ell}.
+\label{eq:rl_reward}
+\end{equation}
+其中 $I_\ell^{\mathrm{act}}$、$C_{\mathrm{ch},\ell}$、$C_{\mathrm{adj},\ell}$、$C_{\mathrm{fail},\ell}$ 分别为区间 $\mathcal I_\ell$ 内真实发生的服务收益、充电成本、路径调整成本和预约超时成本，各项均按真实发生时刻记账，详细展开见附录 D。MPC 目标中的预测随机收益、未来预约超时风险和未来区间成本不进入真实 reward；未到用户的前瞻调整成本也不在当期 reward 中重复实现。该 reward 使 actor 学习逐槽充电功率对当前成本、预约可靠性、路径稳定性和长期电池状态价值的共同影响。
+
+
+\subsection{RL algorithm}
+
+由于逐槽请求功率是连续动作，且需要在不确定需求环境下保持训练稳定性，本文采用 Proximal Policy Optimization (PPO) 作为 RL 层的训练算法。PPO 属于 actor-critic 方法，actor $\pi_{\phi}(a_t\mid s_t)$ 输出连续请求功率动作的随机策略，critic $V_{\theta}(s_t)$ 采用式\eqref{eq:pwl_critic}的分段线性结构，估计由 actor 与 MPC 共同控制时的期望折扣运营净收益。该状态价值通过式\eqref{eq:rl_terminal_value}统一评价终端库存与未完成请求的后续影响，不再为槽位 SOC 或未决交付另设独立价值项。价值网络和状态特征提取的参数在每轮 MPC 求解中固定，输入的预测终端状态随本轮决策变化。
+
+PPO 的 critic 通过最小化价值函数误差进行训练：
+\begin{equation}
+L_V(\theta)=
+\mathbb{E}_t\left[
+\left(V_{\theta}(s_t)-\hat{G}_t\right)^2
+\right],
+\label{eq:value_loss}
+\end{equation}
+其中 $\hat{G}_t$ 为由采样轨迹中后续实际奖励计算的折扣回报，服务收入、充电成本、路径调整成本与预约超时损失均按式\eqref{eq:rl_reward}在实际发生时刻计入。每个采样批次内，供 MPC 使用的网络参数保持固定，批次结束后再更新；训练样本需覆盖不同的电池 SOC 分布、请求到站时间和排队情况。actor 采用 clipped surrogate objective 更新策略。定义重要性采样比率
+\begin{equation}
+w_t^{\mathrm{IS}}(\phi)=
+\frac{\pi_{\phi}(a_t\mid s_t)}{\pi_{\phi_{old}}(a_t\mid s_t)},
+\label{eq:ppo_ratio}
+\end{equation}
+则策略优化目标为
+\begin{equation}
+L_{\mathrm{CLIP}}(\phi)=
+\mathbb{E}_t\left[
+\min\left(
+w_t^{\mathrm{IS}}(\phi)\hat{A}_t,
+\mathrm{clip}(w_t^{\mathrm{IS}}(\phi),1-\epsilon,1+\epsilon)\hat{A}_t
+\right)
+\right],
+\label{eq:ppo_clip}
+\end{equation}
+其中 $\hat{A}_t$ 为优势函数估计，$\epsilon$ 为 clip 参数。优势函数由广义优势估计（Generalized Advantage Estimation, GAE）计算：
+\begin{equation}
+\hat{A}_t=\sum_{n=0}^{\infty}
+(\gamma_{\mathrm{RL}}\lambda_{\mathrm{GAE}})^n
+e_{t+n}^{\mathrm{TD}},
+\quad
+e_t^{\mathrm{TD}}=r_t
++\gamma_{\mathrm{RL}}V_{\theta}(s_{t+1})-V_{\theta}(s_t),
+\label{eq:gae}
+\end{equation}
+其中 $\gamma_{\mathrm{RL}}$ 为折扣因子，
+$\lambda_{\mathrm{GAE}}$ 为 GAE 参数。外层 RL 决策保持固定步长 $\sigma$，与区间内部的连续物理事件并存。
+
+\paragraph{终端价值的计算。}每轮 MPC 求解时，价值网络和特征提取的参数均已固定，因此可逐个线性化式\eqref{eq:pwl_critic}中的 ReLU 单元。令 $\zeta_m=\boldsymbol w_m^\top s_{\ell+H}+d_m$，$u_m$ 为该单元的输出。给定有效上下界 $L_m\le\zeta_m\le U_m$，当 $L_m<0<U_m$ 时，引入 $\delta_m^V\in\{0,1\}$，并施加
+\begin{subequations}
+\label{eq:pwl_critic_embedding}
+\begin{align}
+u_m&\ge0,& u_m&\ge\zeta_m,\\
+u_m&\le U_m\delta_m^V,&
+u_m&\le\zeta_m-L_m(1-\delta_m^V),
+\qquad m=1,\ldots,M.
+\end{align}
+\end{subequations}
+其中 $L_m,U_m$ 根据本轮可行状态的上下界确定。若 $U_m\le0$，直接取 $u_m=0$；若 $L_m\ge0$，直接取 $u_m=\zeta_m$。以 $u_m$ 替换式\eqref{eq:pwl_critic}中的最大值，并同样处理状态特征提取中的 ReLU，即可用混合整数线性约束表示终端价值的计算。需要判断是否激活的 ReLU 单元越多，新增整数变量和约束也越多。
+
+训练完成后，策略网络在每个决策时刻给出当前各槽位的充电功率，并通过式\eqref{eq:rl_power_rollout}逐时段计算整个预测期的功率序列，实际只执行第一时段。价值网络参数在本轮 MPC 求解中保持固定；MPC 优化预约用户的剩余路径、连续服务事件安排和槽位匹配，据此构造 $s_{\ell+H}$，并通过式\eqref{eq:pwl_critic_embedding}计算终端价值。由此，RL 提供充电功率和长期价值函数，MPC 决定路径与电池分配。求解前的预测用于确定功率等输入，MPC 中的终端价值仍由本轮决策对应的期末状态决定。
+
+
+\section{Numerical experiments}
+
+% NUMERICAL_EXPERIMENTS_PLACEHOLDER_BEGIN
+% 待作者提供实验设置、数据与结果
+% NUMERICAL_EXPERIMENTS_PLACEHOLDER_END
+
+
+\section{Conclusion}
+
+本文针对高速公路换电站网络中预约与随机两类异质用户的运营优化问题，构建了 MPC--RL 分层协同框架。在 MPC 层，本文以滚动时域组织运营：未到预约用户从入口出发、相对日前初始发布路径评价调整，在途预约用户从实时虚拟起点出发、相对最近发布的未执行站序评价调整，站内等待请求跨滚动边界携带且保留原到站时刻与截止时刻；候选网络按 SOC 分档离线生成、在线裁剪，路径调整成本按实际发布结算一次。站内服务以连续时间刻画：请求在到达后最长等待 $\Delta t$，预约优先、类内按到站时刻先后服务，同类同刻请求具有相同优先级，服务对象与满电槽位匹配由 MPC 选择；槽位电池严格在达到 SOC $1$ 后交付，充电在满电时停止、换入退回电池后立即恢复。在 RL 层，actor 输出逐槽请求充电功率作为 MPC 的已知参数，critic 采用分段线性价值网络，统一评价终端电池库存与未完成请求对后续运营净收益的影响。每轮先确定参考路径并完成 actor rollout，再由 MPC 在固定请求功率和网络参数下优化路径、服务与槽位匹配，并通过 ReLU 的混合整数线性表示计算本轮决策对应的终端价值。参考预测使用求解前给定的可行分配策略，实际执行落实 MPC 服务计划，预测偏差按固定路径与功率下的服务重优化处理。该顺序保证请求功率的生成不依赖本轮尚未求得的路径与服务结果。
+
+本文的模型边界包括：车辆到达下游节点的预计到达时间为外生给定，未建立随机交通模型；换电视为瞬时事件，未区分服务开始与作业结束；终端价值通过固定维度状态特征与分段线性网络近似，可能无法完整反映电池 SOC 分布以及同一用户多次换电之间的依赖，新增 ReLU 激活变量也会增加求解规模。后续工作可围绕更精细的交通流建模、换电作业时长以及终端价值的精确刻画展开，并通过系统的数值实验评估框架在不同需求强度、电价模式和库存配置下的表现。
+
+
+\appendix
+
+\section{Candidate Events and Effective Arrival Chains}
+\label{app:events}
+
+本附录给出 MPC 中候选换电事件的构造、激活量与有效到达链。站内服务使用通用请求索引 $r$；在需要区分来源时，预约候选事件记为 $\varepsilon=(p,k,j,i)$，由入弧 $(j,i)$ 唯一确定退回 SOC。
+
+站点 $i$、区间 $q\in\mathcal T_\ell$ 的候选预约事件集合为
+\begin{equation}
+\mathcal E_{i,q}^{A}
+=
+\left\{(p,k,j,i):p\in\mathcal P,\ k\in\mathcal K_\ell^p,
+\ (j,i)\in\mathcal A^{p,k},
+\ q(t_{A,i}^{p,k})=q\right\},
+\label{eq:swap_event_sets}
+\end{equation}
+其中 $t_{A,i}^{p,k}$ 是求解前已知的连续预计到达时间：未到用户由预约入口时刻与行程时间计算，在途用户由实时位置外生给定。该集合由已知信息枚举，不以未知路径变量 $y=1$ 为成员条件。上一滚动时刻遗留下来、仍未超时且未服务的等待请求构成携带事件集合 $\mathcal E_{i,\ell}^{A,\mathrm{wait}}$（预约）与 $\mathcal E_{i,\ell}^{R,\mathrm{wait}}$（随机），它们是既有请求记录，保留原请求标识、原到站时刻与原截止时刻，不因原到达区间不属于当前 $\mathcal T_\ell$ 而被删除。随机候选集合为 $\mathcal E_{i,q}^{R}=\mathcal R_{i,q}$。区间 $q$ 的新到请求集仅为
+$\mathcal E_{i,q}=\mathcal E_{i,q}^{A}\cup\mathcal E_{i,q}^{R}$；
+携带请求在站级集合中只出现一次：
+\begin{equation}
+\begin{aligned}
+\mathcal E_i^A
+&=\left(\bigcup_{q\in\mathcal T_\ell}\mathcal E_{i,q}^A\right)
+\cup\mathcal E_{i,\ell}^{A,\mathrm{wait}},\\
+\mathcal E_i^R
+&=\left(\bigcup_{q\in\mathcal T_\ell}\mathcal E_{i,q}^R\right)
+\cup\mathcal E_{i,\ell}^{R,\mathrm{wait}},
+\qquad
+\mathcal E_i=\mathcal E_i^A\cup\mathcal E_i^R.
+\end{aligned}
+\label{eq:station_event_union}
+\end{equation}
+
+每个候选预约事件的路径激活量与退回 SOC 为
+\begin{equation}
+(\delta_\varepsilon,\rho_\varepsilon)=
+\begin{cases}
+(y_{j,i}^{p,k},\rho_{A,j,i}^{p,k}),
+&\varepsilon=(p,k,j,i)\in\mathcal E_{i,q}^{A},\\
+(1,\rho_\varepsilon^{\mathrm{rec}}),
+&\varepsilon\in\mathcal E_{i,\ell}^{A,\mathrm{wait}},
+\end{cases}
+\label{eq:event_activation_and_soc}
+\end{equation}
+其中 $\rho_{A,j,i}^{p,k}$ 按式\eqref{eq:return_soc}计算，携带事件的 $\rho_\varepsilon^{\mathrm{rec}}$ 为其请求记录中的已知退回 SOC。随机请求的存在量固定为 $1$，是否服务由 $z_r$ 控制。
+
+为避免用户在上游超时后仍在下游重复服务或重复计罚，定义预约事件的有效到达量 $a_\varepsilon^A\in\{0,1\}$。对以本轮起点 $o_\ell^{p,k}$ 为首段入弧的首站事件，令
+$a_\varepsilon^A=y_{j,i}^{p,k}$（$j=o_\ell^{p,k}$）；
+对携带等待事件，令 $a_\varepsilon^A=1$；
+对其余沿弧 $(j,i)$ 从上游站 $j$ 到达的事件，令
+\begin{subequations}
+\label{eq:reservation_alive_chain}
+\begin{align}
+a_\varepsilon^A&\le y_{j,i}^{p,k},\\
+a_\varepsilon^A&\le
+\sum_{\varepsilon'\in\mathcal E^A(p,k,j)}s_{\varepsilon'}^A,\\
+a_\varepsilon^A&\ge y_{j,i}^{p,k}
++\sum_{\varepsilon'\in\mathcal E^A(p,k,j)}s_{\varepsilon'}^A-1,
+\end{align}
+\end{subequations}
+其中 $\mathcal E^A(p,k,j)$ 为同一用户到达上游站 $j$ 的候选预约事件集合，所选路径上至多有一个对应服务量为 $1$。因此，一次上游超时使该用户的下游预约事件失活，且只结算真实发生的一次失败。已执行路径前缀上的服务以观测事实作为参数继承，不在本轮重复求解。未被激活或已失活的事件满足 $s_\varepsilon^A=f_\varepsilon^A=\omega_\varepsilon^A=0$，不会被误计为超时。
+
+
+\section{Waiting, Priority, and Timeout Constraints}
+\label{app:waiting}
+
+令 $T=t_{\ell+H}$，并以 $\mathcal E_i=\mathcal E_i^A\cup\mathcal E_i^R$ 统称站点 $i$ 在本轮可能进入队列的预约、随机和携带请求。对任一请求 $r$，定义存在量 $e_r$、服务量 $\varsigma_r$、域内超时或流失量 $\chi_r$ 和边界未决量 $\omega_r$：
+\[
+(e_r,\varsigma_r,\chi_r,\omega_r)
+=
+\begin{cases}
+(a_\varepsilon^A,s_\varepsilon^A,f_\varepsilon^A,\omega_\varepsilon^A),
+&r=\varepsilon\text{ 为预约事件},\\
+(1,z_r,1-z_r-\omega_r^R,\omega_r^R),
+&r\text{ 为随机请求}.
+\end{cases}
+\]
+令 $h_r^T=\mathbb I\{t_r^{\mathrm{ddl}}\ge T\}$ 为求解前已知的跨界标记。预约事件和随机请求分别满足
+\begin{subequations}
+\label{eq:request_outcome_conservation}
+\begin{align}
+s_\varepsilon^A+f_\varepsilon^A+\omega_\varepsilon^A
+&=a_\varepsilon^A,&
+\omega_\varepsilon^A&\le h_\varepsilon^T,&
+f_\varepsilon^A&\le1-h_\varepsilon^T,\label{eq:reservation_outcome_boundary}\\
+z_r+\omega_r^R&\le1,&
+\omega_r^R&\le h_r^T,&
+z_r+\omega_r^R&\ge h_r^T.\label{eq:random_outcome_boundary}
+\end{align}
+\end{subequations}
+因此，$t_r^{\mathrm{ddl}}<T$ 时有 $\omega_r=0$，域内未服务请求只能在截止时刻超时或流失；$t_r^{\mathrm{ddl}}\ge T$ 时有 $\chi_r=0$，随机请求还由最后一个不等式强制为“域内服务”或“跨界未决”二者之一，不能在完整等待窗结束前消失。等号情形 $t_r^{\mathrm{ddl}}=T$ 归入未决，并由下一轮在时刻 $T$ 处理。
+
+
+
+
+附录 C 使用固定位置集
+$\mathcal M_i=\{0,\ldots,\overline M_i-1\}$，
+并定义 $\vartheta_{i,m}=1$ 当且仅当位置 $m$ 位于半开预测域内；终端及填充位置取 $\vartheta_{i,m}=0$。对本轮首次到站的请求，二元标记 $\iota_{i,r,m}^{\mathrm{arr}}$ 将其到站时刻指派给唯一活动位置；对 $t_r^{\mathrm{ddl}}<T$ 的请求，$\iota_{i,r,m}^{\mathrm{ddl}}$ 类似地指派截止时刻。使用平移时间
+$\bar\tau_{i,m}=\tau_{i,m}-t_\ell$、
+$\bar t=t-t_\ell$ 和合法界
+$M_T=T-t_\ell=H\sigma$，有
+\begin{subequations}
+\label{eq:event_time_assignment}
+\begin{align}
+-M_T(1-\iota_{i,r,m}^{\mathrm{arr}})
+&\le \bar\tau_{i,m}-\bar t_r^{\mathrm{arr}}
+\le M_T(1-\iota_{i,r,m}^{\mathrm{arr}}),\\
+-M_T(1-\iota_{i,r,m}^{\mathrm{ddl}})
+&\le \bar\tau_{i,m}-\bar t_r^{\mathrm{ddl}}
+\le M_T(1-\iota_{i,r,m}^{\mathrm{ddl}}),\\
+\sum_{m\in\mathcal M_i}\iota_{i,r,m}^{\mathrm{arr}}&=1,
+\quad t_r^{\mathrm{arr}}\in[t_\ell,T),&
+\sum_{m\in\mathcal M_i}\iota_{i,r,m}^{\mathrm{ddl}}&=1,
+\quad t_r^{\mathrm{ddl}}\in[t_\ell,T),\\
+\iota_{i,r,m}^{\mathrm{arr}}&\le \vartheta_{i,m},&
+\iota_{i,r,m}^{\mathrm{ddl}}&\le \vartheta_{i,m}.
+\end{align}
+\end{subequations}
+候选到站时刻即使对应预约事件未激活也保留，故固定位置上界不依赖未知路径变量；同一物理位置可同时携带多个到站或截止标签。携带请求不重复登记，而在位置 $0$ 以前初始化。
+
+令 $w_{i,r,m}^-$、$w_{i,r,m}^{\mathrm{arr}}$、
+$w_{i,r,m}^{\mathrm{sw}}$ 和 $w_{i,r,m}^+$ 分别表示请求在位置 $m$ 的登记前、登记后、分配后和超时判定后的等待状态；$x_{i,r,m}=1$ 表示请求在该位置获得服务。新到请求的有效登记量
+$a_{i,r,m}^{\mathrm{in}}=e_r\iota_{i,r,m}^{\mathrm{arr}}$
+采用三个标准二元乘积包络。对所有 $m\in\mathcal M_i$，队列递推为
+\begin{subequations}
+\label{eq:queue_event_flow}
+\begin{align}
+w_{i,r,m}^{\mathrm{arr}}
+&=w_{i,r,m}^-+a_{i,r,m}^{\mathrm{in}},&
+x_{i,r,m}&\le w_{i,r,m}^{\mathrm{arr}},&
+x_{i,r,m}&\le \vartheta_{i,m},\\
+w_{i,r,m}^{\mathrm{sw}}
+&=w_{i,r,m}^{\mathrm{arr}}-x_{i,r,m},&
+\chi_{i,r,m}^{\mathrm{to}}
+&=\iota_{i,r,m}^{\mathrm{ddl}}w_{i,r,m}^{\mathrm{sw}},\\
+w_{i,r,m}^{+}
+&=w_{i,r,m}^{\mathrm{sw}}-\chi_{i,r,m}^{\mathrm{to}},&
+w_{i,r,m+1}^{-}&=w_{i,r,m}^{+}.
+\end{align}
+\end{subequations}
+其中两个二元乘积均使用
+$y\le y_1$、$y\le y_2$、
+$y\ge y_1+y_2-1$ 的线性包络。携带请求取
+$w_{i,r,0}^-=e_r$，本轮新到请求取
+$w_{i,r,0}^-=0$；两类集合互斥。终端和填充位置没有到站或截止标签，且 $\vartheta_{i,m}=0$ 强制 $x_{i,r,m}=0$，上述递推只原样携带队列。结果变量满足
+\begin{equation}
+\varsigma_r=\sum_{m\in\mathcal M_i}x_{i,r,m},
+\qquad
+\chi_r=\sum_{m\in\mathcal M_i}\chi_{i,r,m}^{\mathrm{to}},
+\qquad
+\omega_r=w_{i,r,\overline M_i}^{-}.
+\label{eq:queue_outcome_link}
+\end{equation}
+
+站内请求使用不含用户编号的严格优先关系
+\begin{equation}
+r'\prec_i r
+\Longleftrightarrow
+\bigl(\mathbb I\{r'\in\mathcal E_i^R\},
+t_{r'}^{\mathrm{arr}}\bigr)
+<_{\mathrm{lex}}
+\bigl(\mathbb I\{r\in\mathcal E_i^R\},
+t_r^{\mathrm{arr}}\bigr),
+\label{eq:reservation_priority}
+\end{equation}
+即预约在前，同类内部仅比较原到站时刻。同类且同刻到站的不同请求之间既无 $r\prec_i r^{\prime}$ 也无反向优先关系；它们属于同一优先级组，不施加组内先后约束。每个位置仅对严格优先的请求对施加
+\begin{equation}
+x_{i,r,m}
+\le x_{i,r',m}+1-w_{i,r',m}^{\mathrm{arr}},
+\qquad r'\prec_i r,\quad m\in\mathcal M_i.
+\label{eq:reservation_service_order}
+\end{equation}
+若高优先请求尚未到站或已离队，则
+$w_{i,r',m}^{\mathrm{arr}}=0$，不会为其扣留电池；若其正在等待，低优先请求只有在高优先请求同刻也获服务时才可获服务。再令附录 C 中的 $h_{i,b,m}^+$ 表示分配后槽位是否仍满电，施加功守恒约束
+\begin{equation}
+w_{i,r,m}^{\mathrm{sw}}+h_{i,b,m}^{+}
+\le1+(1-\vartheta_{i,m}),
+\qquad r\in\mathcal E_i,\ b\in\mathcal B_i,\ m\in\mathcal M_i.
+\label{eq:work_conservation}
+\end{equation}
+活动位置上该式排除“仍有合格等待请求却留下未用满电槽位”的解；在终端或填充位置，右端的松弛项关闭分配要求。与附录 C 的匹配容量结合后，每个活动位置服务数量等于当前等待请求数与满电槽位数的较小者，且先覆盖较高优先级组；若最后一个可服务组只能部分覆盖，则由 MPC 选择该组中的服务对象。
+
+令 $\bar t_r^{\mathrm{sw}}=t_r^{\mathrm{sw}}-t_\ell$。服务时刻由
+\begin{subequations}
+\label{eq:service_window}
+\begin{align}
+-M_T(1-x_{i,r,m})
+&\le \bar t_r^{\mathrm{sw}}-\bar\tau_{i,m}
+\le M_T(1-x_{i,r,m}),\\
+\bar t_r^{\mathrm{sw}}
+&\ge \max\{0,\bar t_r^{\mathrm{arr}}\}
+-M_T(1-\varsigma_r),\\
+\bar t_r^{\mathrm{sw}}
+&\le \min\{M_T,\bar t_r^{\mathrm{ddl}}\}
++M_T(1-\varsigma_r),\qquad
+0\le\bar t_r^{\mathrm{sw}}\le M_T
+\end{align}
+\end{subequations}
+确定，其中第一式对 $m\in\mathcal M_i$ 施加。由于 $x_{i,r,m}\le \vartheta_{i,m}$，成功服务严格发生在 $T$ 以前；若服务位置同时带有截止标签，式\eqref{eq:queue_event_flow}先扣除服务再计算超时。
+
+附录 C 的区间归属量 $\zeta_{i,m,q}=1$ 精确表示
+$\tau_{i,m}\in[t_q,t_{q+1})$。为线性化
+$x_{i,r,m}\zeta_{i,m,q}$，引入
+$\Gamma_{i,r,m,q}\in\{0,1\}$ 并施加
+\[
+\Gamma_{i,r,m,q}\le x_{i,r,m},\qquad
+\Gamma_{i,r,m,q}\le\zeta_{i,m,q},\qquad
+\Gamma_{i,r,m,q}\ge x_{i,r,m}+\zeta_{i,m,q}-1.
+\]
+服务价格区间由
+\begin{equation}
+\gamma_{i,r,q}
+=\sum_{m\in\mathcal M_i}\Gamma_{i,r,m,q},
+\qquad
+\sum_{q\in\mathcal T_\ell}\gamma_{i,r,q}=\varsigma_r
+\label{eq:service_price_bin}
+\end{equation}
+唯一确定。边界累计定义保证恰在 $t_q$ 的服务归入新区间 $q$，而 $T$ 及填充位置满足 $\sum_q\zeta_{i,m,q}=0$，不属于任何本轮价格区间。
+
+本附录中的存在、结果、时刻指派、队列状态、事件服务量和价格乘积量均为二元量；$t_r^{\mathrm{sw}}$ 与 $\tau_{i,m}$ 为连续时刻。所有 Big-$M$ 关系均在平移后的预测域 $[0,H\sigma]$ 上使用 $M_T=H\sigma$，不依赖运营日的绝对时间原点。
+
+\section{Continuous Charging and Slot Matching}
+\label{app:charging}
+
+先构造与求解变量无关的固定位置上界。令
+\[
+\mathcal F_i=\{t_\ell,t_{\ell+1},\ldots,t_{\ell+H}\}
+\cup\{t_r^{\mathrm{arr}}:
+r\in\mathcal E_i,\ t_r^{\mathrm{arr}}\in[t_\ell,T)\}
+\cup\{t_r^{\mathrm{ddl}}:
+r\in\mathcal E_i,\ t_r^{\mathrm{ddl}}\in[t_\ell,T)\}
+\]
+为去重后的外层边界、候选到站和域内截止时刻集合。每个槽位在初始状态后至多首次充满一次，每次服务后至多再次充满一次，因此
+\[
+\overline M_i=|\mathcal F_i|+|\mathcal B_i|+|\mathcal E_i|,
+\qquad
+\overline{\mathcal M}_i=\{0,\ldots,\overline M_i\},
+\qquad
+\mathcal M_i=\{0,\ldots,\overline M_i-1\}
+\]
+给出有效的有限上界。实际物理时刻按升序装入
+$\tau_{i,0},\ldots,\tau_{i,\overline M_i}$；同刻的边界、到站、截止和一个或多个充满事件合并为一个位置，实际时刻用完后的槽位全部以 $T$ 填充。于是
+\begin{subequations}
+\label{eq:event_position_grid}
+\begin{align}
+t_\ell=\tau_{i,0}
+&\le\tau_{i,1}\le\cdots
+\le\tau_{i,\overline M_i}=T,\\
+d_{i,m}&=\tau_{i,m+1}-\tau_{i,m},&
+0\le d_{i,m}&\le\sigma\vartheta_{i,m},
+\qquad m\in\mathcal M_i,
+\end{align}
+\end{subequations}
+其中 $\vartheta_{i,m}=1$ 当且仅当 $\tau_{i,m}<T$；填充位置取 $\vartheta_{i,m}=0$ 并由上式强制 $d_{i,m}=0$。
+
+为精确处理半开区间，令
+$\iota_{i,q,m}^{\mathrm{bd}}=1$ 表示边界 $t_q$ 位于位置 $m$。对
+$q\in\{\ell,\ldots,\ell+H\}$ 和
+$m\in\overline{\mathcal M}_i$，使用
+\begin{subequations}
+\label{eq:boundary_position_assignment}
+\begin{align}
+-M_T(1-\iota_{i,q,m}^{\mathrm{bd}})
+&\le\bar\tau_{i,m}-\bar t_q
+\le M_T(1-\iota_{i,q,m}^{\mathrm{bd}}),\\
+\sum_{m\in\overline{\mathcal M}_i}
+\iota_{i,q,m}^{\mathrm{bd}}&=1,
+&\iota_{i,\ell,0}^{\mathrm{bd}}&=1.
+\end{align}
+\end{subequations}
+边界标签按上述合并规则放在该时刻的第一个位置。定义
+\begin{equation}
+B_{i,q,m}=\sum_{n=0}^{m}\iota_{i,q,n}^{\mathrm{bd}},
+\qquad
+\zeta_{i,m,q}=B_{i,q,m}-B_{i,q+1,m},
+\qquad
+\vartheta_{i,m}=\sum_{q\in\mathcal T_\ell}\zeta_{i,m,q}.
+\label{eq:boundary_interval_affiliation}
+\end{equation}
+由此，$\zeta_{i,m,q}=1$ 当且仅当
+$\tau_{i,m}\in[t_q,t_{q+1})$；恰在 $t_q$ 的位置归入新区间 $q$，而 $T$ 及其填充位置不属于本轮任何区间。物理时刻严格递增直至第一次出现 $T$，相同时刻只保留一个位置；该索引规范化是事件递推的定义，不借助数值 $\epsilon$ 区分同刻事件。
+
+槽位 $b$ 在位置 $m$ 分配前后的 SOC 分别记为
+$S_{i,b,m}^{-}$ 和 $S_{i,b,m}^{+}$，相应服务就绪标记为
+$h_{i,b,m}^{-}$ 和 $h_{i,b,m}^{+}$。本轮初始条件为
+\begin{equation}
+S_{i,b,0}^{-}=S_{i,b}^{\mathrm{obs}}(t_\ell),
+\qquad
+h_{i,b,0}^{-}=\mathbb I\{S_{i,b}^{\mathrm{obs}}(t_\ell)=1\}.
+\label{eq:initial_battery_soc}
+\end{equation}
+对活动位置 $m$，下一个固定候选时刻是
+\[
+\Theta_{i,m}^{\mathrm{fix}}
+=\min\{t\in\mathcal F_i:t>\tau_{i,m}\}.
+\]
+若 $\zeta_{i,m,q}=1$、$h_{i,b,m}^{+}=0$ 且
+$\widehat P_{i,b,q}>0$，槽位的理论充满候选为
+\begin{equation}
+\Theta_{i,b,m,q}^{\mathrm{full}}
+=\tau_{i,m}
++\frac{E_B(1-S_{i,b,m}^{+})}
+{\eta_i\widehat P_{i,b,q}}.
+\label{eq:full_time_candidate}
+\end{equation}
+仅当该时刻严格位于 $(\tau_{i,m},T)$ 时才将其加入候选；等于 $T$ 的充满由下一轮处理。令 $\mathcal C_{i,m}$ 包含上述下一个固定候选以及所有有效充满候选，并将候选 $c$ 的时刻记为 $\Theta_{i,c,m}$。精确最小时刻标签定义为
+\[
+\psi_{i,c,m}
+=\mathbb I\!\left\{
+\Theta_{i,c,m}=\min_{c'\in\mathcal C_{i,m}}
+\Theta_{i,c',m}\right\}.
+\]
+即并列最小的标签全部取 $1$，而非任意选择其中一个；$\psi$ 是给定当前匹配后槽位状态时，由事件生成器计算的派生标签，不是可自由取值的决策变量；匹配改变时须重新计算相应候选充满时刻及标签。令
+$\bar\Theta_{i,c,m}=\Theta_{i,c,m}-t_\ell$。
+在给定该标签后，与连续时刻连接的 indicator/Big-$M$ 接口为
+\begin{subequations}
+\label{eq:next_physical_event}
+\begin{align}
+\bar\tau_{i,m+1}&\le\bar\Theta_{i,c,m},
+&&c\in\mathcal C_{i,m},\\
+\bar\tau_{i,m+1}&\ge
+\bar\Theta_{i,c,m}-M_T(1-\psi_{i,c,m}),
+&&c\in\mathcal C_{i,m},\\
+\sum_{c\in\mathcal C_{i,m}}\psi_{i,c,m}&\ge1,
+&&\vartheta_{i,m}=1.
+\end{align}
+\end{subequations}
+候选有效性是 $\zeta_{i,m,q}$、$1-h_{i,b,m}^{+}$ 和正功率条件的逻辑与，可用标准二元乘积包络实现。对每个槽位，令
+\[
+\varpi_{i,b,m}^{\mathrm{full}}
+=\sum_{\substack{c\in\mathcal C_{i,m}:\\
+c\text{ 为槽位 }b\text{ 的充满候选}}}
+\psi_{i,c,m},
+\qquad
+g_{i,b,m}=h_{i,b,m}^{+}+\varpi_{i,b,m}^{\mathrm{full}},
+\qquad
+h_{i,b,m+1}^{-}=g_{i,b,m},
+\]
+并施加 $\varpi_{i,b,m}^{\mathrm{full}}\le1-h_{i,b,m}^{+}$。这样，充满与固定事件同刻时，充满标签不会因另一个并列候选被选中而丢失；$g$ 也不再是可任意关闭的“$S=1$”分支。每个物理位置按“前段充满完成 $\rightarrow$ 外层边界功率切换 $\rightarrow$ 到站登记 $\rightarrow$ 队列分配 $\rightarrow$ 未服务请求超时”的顺序处理。终点 $T$ 只保留事件前快照，不执行这些阶段。
+
+以 $u_{i,b,m}$ 表示槽位在事件段内因段首已经满电而停止充电的时长。由于式\eqref{eq:next_physical_event}不会让未满槽位越过首次充满时刻，$u$ 恰为
+$d_{i,m}h_{i,b,m}^{+}$，其线性化为
+\begin{subequations}
+\label{eq:full_stop_indicator}
+\begin{align}
+0\le u_{i,b,m}&\le d_{i,m},&
+u_{i,b,m}&\le\sigma h_{i,b,m}^{+},\\
+u_{i,b,m}&\ge d_{i,m}
+-\sigma(1-h_{i,b,m}^{+}).
+\end{align}
+\end{subequations}
+再令 $\upsilon_{i,b,m,q}^{\mathrm{ch}}$ 为事件段 $m$ 在区间 $q$ 内的实际充电时长。乘积
+$\zeta_{i,m,q}(d_{i,m}-u_{i,b,m})$ 由
+\begin{subequations}
+\label{eq:interval_charging_duration}
+\begin{align}
+0\le\upsilon_{i,b,m,q}^{\mathrm{ch}}
+&\le\sigma\zeta_{i,m,q},\\
+\upsilon_{i,b,m,q}^{\mathrm{ch}}
+&\le d_{i,m}-u_{i,b,m},\\
+\upsilon_{i,b,m,q}^{\mathrm{ch}}
+&\ge d_{i,m}-u_{i,b,m}
+-\sigma(1-\zeta_{i,m,q}),\\
+\sum_{q\in\mathcal T_\ell}
+\upsilon_{i,b,m,q}^{\mathrm{ch}}
+&=d_{i,m}-u_{i,b,m}
+\end{align}
+\end{subequations}
+精确给出。SOC 递推于是写为
+\begin{equation}
+S_{i,b,m+1}^{-}
+=S_{i,b,m}^{+}
++\frac{\eta_i}{E_B}
+\sum_{q\in\mathcal T_\ell}
+\widehat P_{i,b,q}
+\upsilon_{i,b,m,q}^{\mathrm{ch}},
+\qquad 0\le S_{i,b,m+1}^{-}\le1.
+\label{eq:appendix_charging_recursion}
+\end{equation}
+请求功率为 $0$ 时，未满槽位保持原 SOC 且不生成伪充满事件；段首已满的槽位取 $u=d$。槽位在 $T$ 恰好充满时，式\eqref{eq:appendix_charging_recursion}仍给出 $S(T^-)=1$，但终点不生成可服务事件。
+
+对每个 $m\in\mathcal M_i$，引入
+$\alpha_{i,b,r,m}\in\{0,1\}$；
+$\alpha_{i,b,r,m}=1$ 表示请求 $r$ 在该位置由槽位 $b$ 服务。令
+$a_{i,b,m}=\sum_{r\in\mathcal E_i}\alpha_{i,b,r,m}$。
+附录 B 的服务量与槽位匹配满足
+\begin{subequations}
+\label{eq:battery_event_assignment}
+\begin{align}
+\sum_{b\in\mathcal B_i}\alpha_{i,b,r,m}
+&=x_{i,r,m},
+&&r\in\mathcal E_i,\ m\in\mathcal M_i,\\
+\sum_{r\in\mathcal E_i}\alpha_{i,b,r,m}
+&=a_{i,b,m},
+&&b\in\mathcal B_i,\ m\in\mathcal M_i,\\
+a_{i,b,m}&\le h_{i,b,m}^{-},&
+a_{i,b,m}&\le \vartheta_{i,m}.
+\end{align}
+\end{subequations}
+因此一个请求恰好匹配一个槽位，一个槽位同刻至多服务一个请求，且只有 SOC 精确为 $1$ 的就绪槽位可交付。本文的有效换电请求均满足 $0\le\rho_r<1$。
+\begin{subequations}
+\label{eq:continuous_swap_transition}
+\begin{align}
+h_{i,b,m}^{+}
+&=h_{i,b,m}^{-}-a_{i,b,m},\\
+S_{i,b,m}^{+}
+&=S_{i,b,m}^{-}-a_{i,b,m}
++\sum_{r\in\mathcal E_i}\rho_r\alpha_{i,b,r,m}.
+\end{align}
+\end{subequations}
+式\eqref{eq:continuous_swap_transition}给出分配后的状态。若槽位未被使用，前后状态相同；若被使用，则
+$S_{i,b,m}^{-}=1$，服务后的 SOC 恰为退回值 $\rho_r$，并立即按位置所属区间的同一请求功率重新充电。
+
+槽位选择不附加编号排序约束。式\eqref{eq:battery_event_assignment}允许每个获服务请求匹配任意一个可用满电槽位，优先级约束只限制服务对象，不限制所用槽位的编号。虽然不同满电电池对用户提供相同服务，退回电池会继承所选槽位在当前区间的请求功率，因此不同匹配可能产生不同的后续充满时刻、服务收益、充电成本和终端状态；这些影响由式\eqref{eq:objective}统一权衡。与式\eqref{eq:reservation_service_order}和式\eqref{eq:work_conservation}结合后，模型保证优先服务和及时服务，同时由 MPC 优化 $x$ 与 $\alpha$。同一槽位可在同一外层区间内多次服务，但式\eqref{eq:battery_event_assignment}要求它在每次服务前重新出现 $h_{i,b,m}^{-}=1$，排除了未真实充满便再次交付。
+
+槽位在区间 $q$ 的实际购电量及站级限额为
+\begin{subequations}
+\label{eq:event_interval_energy}
+\begin{align}
+E_{i,b,q}^{\mathrm{act}}
+&=\sum_{m\in\mathcal M_i}
+\widehat P_{i,b,q}
+\upsilon_{i,b,m,q}^{\mathrm{ch}},\\
+\sum_{b\in\mathcal B_i}E_{i,b,q}^{\mathrm{act}}
+&\le\overline E_{i,q},
+\qquad i\in\mathcal S,\ q\in\mathcal T_\ell.
+\end{align}
+\end{subequations}
+于是式\eqref{eq:chargingcost}等价于
+$C_{\mathrm{ch}}=\sum_{i,q,b}e_{i,q}E_{i,b,q}^{\mathrm{act}}$；
+边界位置把充电段严格切开，不会沿用旧区间功率或电价。终端 SOC 使用
+$S_{i,b}(T^-)=S_{i,b,\overline M_i}^{-}$；终端及填充位置的 $\vartheta=0$，因而不存在服务或超时。变量域为
+\[
+\begin{gathered}
+0\le S_{i,b,m}^{-},S_{i,b,m}^{+}\le1,
+\qquad d_{i,m},u_{i,b,m},
+\upsilon_{i,b,m,q}^{\mathrm{ch}}\ge0,\\
+h_{i,b,m}^{-},h_{i,b,m}^{+},g_{i,b,m},
+\varpi_{i,b,m}^{\mathrm{full}},a_{i,b,m},\vartheta_{i,m},
+\zeta_{i,m,q}\in\{0,1\},\\
+\alpha_{i,b,r,m},\iota_{i,q,m}^{\mathrm{bd}}
+\in\{0,1\}.
+\end{gathered}
+\]
+其中候选有效性、精确等时合并和 $\psi$ 的全并列规范均由给定当前状态的事件生成器给出；槽位状态依赖所选匹配，因此后续事件及其标签须随匹配更新，不能将参考轨迹的事件序列固定后用于所有候选解。式\eqref{eq:next_physical_event}只连接其输出与连续事件时刻，不能另行关闭某个并列充满标签。完整实现因而是“确定性规范化事件生成器 + 固定维度线性条件模型”的组合：全并列的反向蕴含由事件生成器精确处理，而不以带数值 $\epsilon$ 的标准 Big-$M$ 约束近似；在此规范下，持续时间、SOC、能量和二元乘积均由上述线性关系展开。事件生成器只确定所选匹配之后的物理演化，不替代优化器选择服务对象或槽位。
+
+
+
+\section{Publication, Boundary State, and Accounting}
+\label{app:accounting}
+
+本附录展开路径发布的参考对齐、跨边界状态继承与真实记账规则。
+
+\textbf{参考对齐与发布。}式\eqref{eq:reference_visit_indicator}中的参考访问量按用户状态区分：未到用户的参考为日前初始发布路径的站点访问量
+$\bar x_{A,i}^{p,k}=\sum_{\{j\mid(j,i)\in\bar{\mathcal A}^{p,k}\}}\bar y_{A,j,i}^{p,k}$；
+在途用户的参考为最近一次实际发布路径 $y_A^{\mathrm{pub},p,k}$ 的未执行站序对应的站点访问量 $x_{A,i\mid\ell}^{\mathrm{pub},p,k}$。比较范围为当前候选实体站点与参考未执行站点的并集，缺失访问量补零；已执行路径前缀不参与比较。在途用户的剩余站序在本轮发生变化时，于本轮边界立即发布，结算一次路径调整成本，并将新站序写入 $y_A^{\mathrm{pub},p,k}$ 作为下一轮参考；虚拟起点随滚动前移而剩余站序不变时，$d_{p,k}=0$，不产生路径调整成本。未到用户的内部优化路径不发布、不覆盖 $\bar y_A$，也不进入当期实际记账。
+
+\textbf{边界状态。}滚动边界处继承的状态包括：逐槽 SOC $S_{i,b}^{\mathrm{obs}}(t_{\ell+1})$（含正在充电的槽位）、仍未超时的等待队列 $\mathcal W_{\ell+1}$（保留原请求标识、原到站时刻与原截止时刻）以及已发布剩余路径。对预约用户 $(p,k)$ 定义边界存活变量 $A_{p,k}^{\mathrm{bd}}\in\{0,1\}$；若其任一域内激活事件超时，则后续交付全部失活。令 $\mathcal E_{p,k}^{A,\mathrm{in}}$ 为该用户在预测边界前可能到达的固定候选事件集合，则
+\begin{subequations}
+\label{eq:boundary_alive}
+\begin{align}
+A_{p,k}^{\mathrm{bd}}
+&\ge 1-\sum_{\varepsilon\in\mathcal E_{p,k}^{A,\mathrm{in}}}
+f_\varepsilon^A,\\
+A_{p,k}^{\mathrm{bd}}
+&\le 1-f_\varepsilon^A,
+\qquad \varepsilon\in\mathcal E_{p,k}^{A,\mathrm{in}},
+\end{align}
+\end{subequations}
+即 $A_{p,k}^{\mathrm{bd}}=1$ 当且仅当该用户没有域内激活事件超时；若域内事件集为空，则固定 $A_{p,k}^{\mathrm{bd}}=1$。正文中的 $\overline{\mathcal D}_{\ell}^{A}$ 在求解前枚举所有尚可能影响后续运营的候选预约交付。对记录 $h\in\overline{\mathcal D}_{\ell}^{A}$，属性 $i(h)$、$p(h)$、$k(h)$ 和 $\rho_h$ 分别表示交付站点、用户 O--D 对、用户编号和退回 SOC。每条记录还保留预计到站时刻、等待截止时刻及前序换电关系，作为终端请求特征。令 $\delta_h$ 为其已知或路径诱导的激活量：普通候选交付取相应入弧变量，携带请求取 $1$；令 $s_h^{\mathrm{in}}$ 为其域内服务量，若该交付在边界前不可能服务则固定为 $0$。未决交付是 $\delta_h$、用户边界存活和未在域内完成三者的逻辑与：
+\begin{subequations}
+\label{eq:pending_delivery_alive}
+\begin{align}
+w_h^{\mathrm{pend}}&\le\delta_h,&
+w_h^{\mathrm{pend}}&\le A_{p(h),k(h)}^{\mathrm{bd}},\\
+w_h^{\mathrm{pend}}&\le1-s_h^{\mathrm{in}},&
+w_h^{\mathrm{pend}}
+&\ge\delta_h+A_{p(h),k(h)}^{\mathrm{bd}}
+-s_h^{\mathrm{in}}-1.
+\end{align}
+\end{subequations}
+因此，预计在边界后到达的交付以及边界处仍在等待的域内到达请求均可取 $w_h^{\mathrm{pend}}=1$；若服务已经在域内完成，则 $s_h^{\mathrm{in}}=1$ 强制其未决指示为 $0$。已服务交付的电池更换结果只体现在终端 SOC 中，不再作为未完成请求输入价值网络；仍在等待的预约请求同时满足 $w_h^{\mathrm{pend}}=\omega_r=1$，在 $f_W$ 中记录后不再通过 $f_A$ 重复计入。尚未到站的未决交付通过预约特征保留预计到站时间、截止时间、退回 SOC 和前序换电关系，不加入当前等待队列；随机未决请求通过 $\omega_r^R$ 纳入等待特征。以预测边界为时间基准，将上述信息与终端 SOC、时间、电价及后续需求预测编码为 $s_{\ell+H}$，由式\eqref{eq:rl_terminal_value}统一估值，域内已结算收益和成本不重复计入。
+
+\textbf{实际记账。}各成本与收益按真实发生时刻结算，且跨轮只结算一次。
+\begin{align}
+I_\ell^{A,\mathrm{act}}
+&=E_B\sum_{i\in\mathcal S}
+\sum_{\substack{r:\ \text{预约},\ i(r)=i,\\
+t_r^{\mathrm{sw,act}}\in\mathcal I_\ell}}
+\pi_{i,\ell}^{\mathrm{sw}}
+(1-\rho_r^{\mathrm{act}}),
+\label{eq:realized_reservation_income}\\
+I_\ell^{R,\mathrm{act}}
+&=E_B\sum_{i\in\mathcal S}
+\sum_{\substack{r\in\mathcal R_{i}^{\mathrm{act}}:\\
+t_r^{\mathrm{sw,act}}\in\mathcal I_\ell}}
+\pi_{i,\ell}^{\mathrm{sw}}
+(1-\mathrm{soc}_R^{i,r}),
+\label{eq:realized_random_income}\\
+C_{\mathrm{ch},\ell}
+&=\sum_{i\in\mathcal S}\sum_{b\in\mathcal B_i}
+e_{i,\ell}
+\int_{\mathcal I_\ell}P_{i,b}^{\mathrm{act}}(t)\,\mathrm dt,
+\label{eq:realized_charging_cost}\\
+C_{\mathrm{adj},\ell}
+&=\kappa\sum_{p\in\mathcal P}
+\sum_{k\in\mathcal K_\ell^{\mathrm{enr},p}}
+\mathbb I\!\left\{
+\text{用户 }k\text{ 的剩余站序在本轮发布时发生变化}
+\right\},
+\label{eq:realized_adjustment_cost}\\
+C_{\mathrm{fail},\ell}
+&=c^{\mathrm{fail}}\sum_{i\in\mathcal S}
+\sum_{\substack{r:\ \text{预约},\ i(r)=i,\\
+t_r^{\mathrm{ddl}}\in\mathcal I_\ell}}
+f_r^{\mathrm{act}},
+\label{eq:realized_reservation_failure_cost}
+\end{align}
+上述各式给出区间 $\mathcal I_\ell$ 的已实现量。其中 $t_r^{\mathrm{sw,act}}$、$\rho_r^{\mathrm{act}}$ 和 $f_r^{\mathrm{act}}$ 为执行算子记录的真实服务时刻、真实退回 SOC 与真实超时结果。服务收益按实际服务时刻所在价格区间结算，充电成本按区间内实际功率积分结算，路径调整成本按实际发布时刻结算，预约失败成本按截止时刻所在执行区间结算；上期到站、本期服务的请求只在实际服务区间结算一次收入。式\eqref{eq:rl_reward}中的各项即由上述已实现量构成。成功服务请求的已实现等待时间为 $t_r^{\mathrm{sw,act}}-t_r^{\mathrm{arr}}$；在截止时刻流失的请求记为 $\Delta t$，跨边界未决请求只携带已经历等待时长而不作最终统计。
+
+%%----------- 参考文献 -------------------%%
+%在reference.bib文件中填写参考文献，此处自动生成
+
+% 当前正文尚无 \cite 命令，添加正式引用后再启用下行参考文献列表。
+% \reference
+
+\end{document}

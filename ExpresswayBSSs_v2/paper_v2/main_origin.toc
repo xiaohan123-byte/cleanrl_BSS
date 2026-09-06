@@ -1,0 +1,24 @@
+\contentsline {section}{\numberline {1}Introduction}{4}{section.1}%
+\contentsline {section}{\numberline {2}Problem Statement}{6}{section.2}%
+\contentsline {section}{\numberline {3}MPC Formulation}{7}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Offline Candidate networks by SOC Range}{8}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}Day-Ahead Baseline Path Generation}{9}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Optimization Model}{10}{subsection.3.3}%
+\contentsline {paragraph}{Decision variables.}{10}{paragraph*.2}%
+\contentsline {paragraph}{Objective function.}{11}{paragraph*.3}%
+\contentsline {paragraph}{Constraints.}{12}{paragraph*.4}%
+\contentsline {section}{\numberline {4}RL Formulation}{14}{section.4}%
+\contentsline {subsection}{\numberline {4.1}Markov decision process}{15}{subsection.4.1}%
+\contentsline {paragraph}{State.}{15}{paragraph*.5}%
+\contentsline {paragraph}{Action.}{15}{paragraph*.6}%
+\contentsline {paragraph}{Reference rollout.}{16}{paragraph*.7}%
+\contentsline {paragraph}{Transition.}{16}{paragraph*.8}%
+\contentsline {paragraph}{Reward.}{17}{paragraph*.9}%
+\contentsline {subsection}{\numberline {4.2}RL algorithm}{18}{subsection.4.2}%
+\contentsline {paragraph}{终端价值的计算。}{18}{paragraph*.10}%
+\contentsline {section}{\numberline {5}Numerical experiments}{19}{section.5}%
+\contentsline {section}{\numberline {6}Conclusion}{19}{section.6}%
+\contentsline {section}{\numberline {A}Candidate Events and Effective Arrival Chains}{20}{appendix.A}%
+\contentsline {section}{\numberline {B}Waiting, Priority, and Timeout Constraints}{21}{appendix.B}%
+\contentsline {section}{\numberline {C}Continuous Charging and Slot Matching}{23}{appendix.C}%
+\contentsline {section}{\numberline {D}Publication, Boundary State, and Accounting}{26}{appendix.D}%
