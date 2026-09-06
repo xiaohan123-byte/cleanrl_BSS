@@ -283,10 +283,10 @@ def simulate_dayahead_inventory(
             ready_count = sum(
                 1 for cell in row if cell.ready and cell.soc >= 1.0 - _EPS
             )
-            # These legacy-named diagnostics now mean the state at the
-            # interval's right limit.  Continuous service may recharge again
-            # after a reservation, so an old single interior snapshot would be
-            # misleading; the full event log above is authoritative.
+            # These diagnostics record the state at the interval's right
+            # limit.  Continuous service may recharge again after a
+            # reservation, so a single interior snapshot would be misleading;
+            # the full event log above is authoritative.
             full_after_reservation[station][period] = ready_count
             full_after_random[station][period] = ready_count
             slot_soc_end[station][period] = [cell.soc for cell in row]

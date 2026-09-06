@@ -64,12 +64,11 @@ class LedgerPosting:
 def _price_at(
     source: PriceSource, interval: int, name: str, station: int | None = None
 ) -> float:
-    """Read a legacy interval price or a station-by-interval price.
+    """Read an interval price or a station-by-interval price.
 
     Supported forms include a scalar, ``[period]``, ``[station][period]``, a
     mapping with tuple ``(station, period)`` keys, and callables accepting
-    either ``(period)`` or ``(station, period)``.  The one-dimensional API is
-    deliberately retained for existing callers.
+    either ``(period)`` or ``(station, period)``.
     """
 
     if callable(source):
@@ -358,8 +357,8 @@ class RealizedLedger:
 
         Executor entries carry ``return_soc`` and ``battery_capacity_kwh`` so
         the normal path is ``price[station, interval] * E_B * (1-return_soc)``.
-        An explicit ``amount`` remains an already-calculated total for legacy
-        callers, and entries without return-SOC metadata retain flat pricing.
+        An explicit ``amount`` remains an already-calculated total;
+        entries without return-SOC metadata retain flat pricing.
         """
 
         if "amount" in entry.metadata:

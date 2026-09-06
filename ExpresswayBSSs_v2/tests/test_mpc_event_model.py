@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """连续事件 MPC 输入契约与半开时间边界测试。
 
-这些用例不调用旧离散 Gurobi 模型。它们验证新的 replay-first MPC 分支：
+这些用例验证 replay-first MPC 分支：
 Mock 功率是固定参数，服务与等待由共享 ContinuousEventEngine 决定。
 """
 
@@ -13,13 +13,13 @@ from unittest.mock import patch
 from data_generation_test.parameter import get_default_parameters
 from data_generation_test.rl_data import RLSignals
 from src.domain import CandidateRequest, RollingState, SlotState
-from src.mpc_model import (
+from src.paper_mpc import (
     EventMPCModelBundle,
     EventMPCWindowInput,
     MPCController,
     MPCInputError,
 )
-import src.mpc_model as mpc_model
+import src.paper_mpc as paper_mpc
 
 
 def _state(params, *, first_slot_soc: float = 1.0) -> RollingState:
@@ -62,7 +62,7 @@ class EventMPCInputContractTests(unittest.TestCase):
         self.params = get_default_parameters()
         self.params.horizon = 1
         self.params.validate()
-        self.controller = MPCController(self.params, candidate_network={})
+        self.controller = MPCController(self.params)
 
     def test_near_right_endpoint_remains_in_current_half_open_interval(self) -> None:
         # 不能把正常的 t_end-5e-8 事件吸附到下一轮。
@@ -172,8 +172,8 @@ class EventMPCInputContractTests(unittest.TestCase):
             rl_signals=_signals(self.params, 0),
             reference_context={"path_search_enabled": True},
         )
-        with patch.object(mpc_model, "gp", None), patch.object(
-            mpc_model, "GRB", None
+        with patch.object(paper_mpc, "gp", None), patch.object(
+            paper_mpc, "GRB", None
         ):
             result = self.controller.solve_step(window)
         self.assertEqual(result.status, "EVENT_PATH_ENUM_REPLAY")

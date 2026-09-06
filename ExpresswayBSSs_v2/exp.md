@@ -231,7 +231,7 @@ FeasibilityTol=1e-8、时限）。所有随机分布给出种子与生成公式�
 - 训练种子 ≥5 个，验证种子独立（选 best checkpoint 与早停），测试种子即 E1
   的 30 个；报告超参数表：学习率与退火、clip 系数、γ、GAE λ、熵/价值系数、
   网络结构（置换不变 critic、逐槽 actor）、并行环境数、批量与总步数
-  （按 `plan_rl.md` 口径）。
+  （按 `docs/archive/plan_rl.md` 口径）。
 
 **收敛性**
 
@@ -279,8 +279,8 @@ FeasibilityTol=1e-8、时限）。所有随机分布给出种子与生成公式�
    参数/开关级改动。
 4. **完美信息上界**：全日一次性 MILP（todo.md P1），需新建；oracle 需求
    在线变体（C5 分解用）为同一模型的预测替换开关。
-5. **PPO 环境**：`src/env_bss.py` + `RL/ppo.py` 连续动作改造（plan_rl.md，
-   已批准未实施）→ M0。
+5. **PPO 环境**：`src/env_bss.py` + `RL/ppo.py` 连续动作改造（`docs/archive/plan_rl.md`
+   旧版，实施前需按 v3 连续事件接口修订）→ M0。
 6. **执行序**：协议 → 基线 → 上界 → 多种子基线/消融（E1 部分、E2、E3、E4
    的 MPC 侧）→ PPO 训练接入 → 测试种子同场比较（E1 完整、E5）→ 图表汇总。
 

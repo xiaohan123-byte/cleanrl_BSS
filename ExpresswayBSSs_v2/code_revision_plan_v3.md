@@ -1,14 +1,42 @@
 # MPC 连续事件代码修订执行计划（RL 输出暂用 Mock）
 
-> 状态：核心可执行链路已实施（2026-08-30；RL 训练仍明确不在本轮范围）  
 > 需求基线：以 `paper/manuscript_revision_plan_v3.md` 为主，以 `paper/manuscript_revision_plan_v2.md` 补充实现细节  
 > 适用范围：MPC、连续事件执行、Mock 信号、测试、配置和可再生成的六站模拟数据；不实现 RL 训练，不修改论文正文
 
-> 实施落点：已新增统一时间/领域/事件/账本内核、六站 seed 模拟数据与受限 Mock、严格“到站即有满电池”的连续日前基准、参考预约事件适配和 schema-3 滚动执行入口；滚动状态会刷新已观测车辆快照、枚举并回放评价在途剩余路径、发布赢家站序、替换真实未执行 rollout、重建依赖图，并移出已完成/失败用户。`run_mpc.py` 现调用 Mock 候选路径枚举回放分支。当前 61 项不依赖旧 Gurobi 离散分支的测试全部通过（含无 Gurobi runtime 的事件路径分支测试）；另 3 个旧离散测试方法（其中一个含 2 个子场景）因运行账户与本机许可证用户名不一致而无法启动；默认落盘的 mock、日前计划、滚动结果和统计已同步重生为 schema 2/2/3/1。
->
-> 当前 MPC 边界：运行模式已升级为 `EVENT_PATH_ENUM_REPLAY`。它从实时虚拟起点枚举可行剩余路径，以固定 Mock 功率和共享连续事件内核逐候选回放评分，并把赢家路径写入真实执行；搜索采用确定性逐用户 coordinate enumeration。P1-6 规划中的联合“事件位置驱动 MILP”仍未落地，因此结果只能称为给定候选集上的 Mock 路径搜索结果，不得标注为全局最优解。
+## 当前状态（2026-09-03 集中更新，替代原文末的历次实施更新）
 
-> 阶段状态说明：下文保留的是完整目标计划，而不是“全部已完成”的声明。已完成 P0-1、P0-2、P0-3、P1-4 和 P1-5 的核心链路；P1-7 已完成六站 Mock 滚动、候选剩余路径优化、首区间回放、路径发布和真实账本。P1-6 的联合事件位置 MILP 与 P2-8 的遗留代码清理仍待实施。P0-0 仅完成环境固定，未创建历史 golden fixture。
+**阶段完成度**：P0-1、P0-2、P0-3、P1-4、P1-5、P1-6、P1-7、P2-8 均已完成；
+P0-0 仅完成环境固定，未创建历史 golden fixture。RL 训练仍明确不在本
+计划范围内。
+
+**当前实现链路**：`run_mpc.py` → `src.continuous_runner.run_continuous_rolling_mpc`
+→ `src.paper_mpc.solve_paper_mpc`（运行模式 `PAPER_GUROBI_OPTIMAL`）：每轮
+由本机 Gurobi 联合优化路径流 y、访问量 x、调整指示 d、预约
+激活/服务/失败/未决 a/s/f/omega、随机请求结果、边界存活 A 与未决交付 w；
+附录 B--C 的排队、连续充电和槽位分配用站级事件模式扩展式表示，解后由
+统一 ContinuousEventEngine 回放核验。
+
+**2026-08-31**：路径—事件联合 MILP（`src/paper_mpc.py`）接入，运行模式
+从 EVENT_PATH_ENUM_REPLAY 升级为 PAPER_GUROBI_OPTIMAL；默认六站 12 轮
+全部 OPTIMAL（Gurobi 12.0.1，许可证 2791221）。压力验收：联合共享库存
+产生一次优化改路成本；60 kW 场景产生 0.175438596491 h 等待；0 kW 场景
+产生一次 1000 的预约失败成本且下游失活。
+
+**2026-09-03**：P2-8 清理完成。`src/mpc_model.py` 的事件接口与精简版
+`MPCController` 并入 `src/paper_mpc.py`，旧离散 MILP 及旧类型
+（`ReservationObservation`、`FixedCommitment`、`MPCWindowInput` 等）全部
+删除；`run_mpc.py` 由 956 行瘦至 236 行，删除无调用方的旧路径函数；
+`src/dayahead_plan.py` 删除旧离散日前实现（约 950 → 278 行），公开接口
+委托 `src.continuous_dayahead`；`data_generation_test/parameter.py` 删除
+`station_power_limit_kw`、`delta_hours`、`full_soc_tolerance`、
+`full_power_tolerance_kw` 迁移兼容接口；`src/reference_rollout.py` 删除
+`entry_*` 旧字段回退。
+
+**验证基线**：`python -m unittest discover -s tests` 64 项全绿（1 项
+跳过）；`python run_mpc.py --seed 42` 12 轮全部 PAPER_GUROBI_OPTIMAL、
+首区间回放全部通过，总收益 505.387、调整成本 13、违约 0。RL
+actor/critic 仍未训练，P_hat、终端 SOC 系数和域外交付系数继续使用 Mock
+参数（输出标注 `signal_source="mock"`，不得作为 RL 性能结论）。
 
 ## 0. 目标、依据与完成定义
 
@@ -643,13 +671,3 @@ P0-2 + P0-3
 - 不实现或修改 `RL/ppo.py`、`src/env_bss.py`、actor/critic、Gymnasium 适配、训练循环、checkpoint 或策略评估。
 - 不接入 `data_generation_rl` 或任何真实数据抽取流程；本轮外部参数和观测一律来自可复现的模拟快照。
 - 不实现完美信息全日上界、正式消融和绘图；这些在核心口径通过后另立实验计划。
-# 2026-08-31 实施更新：论文路径—事件 MILP 已接入
-
-当前公开滚动入口已从 EVENT_PATH_ENUM_REPLAY 升级为 PAPER_GUROBI_OPTIMAL：每轮由本机 Gurobi 在同一个模型中联合优化全部用户的路径流 y、访问量 x、调整指示 d、预约激活/服务/失败/未决变量 a/s/f/omega、随机请求结果、边界存活 A 与未决交付 w。附录 B--C 的确定性排队、连续充电和槽位分配使用完整站级事件模式扩展式表示，并在解后由统一 ContinuousEventEngine 联合回放核验。
-
-- 新增实现：src/paper_mpc.py。
-- 滚动接入：src/continuous_runner.py 与 run_mpc.py。
-- 本机验证：Gurobi 12.0.1、许可证 ID 2791221；默认六站 12 轮均为 OPTIMAL。
-- 压力验收：联合共享库存会产生一次优化改路成本；60 kW 场景产生 0.175438596491 h 等待；0 kW 场景产生一次 1000 的预约失败成本且下游失活。
-- 结果：data_generation_test/output/mpc_run_result.json、mpc_run_statistics.md、paper_mpc_gurobi_validation.md。
-- 边界：RL actor/critic 仍未训练，P_hat、终端 SOC 系数和域外交付系数继续使用 Mock 参数。

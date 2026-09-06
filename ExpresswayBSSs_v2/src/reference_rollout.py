@@ -225,32 +225,31 @@ def resolve_visible_entry(
     A supplied visible override may use either the observation schema
     (``arrival_time`` / ``arrival_soc``) or explicit entry fields.  The
     day-ahead record itself is deliberately read only through
-    ``day_ahead_entry_*`` (with ``entry_*`` as a legacy fallback); its
-    ``actual_entry_*`` fields are never read.
+    ``day_ahead_entry_*``; its ``actual_entry_*`` fields are never read.
     """
 
     override = _find_visible_override(reservation_record, visible_entries)
     if override is not None:
         entry_time = _first_present(
             override,
-            ("arrival_time", "entry_time", "actual_entry_time"),
+            ("arrival_time", "actual_entry_time"),
             "visible entry time",
         )
         entry_soc = _first_present(
             override,
-            ("arrival_soc", "entry_soc", "actual_entry_soc", "return_soc"),
+            ("arrival_soc", "actual_entry_soc", "return_soc"),
             "visible entry SOC",
         )
         source = "visible_override"
     else:
         entry_time = _first_present(
             reservation_record,
-            ("day_ahead_entry_time", "entry_time"),
+            ("day_ahead_entry_time",),
             "day-ahead entry time",
         )
         entry_soc = _first_present(
             reservation_record,
-            ("day_ahead_entry_soc", "entry_soc"),
+            ("day_ahead_entry_soc",),
             "day-ahead entry SOC",
         )
         source = "day_ahead"

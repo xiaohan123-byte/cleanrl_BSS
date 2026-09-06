@@ -894,8 +894,8 @@ class ContinuousEventEngine:
 
         cancelled: List[str] = []
         pending = list(state.reservation_dependencies.get(upstream_event_id, []))
-        # A few legacy callers key dependencies by request ID rather than event
-        # ID; accepting both preserves the one-way cancellation semantics.
+        # Dependencies may be keyed by request ID rather than event ID;
+        # accepting both preserves the one-way cancellation semantics.
         if ":" in upstream_event_id:
             pending.extend(state.reservation_dependencies.get(upstream_event_id.rsplit(":", 1)[-1], []))
         seen: set[str] = set()

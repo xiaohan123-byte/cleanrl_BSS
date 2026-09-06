@@ -31,8 +31,10 @@ from src.domain import (
 )
 from src.event_engine import ContinuousEventEngine
 from src.event_path_search import EventPathSearchError, build_path_options
-from src.mpc_model import EventMPCResult, EventMPCWindowInput, MPCController
 from src.paper_mpc import (
+    EventMPCResult,
+    EventMPCWindowInput,
+    MPCController,
     PaperMPCError,
     PaperMPCNoSolution,
     PaperMPCSolverUnavailable,
@@ -760,7 +762,7 @@ def run_continuous_rolling_mpc(
     grid = TimeGrid(params.interval_hours, num_intervals=params.num_periods)
     engine = _engine(params, grid)
     state = _initial_state(params)
-    controller = MPCController(params, dict(network), rl_provider=provider, dayahead_plan=dict(plan))
+    controller = MPCController(params, rl_provider=provider)
     ledger = RealizedLedger(
         grid,
         energy_price=params.electricity_price,

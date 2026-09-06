@@ -47,6 +47,7 @@ except ImportError:  # pragma: no cover - exercised on solver-free deployments
 
 from data_generation_test.candidate_network import get_feasible_arcs
 from data_generation_test.parameter import ENTRY_NODE, EXIT_NODE, BusinessParameters, NodeId
+from data_generation_test.rl_data import MockRLProvider, RLProvider, RLSignals
 from src.domain import (
     CandidateRequest,
     PhysicalRequestStatus,
@@ -1478,6 +1479,1046 @@ def solve_paper_mpc(
     )
 
 
+# ======================================================================
+# 事件 MPC 接口与 replay 控制器
+# 说明：本区段是连续事件 MPC 的输入/输出类型、replay-first 求值与
+# MPCController 门面。
+# ======================================================================
+
+class MPCError(RuntimeError):
+    """MPC 求解相关异常基类。"""
+
+
+class MPCInputError(ValueError):
+    """MPC 窗口输入不合法。"""
+
+
+
+
+class MPCNoSolutionError(MPCError):
+    """求解结束但无可行 incumbent（如时限内未找到解）。"""
+
+
+
+@dataclass(frozen=True)
+class MPCEventRequest:
+    """MPC 侧的连续候选请求快照。
+
+    该类与 ``src.domain.CandidateRequest`` / ``WaitingRequest`` 字段兼容，
+    但不替代领域层的真实状态。它只描述当前一次预测中已枚举的候选，
+    ``deadline`` 在构造后不可改写，且时刻均以运营日起点后的小时表示。
+    ``kind`` 接受 ``reservation`` / ``random`` 或对应 enum 的 ``.value``。
+    """
+
+    request_id: str
+    kind: Any
+    station: int
+    arrival_time: float
+    deadline: float
+    return_soc: float
+    user_key: Optional[UserKey] = None
+    source_arc: Optional[Arc] = None
+    path_order: int = 0
+    event_id: Optional[str] = None
+    upstream_request_id: Optional[str] = None
+    active: bool = True
+
+
+@dataclass
+class EventMPCWindowInput:
+    """连续事件 MPC 的显式输入类型。
+
+    全部调用方统一使用该类型构造预测窗口。
+    """
+
+    params: BusinessParameters
+    rolling_state: RollingState
+    period_ell: int
+    rl_signals: RLSignals
+    event_requests: List[Any] = field(default_factory=list)
+    event_engine: Optional[Any] = None
+    time_grid: Optional[Any] = None
+    horizon: Optional[int] = None
+    reference_context: Optional[Any] = None
+    # Fixed prediction-only cost supplied by the deterministic path search.
+    # It never enters the realised ledger; the runner records a real
+    # PATH_PUBLISHED event only after committing the winning route.
+    planned_adjustment_cost: float = 0.0
+
+
+@dataclass(frozen=True)
+class MPCReplayReport:
+    """首区间重放比对结果；``matches`` 为真才允许进入真实执行。"""
+
+    matches: bool
+    expected_services: Tuple[Tuple[Any, ...], ...]
+    replayed_services: Tuple[Tuple[Any, ...], ...]
+    expected_slots: Tuple[Tuple[Any, ...], ...]
+    replayed_slots: Tuple[Tuple[Any, ...], ...]
+    message: str = ""
+
+
+@dataclass
+class FirstStageExecution:
+    """首阶段（时段 ell）执行包：唯一被实际执行的部分。"""
+
+    period: int  # = ell
+    power_kw: List[List[float]]  # P_act[i][b]：首区间实际充电功率
+    ready: List[List[int]]  # g*[i][b] 服务就绪指示
+    available_full: List[int]  # F*[i] 可用满电电池数
+    assignments: List[Dict[str, Any]]  # 事件-槽匹配（按 站, 槽 升序）
+    # 连续事件分支的可重放证据。旧调用方构造该类时无需提供这些字段。
+    charging_segments: List[Dict[str, Any]] = field(default_factory=list)
+    state_after: Optional[Any] = None
+    execution_result: Optional[Any] = None
+
+
+@dataclass
+class EventMPCModelBundle:
+    """连续事件 MPC 的构模快照。
+
+    请求功率由 Mock 信号固定，物理可行性与同刻事件顺序由
+    ``ContinuousEventEngine`` 定义。因此这里保存的是经规范化后的候选、
+    时间契约和稳定排序。
+    ``model`` 保留为 ``None``，使调用方可以明确区分尚未将事件位置
+    MILP 化的 replay-first 实现与旧 Gurobi bundle。
+    """
+
+    window: EventMPCWindowInput
+    time_grid: Any
+    horizon: int
+    requests: List[MPCEventRequest]
+    requested_power: List[List[List[float]]]
+    event_engine: Any
+    model: Optional[Any] = None
+    candidate_event_count: int = 0
+    variable_count: int = 0
+    constraint_count: int = 0
+
+
+@dataclass
+class EventMPCResult:
+    """连续事件 MPC 的可重放结果。
+
+    目前 RL 输出和外部参数均为 Mock；功率轨迹是输入参数，因而本结果以
+    事件执行器对候选请求的确定性预测为可行 incumbent。它不把
+    ``PENDING_AT_HORIZON`` 写回真实状态，也不将终端近似写入 ledger。
+    """
+
+    period_ell: int
+    horizon: int
+    status: str
+    is_optimal: bool
+    solve_time_sec: float
+    objective_total: float
+    income_reservation: float
+    income_random: float
+    charging_cost: float
+    adjustment_cost: float
+    reservation_failure_cost: float
+    terminal_value: float
+    terminal_value_weight: float
+    request_outcomes: Dict[str, str]
+    events: List[Dict[str, Any]]
+    first_stage: FirstStageExecution
+    terminal_state: Any
+    pending_request_ids: List[str]
+    replay_initial_state: Any = field(repr=False)
+    replay_requests: List[MPCEventRequest] = field(repr=False)
+    replay_requested_power: List[List[float]] = field(repr=False)
+    time_grid: Any = field(repr=False)
+    event_engine: Any = field(repr=False)
+    model_statistics: Dict[str, Any] = field(default_factory=dict)
+
+
+# ----------------------------------------------------------------------
+# 连续事件接口的无状态工具
+# ----------------------------------------------------------------------
+_MISSING = object()
+
+
+def _field(value: Any, name: str, default: Any = _MISSING) -> Any:
+    """同时支持 dataclass / 普通对象 / JSON dict 的只读字段访问。"""
+    if isinstance(value, dict):
+        if name in value:
+            return value[name]
+    elif hasattr(value, name):
+        return getattr(value, name)
+    if default is _MISSING:
+        raise MPCInputError(f"连续事件输入缺少必填字段 {name!r}")
+    return default
+
+
+def _finite_number(value: Any, label: str) -> float:
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as exc:
+        raise MPCInputError(f"{label} 必须是有限浮点数，当前为 {value!r}") from exc
+    if not math.isfinite(out):
+        raise MPCInputError(f"{label} 必须是有限浮点数，当前为 {value!r}")
+    return out
+
+
+def _interval_hours(params: Any) -> float:
+    """读取外层区间时长（小时）。"""
+    return _finite_number(
+        getattr(params, "interval_hours", None), "params.interval_hours"
+    )
+
+
+def _time_epsilon(params: Any) -> float:
+    """仅用于消除浮点运算误差，绝不定义预测域的 guard 带。"""
+    epsilon = _finite_number(getattr(params, "time_epsilon", 1e-9), "time_epsilon")
+    if epsilon < 0.0:
+        raise MPCInputError("time_epsilon 不能为负")
+    return epsilon
+
+
+@dataclass(frozen=True)
+class _FallbackTimeGrid:
+    """event_core 尚未导入时使用的最小时间契约实现。
+
+    正常路径会使用 ``src.time_grid.TimeGrid``；保留该实现能让本模块的
+    输入校验和边界契约独立可测，且其半开区间规则与正式实现一致。
+    """
+
+    interval_hours: float
+    time_epsilon: float
+
+    def start(self, interval: int) -> float:
+        return interval * self.interval_hours
+
+    def end(self, interval: int) -> float:
+        return (interval + 1) * self.interval_hours
+
+    def interval(self, interval: int) -> Tuple[float, float]:
+        return (self.start(interval), self.end(interval))
+
+    def prediction_bounds(self, ell: int, horizon: int) -> Tuple[float, float]:
+        return (self.start(ell), self.end(ell + horizon - 1))
+
+    def normalize_for_window(self, t: float, t_end: float) -> float:
+        # 仅规范数值计算所得的“精确右端”。例如 t_end-5e-8 仍是当前
+        # 窗口事件，不能用求解器 guard 带将其偷移到下一轮。
+        if abs(t - t_end) <= self.time_epsilon:
+            return t_end
+        return t
+
+    def contains_execution_time(self, t: float, interval: int) -> bool:
+        start, end = self.interval(interval)
+        return start <= t < end
+
+    def current_event_upper_bound(self, t_end: float) -> float:
+        return t_end
+
+
+def _time_grid(params: Any, supplied: Any = None) -> Any:
+    if supplied is not None:
+        return supplied
+    duration = _interval_hours(params)
+    epsilon = _time_epsilon(params)
+    try:
+        from src.time_grid import TimeGrid  # type: ignore
+
+        return TimeGrid(duration)
+    except (ImportError, TypeError):
+        # 其余逻辑仍按相同时间契约执行，避免为了导入顺序而回到旧的
+        # floor/整时段语义。
+        return _FallbackTimeGrid(duration, epsilon)
+
+
+def _grid_prediction_bounds(grid: Any, ell: int, horizon: int) -> Tuple[float, float]:
+    bounds = _field(grid, "prediction_bounds")(ell, horizon)
+    if not isinstance(bounds, (tuple, list)) or len(bounds) != 2:
+        raise MPCInputError("TimeGrid.prediction_bounds 必须返回 (t_start, t_end)")
+    start = _finite_number(bounds[0], "prediction t_start")
+    end = _finite_number(bounds[1], "prediction t_end")
+    if not start < end:
+        raise MPCInputError(f"预测窗口必须满足 t_start<t_end，当前为 ({start}, {end})")
+    return start, end
+
+
+def _grid_normalize(grid: Any, t: float, t_end: float) -> float:
+    normalizer = _field(grid, "normalize_for_window", None)
+    if normalizer is None:
+        return t
+    value = normalizer(t, t_end)
+    # 有些早期实现返回 (normalized_time, snapped)，适配其第一项。
+    if isinstance(value, (tuple, list)):
+        if not value:
+            raise MPCInputError("TimeGrid.normalize_for_window 返回空值")
+        value = value[0]
+    return _finite_number(value, "normalized event time")
+
+
+def _kind_name(kind: Any) -> str:
+    raw = getattr(kind, "value", kind)
+    name = str(raw).strip().lower()
+    if name in {"reservation", "reserved", "res", "预约"}:
+        return "reservation"
+    if name in {"random", "rand", "随机"}:
+        return "random"
+    raise MPCInputError(f"不支持的请求类别 {kind!r}；仅允许 reservation/random")
+
+
+def _station_energy_limit(params: Any, station: int, period: int) -> float:
+    """读取逐站逐区间能量上限，兼容旧参数对象的标量方法。"""
+    value = getattr(params, "station_energy_limit_kwh", None)
+    if callable(value):
+        try:
+            value = value(station, period)
+        except TypeError:
+            value = value()
+    if value is not None:
+        if isinstance(value, (int, float)):
+            return _finite_number(value, "station_energy_limit_kwh")
+        try:
+            row = value[station]
+            item = row[period]
+        except (IndexError, KeyError, TypeError) as exc:
+            raise MPCInputError(
+                f"station_energy_limit_kwh 缺少站 {station}、区间 {period}"
+            ) from exc
+        return _finite_number(item, f"station_energy_limit_kwh[{station}][{period}]")
+    raise MPCInputError("参数缺少 station_energy_limit_kwh")
+
+
+def _record(value: Any) -> Dict[str, Any]:
+    """将执行器事件转换为稳定、JSON 友好的浅记录。"""
+    if isinstance(value, dict):
+        return dict(value)
+    names = (
+        "event_id", "request_id", "kind", "station", "slot", "time",
+        "occurred_at", "service_time", "arrival_time", "deadline",
+        "return_soc", "start_time", "end_time", "power_kw", "duration",
+        "interval", "amount", "energy_kwh", "wait_hours",
+    )
+    out: Dict[str, Any] = {}
+    for name in names:
+        if hasattr(value, name):
+            item = getattr(value, name)
+            if hasattr(item, "value"):
+                item = item.value
+            if isinstance(item, tuple):
+                item = list(item)
+            out[name] = item
+    # ServiceEvent / TimeoutEvent 将请求嵌在 ``request`` 字段，展开为与
+    # JSON ``to_dict`` 一致的扁平证据，避免结果提取丢失 request_id。
+    request = getattr(value, "request", None)
+    if request is not None:
+        for name in (
+            "request_id", "kind", "station", "arrival_time", "deadline",
+            "return_soc", "event_id", "user_key", "source_arc", "path_order",
+        ):
+            if name not in out and hasattr(request, name):
+                item = getattr(request, name)
+                if hasattr(item, "value"):
+                    item = item.value
+                if isinstance(item, tuple):
+                    item = list(item)
+                out[name] = item
+        if "event_id" in out and "request_event_id" not in out:
+            # 外层 event_id 是 service:/timeout:，嵌套 id 才是请求标识。
+            outer_id = out["event_id"]
+            request_id = getattr(request, "event_id", None)
+            if request_id is not None:
+                out["request_event_id"] = request_id
+            out["event_id"] = outer_id
+    return out
+
+
+# ----------------------------------------------------------------------
+# 内部结构
+# ----------------------------------------------------------------------
+class MPCController:
+    """连续事件 MPC 控制器（replay-first 求值与首区间重放）。
+
+    参数
+    ----
+    params : BusinessParameters
+        业务参数对象（data_generation_test.parameter）。
+    rl_provider : RLProvider, optional
+        RL 信号提供者；缺省 MockRLProvider(params)。
+    """
+
+    def __init__(
+        self,
+        params: BusinessParameters,
+        rl_provider: Optional[RLProvider] = None,
+    ) -> None:
+        params.validate()
+        self.params = params
+        self.rl_provider = (
+            rl_provider if rl_provider is not None else MockRLProvider(params)
+        )
+
+    def build_model(self, window: EventMPCWindowInput) -> EventMPCModelBundle:
+        """兼容别名：构造连续事件 MPC 的构模快照。"""
+        return self.build_event_model(window)
+
+    def solve_step(self, window: EventMPCWindowInput) -> EventMPCResult:
+        """求解本轮连续事件 MPC（replay-first），返回可重放结果。"""
+        return self.solve_event_step(window)
+
+    @staticmethod
+    def _event_request_from(value: Any) -> MPCEventRequest:
+        """把领域层 CandidateRequest / WaitingRequest 转为只读 MPC 快照。"""
+        if isinstance(value, MPCEventRequest):
+            return value
+        raw_key = _field(value, "user_key", None)
+        if raw_key is not None:
+            try:
+                raw_key = (int(raw_key[0]), int(raw_key[1]))
+            except (TypeError, IndexError, ValueError) as exc:
+                raise MPCInputError(f"请求 user_key={raw_key!r} 非法") from exc
+        raw_arc = _field(value, "source_arc", None)
+        if raw_arc is not None:
+            try:
+                raw_arc = (raw_arc[0], raw_arc[1])
+            except (TypeError, IndexError) as exc:
+                raise MPCInputError(f"请求 source_arc={raw_arc!r} 非法") from exc
+        return MPCEventRequest(
+            request_id=str(_field(value, "request_id")),
+            kind=_field(value, "kind"),
+            station=int(_field(value, "station")),
+            arrival_time=_finite_number(_field(value, "arrival_time"), "arrival_time"),
+            deadline=_finite_number(_field(value, "deadline"), "deadline"),
+            return_soc=_finite_number(_field(value, "return_soc"), "return_soc"),
+            user_key=raw_key,
+            source_arc=raw_arc,
+            path_order=int(_field(value, "path_order", 0)),
+            event_id=_field(value, "event_id", None),
+            upstream_request_id=_field(value, "upstream_request_id", None),
+            active=bool(_field(value, "active", True)),
+        )
+
+    @staticmethod
+    def _slot_matrices(
+        state: Any, n_sta: int, n_slot: int
+    ) -> Tuple[List[List[float]], List[List[int]], Tuple[Tuple[Any, ...], ...]]:
+        """提取领域状态的逐槽 SOC/ready，用于首区间快照与重放校验。"""
+        soc = [[0.0 for _ in range(n_slot)] for _ in range(n_sta)]
+        ready = [[0 for _ in range(n_slot)] for _ in range(n_sta)]
+        seen: set[Tuple[int, int]] = set()
+        slots = _field(state, "slots", _field(state, "slot_states", None))
+        if slots is None:
+            old_soc = _field(state, "soc_obs", None)
+            if old_soc is None:
+                return soc, ready, tuple()
+            if len(old_soc) != n_sta or any(len(row) != n_slot for row in old_soc):
+                raise MPCInputError("事件状态的 slots / soc_obs 形状与站点配置不一致")
+            for i in range(n_sta):
+                for b in range(n_slot):
+                    value = _finite_number(old_soc[i][b], f"soc_obs[{i}][{b}]")
+                    soc[i][b] = value
+                    ready[i][b] = int(value == 1.0)
+                    seen.add((i, b))
+        else:
+            # 支持扁平 [SlotState]、二维 [站][槽] 和 {station: [SlotState]}。
+            if isinstance(slots, dict):
+                iterable: Iterable[Any] = (
+                    item for row in slots.values() for item in row
+                )
+            elif slots and isinstance(slots[0], (list, tuple)):
+                iterable = (item for row in slots for item in row)
+            else:
+                iterable = iter(slots)
+            for fallback, item in enumerate(iterable):
+                i = int(_field(item, "station", fallback // n_slot))
+                b = int(_field(item, "slot", fallback % n_slot))
+                if not (0 <= i < n_sta and 0 <= b < n_slot):
+                    raise MPCInputError(f"SlotState({i}, {b}) 超出站点/槽位范围")
+                if (i, b) in seen:
+                    raise MPCInputError(f"事件状态重复包含 SlotState({i}, {b})")
+                value = _finite_number(_field(item, "soc"), f"slot[{i},{b}].soc")
+                if not 0.0 <= value <= 1.0:
+                    raise MPCInputError(f"slot[{i},{b}].soc={value} 超出 [0,1]")
+                soc[i][b] = value
+                ready[i][b] = int(bool(_field(item, "ready", value == 1.0)))
+                seen.add((i, b))
+        signature: List[Tuple[Any, ...]] = []
+        for i in range(n_sta):
+            for b in range(n_slot):
+                signature.append((i, b, round(soc[i][b], 12), ready[i][b]))
+        return soc, ready, tuple(signature)
+
+    def _validate_event_window(
+        self, window: EventMPCWindowInput
+    ) -> Tuple[Any, int, List[MPCEventRequest], List[List[List[float]]], Any]:
+        """验证连续时序、Mock 信号和站级能量边界，并返回规范化快照。
+
+        这里刻意不读取外部真值或上一轮的求解结果；所有输入必须来自
+        ObservationView / Mock reference 的当前快照。
+        """
+        p = window.params
+        try:
+            p.validate()
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise MPCInputError(f"业务参数不合法: {exc}") from exc
+        st = p.station
+        n_sta, n_slot = st.num_stations, st.num_slots
+        ell = int(window.period_ell)
+        if not 0 <= ell < p.num_periods:
+            raise MPCInputError(f"period_ell={ell} 超出运营日范围")
+        grid = _time_grid(p, window.time_grid)
+        horizon = int(window.horizon if window.horizon is not None else p.horizon)
+        if horizon <= 0:
+            raise MPCInputError("连续事件 horizon 必须为正整数")
+        if ell + horizon > p.num_periods:
+            raise MPCInputError(
+                f"预测窗口 [{ell}, {ell + horizon}) 超出 num_periods={p.num_periods}；"
+                "请在日末缩短 horizon，而不是用最后一段价格/能量限额延展"
+            )
+        t_start, t_end = _grid_prediction_bounds(grid, ell, horizon)
+        state_now = _field(window.rolling_state, "now", None)
+        if state_now is not None:
+            now = _finite_number(state_now, "state.now")
+            if abs(now - t_start) > _time_epsilon(p):
+                raise MPCInputError(
+                    f"state.now={now} 与 period_ell={ell} 的左端 {t_start} 不一致"
+                )
+        self._slot_matrices(window.rolling_state, n_sta, n_slot)
+
+        sig = window.rl_signals
+        if sig is None:
+            raise MPCInputError("连续事件 MPC 必须接收 Mock RLSignals")
+        signal_source = _field(sig, "signal_source", None)
+        if signal_source is not None and str(signal_source).lower() != "mock":
+            raise MPCInputError(
+                f"本轮仅允许 Mock 信号，signal_source={signal_source!r}"
+            )
+        if int(_field(sig, "start_period")) != ell:
+            raise MPCInputError("RLSignals.start_period 与 period_ell 不一致")
+        if int(_field(sig, "horizon")) != horizon:
+            raise MPCInputError("RLSignals.horizon 与连续事件 horizon 不一致")
+        raw_power = _field(sig, "requested_power")
+        if len(raw_power) != n_sta or any(len(raw_power[i]) != n_slot for i in range(n_sta)):
+            raise MPCInputError("requested_power 形状必须为 [station][slot][horizon]")
+        slot_cap = _finite_number(st.slot_power_limit_kw, "slot_power_limit_kw")
+        requested_power: List[List[List[float]]] = []
+        duration = _interval_hours(p)
+        for i in range(n_sta):
+            station_rows: List[List[float]] = []
+            for b in range(n_slot):
+                row = raw_power[i][b]
+                if len(row) != horizon:
+                    raise MPCInputError(
+                        f"requested_power[{i}][{b}] 长度必须为 horizon={horizon}"
+                    )
+                power_row: List[float] = []
+                for h, item in enumerate(row):
+                    value = _finite_number(item, f"requested_power[{i}][{b}][{h}]")
+                    if not 0.0 <= value <= slot_cap:
+                        raise MPCInputError(
+                            f"requested_power[{i}][{b}][{h}]={value} 超出 [0,{slot_cap}]"
+                        )
+                    power_row.append(value)
+                station_rows.append(power_row)
+            requested_power.append(station_rows)
+            for h in range(horizon):
+                energy = duration * sum(requested_power[i][b][h] for b in range(n_slot))
+                limit = _station_energy_limit(p, i, ell + h)
+                if limit < 0.0:
+                    raise MPCInputError(f"station_energy_limit_kwh[{i}][{ell+h}] 不能为负")
+                if energy > limit + 1e-9:
+                    raise MPCInputError(
+                        f"站 {i} 区间 {ell+h} 请求能量 {energy} kWh 超过上限 {limit} kWh"
+                    )
+
+        seen_ids: set[str] = set()
+        requests: List[MPCEventRequest] = []
+        for raw in window.event_requests:
+            req = self._event_request_from(raw)
+            if not req.request_id:
+                raise MPCInputError("候选请求 request_id 不能为空")
+            if req.request_id in seen_ids:
+                raise MPCInputError(f"候选请求 id {req.request_id!r} 重复")
+            seen_ids.add(req.request_id)
+            _kind_name(req.kind)
+            if not 0 <= req.station < n_sta:
+                raise MPCInputError(f"请求 {req.request_id} 的 station={req.station} 非法")
+            if not 0.0 <= req.return_soc <= 1.0:
+                raise MPCInputError(
+                    f"请求 {req.request_id} 的 return_soc={req.return_soc} 超出 [0,1]"
+                )
+            arrival = _grid_normalize(grid, req.arrival_time, t_end)
+            deadline = _grid_normalize(grid, req.deadline, t_end)
+            if deadline < arrival:
+                raise MPCInputError(
+                    f"请求 {req.request_id} 的 deadline={deadline} 早于 arrival={arrival}"
+                )
+            requests.append(
+                MPCEventRequest(
+                    request_id=req.request_id,
+                    kind=req.kind,
+                    station=req.station,
+                    arrival_time=arrival,
+                    deadline=deadline,
+                    return_soc=req.return_soc,
+                    user_key=req.user_key,
+                    source_arc=req.source_arc,
+                    path_order=req.path_order,
+                    event_id=req.event_id,
+                    upstream_request_id=req.upstream_request_id,
+                    active=req.active,
+                )
+            )
+        # 预约优先、类内 FCFS 与 stable id：该顺序同样传给执行器，禁止由
+        # dict 插入顺序或求解器变量编号隐式决定。
+        requests.sort(
+            key=lambda r: (
+                r.arrival_time,
+                0 if _kind_name(r.kind) == "reservation" else 1,
+                r.request_id,
+                r.station,
+                r.path_order,
+            )
+        )
+        return grid, horizon, requests, requested_power, window.event_engine
+
+    def _event_engine(self, window_engine: Any, grid: Any) -> Any:
+        """获取共享连续事件内核；不在 MPC 内复制物理规则。"""
+        if window_engine is not None:
+            return window_engine
+        try:
+            from src.event_engine import ContinuousEventEngine  # type: ignore
+        except ImportError as exc:
+            raise MPCInputError(
+                "连续事件 MPC 需要 src.event_engine.ContinuousEventEngine"
+            ) from exc
+        p = self.params
+        try:
+            return ContinuousEventEngine(
+                time_grid=grid,
+                battery_capacity_kwh=p.battery_capacity_kwh,
+                charging_efficiency=p.station.charging_efficiency,
+                max_wait_hours=getattr(p, "max_wait_hours", None),
+                slot_power_limit_kw=p.station.slot_power_limit_kw,
+                station_energy_limit_kwh=getattr(p, "station_energy_limit_kwh", None),
+            )
+        except TypeError:
+            # 兼容开发期的严格构造器：max_wait 已由每个 request.deadline
+            # 固化时无需重复传入。
+            return ContinuousEventEngine(
+                time_grid=grid,
+                battery_capacity_kwh=p.battery_capacity_kwh,
+                charging_efficiency=p.station.charging_efficiency,
+                slot_power_limit_kw=p.station.slot_power_limit_kw,
+                station_energy_limit_kwh=getattr(p, "station_energy_limit_kwh", None),
+            )
+
+    @staticmethod
+    def _contains_time(grid: Any, time_value: float, period: int) -> bool:
+        contains = _field(grid, "contains_execution_time", None)
+        if contains is not None:
+            return bool(contains(time_value, period))
+        start, end = _field(grid, "interval")(period)
+        return start <= time_value < end
+
+    @staticmethod
+    def _run_event_interval(
+        engine: Any,
+        state: Any,
+        period: int,
+        requested_power: List[List[float]],
+        arrivals: List[MPCEventRequest],
+    ) -> Any:
+        """调用共享内核，兼容 keyword 与早期 positional 形态。"""
+        try:
+            return engine.simulate_interval(
+                state,
+                interval_index=period,
+                requested_power=requested_power,
+                arrivals=arrivals,
+                realized=False,
+            )
+        except TypeError as keyword_error:
+            try:
+                return engine.simulate_interval(
+                    state, period, requested_power, arrivals, realized=False
+                )
+            except TypeError:
+                raise keyword_error
+
+    @staticmethod
+    def _engine_requests(requests: Sequence[MPCEventRequest]) -> List[Any]:
+        """把 MPC 快照转换为领域层候选，避免执行器依赖历史 dataclass。"""
+        try:
+            from src.domain import CandidateRequest, RequestKind  # type: ignore
+
+            return [
+                CandidateRequest(
+                    request_id=req.request_id,
+                    kind=RequestKind(_kind_name(req.kind)),
+                    station=req.station,
+                    arrival_time=req.arrival_time,
+                    deadline=req.deadline,
+                    return_soc=req.return_soc,
+                    user_key=req.user_key,
+                    source_arc=req.source_arc,
+                    path_order=req.path_order,
+                    event_id=req.event_id,
+                    upstream_request_id=req.upstream_request_id,
+                    active=req.active,
+                )
+                for req in requests
+            ]
+        except ImportError:
+            # 仅在 event_core 尚未安装完成的开发阶段允许 duck typing；正式
+            # 执行仍必须经过共享领域类型。
+            return list(requests)
+
+    @staticmethod
+    def _result_items(result: Any, name: str) -> List[Any]:
+        value = _field(result, name, [])
+        return list(value or [])
+
+    @staticmethod
+    def _event_time(record: Dict[str, Any], fallback: Optional[float] = None) -> Optional[float]:
+        for key in ("service_time", "occurred_at", "time", "start_time"):
+            if key in record and record[key] is not None:
+                return _finite_number(record[key], key)
+        return fallback
+
+    @staticmethod
+    def _service_signature(records: Sequence[Dict[str, Any]]) -> Tuple[Tuple[Any, ...], ...]:
+        out: List[Tuple[Any, ...]] = []
+        for record in records:
+            time_value = MPCController._event_time(record)
+            out.append(
+                (
+                    record.get("request_id"),
+                    record.get("station"),
+                    record.get("slot"),
+                    None if time_value is None else round(time_value, 12),
+                )
+            )
+        return tuple(sorted(out, key=repr))
+
+    def build_event_model(
+        self, window: EventMPCWindowInput
+    ) -> EventMPCModelBundle:
+        """构造连续事件 MPC 的固定候选与时间契约快照。
+
+        该阶段不再生成 ``P/g/F/S_pre`` 等整时段变量：Mock 请求功率是
+        参数，连续状态由统一事件内核产生。调用 ``solve_event_step`` 后
+        首区间快照可被同一内核逐字段重放。
+        """
+        event_window = window
+        grid, horizon, requests, power, supplied_engine = self._validate_event_window(
+            event_window
+        )
+        engine = self._event_engine(supplied_engine, grid)
+        return EventMPCModelBundle(
+            window=event_window,
+            time_grid=grid,
+            horizon=horizon,
+            requests=requests,
+            requested_power=power,
+            event_engine=engine,
+            candidate_event_count=len(requests),
+            variable_count=0,
+            constraint_count=0,
+        )
+
+    def solve_event_step(
+        self, window: EventMPCWindowInput
+    ) -> EventMPCResult:
+        """以共享执行器评价一个给定候选并产生可重放 incumbent。
+
+        单次调用仍不创建事件位置变量：Mock ``P_hat`` 和该调用的请求集合
+        都是固定参数。公开 runner 在本函数外枚举剩余路径并逐候选调用本
+        函数，赢家因此可标为 ``EVENT_PATH_ENUM_REPLAY``；这与联合路径—
+        事件位置 MILP 的全局最优性是两个不同层级。
+        """
+        bundle = self.build_event_model(window)
+        event_window = bundle.window
+        p = event_window.params
+        st = p.station
+        ell = event_window.period_ell
+        t_start, t_end = _grid_prediction_bounds(bundle.time_grid, ell, bundle.horizon)
+        state = copy.deepcopy(event_window.rolling_state)
+        initial_state = copy.deepcopy(state)
+        first_execution: Optional[Any] = None
+        all_services: List[Dict[str, Any]] = []
+        all_timeouts: List[Dict[str, Any]] = []
+        all_segments: List[Dict[str, Any]] = []
+        all_events: List[Dict[str, Any]] = []
+        t0 = time.perf_counter()
+        for h in range(bundle.horizon):
+            q = ell + h
+            arrivals = [
+                req for req in bundle.requests
+                if req.active
+                and self._contains_time(bundle.time_grid, req.arrival_time, q)
+            ]
+            power_q = [
+                [bundle.requested_power[i][b][h] for b in range(st.num_slots)]
+                for i in range(st.num_stations)
+            ]
+            execution = self._run_event_interval(
+                bundle.event_engine, state, q, power_q, self._engine_requests(arrivals)
+            )
+            state = _field(execution, "state", state)
+            services = [_record(item) for item in self._result_items(execution, "services")]
+            timeouts = [_record(item) for item in self._result_items(execution, "timeouts")]
+            segments = [
+                _record(item) for item in self._result_items(execution, "charging_segments")
+            ]
+            all_services.extend(services)
+            all_timeouts.extend(timeouts)
+            all_segments.extend(segments)
+            all_events.extend({"event_type": "SERVICE", **item} for item in services)
+            all_events.extend({"event_type": "TIMEOUT", **item} for item in timeouts)
+            if h == 0:
+                first_execution = execution
+        solve_time = time.perf_counter() - t0
+        if first_execution is None:  # defensive; horizon has already been validated > 0.
+            raise MPCNoSolutionError("连续事件 MPC 未生成首区间执行结果")
+
+        request_by_id = {req.request_id: req for req in bundle.requests}
+        served_ids = {
+            str(item["request_id"])
+            for item in all_services
+            if item.get("request_id") is not None
+        }
+        timeout_ids = {
+            str(item["request_id"])
+            for item in all_timeouts
+            if item.get("request_id") is not None
+        }
+        outcomes: Dict[str, str] = {}
+        for req in bundle.requests:
+            if not req.active:
+                outcomes[req.request_id] = "NOT_EFFECTIVE"
+            elif req.request_id in served_ids:
+                outcomes[req.request_id] = "SERVED_IN_HORIZON"
+            elif req.request_id in timeout_ids:
+                outcomes[req.request_id] = "FAILED_IN_HORIZON"
+            else:
+                # 包含 t_end / guard 内事件：它们严格属于下一轮，不能被
+                # 改写为本轮服务或失败。
+                outcomes[req.request_id] = "PENDING_AT_HORIZON"
+        pending_ids = sorted(
+            request_id for request_id, outcome in outcomes.items()
+            if outcome == "PENDING_AT_HORIZON"
+        )
+        all_events.extend(
+            {
+                "event_type": "PENDING_AT_HORIZON",
+                "request_id": request_id,
+                "outcome": outcomes[request_id],
+            }
+            for request_id in pending_ids
+        )
+
+        # ---- 目标分项：均由事件时间/分段积分取得，不用整时段平均快照。 ----
+        income_reservation = 0.0
+        income_random = 0.0
+        for service in all_services:
+            req = request_by_id.get(str(service.get("request_id")))
+            if req is None:
+                continue
+            service_time = self._event_time(service, req.arrival_time)
+            if service_time is None:
+                continue
+            interval_of = _field(bundle.time_grid, "interval_of", None)
+            if interval_of is None:
+                period = int(service_time / _interval_hours(p))
+            else:
+                period = int(interval_of(service_time))
+            price_row = p.swap_service_price[req.station]
+            if not 0 <= period < len(price_row):
+                raise MPCError(f"服务 {req.request_id} 的价格区间 {period} 非法")
+            income = p.battery_capacity_kwh * price_row[period] * (1.0 - req.return_soc)
+            if _kind_name(req.kind) == "reservation":
+                income_reservation += income
+            else:
+                income_random += income
+        charging_cost = 0.0
+        for segment in all_segments:
+            station = segment.get("station")
+            power_kw = segment.get("power_kw")
+            if station is None or power_kw is None:
+                continue
+            begin = self._event_time(segment)
+            end = segment.get("end_time")
+            duration = segment.get("duration")
+            if duration is None and begin is not None and end is not None:
+                duration = _finite_number(end, "segment.end_time") - begin
+            if duration is None:
+                continue
+            duration = _finite_number(duration, "segment.duration")
+            if duration <= 0.0:
+                continue
+            period = int(_field(bundle.time_grid, "interval_of")(begin)) if begin is not None else ell
+            charging_cost += (
+                p.electricity_price[int(station)][period]
+                * _finite_number(power_kw, "segment.power_kw")
+                * duration
+            )
+        reservation_failure_cost = p.reservation_failure_penalty * sum(
+            1
+            for request_id in timeout_ids
+            if request_id in request_by_id
+            and _kind_name(request_by_id[request_id].kind) == "reservation"
+        )
+        terminal_soc, _, _ = self._slot_matrices(state, st.num_stations, st.num_slots)
+        terminal_value = 0.0
+        terminal_values = _field(event_window.rl_signals, "terminal_soc_value")
+        for i in range(st.num_stations):
+            for b in range(st.num_slots):
+                terminal_value += _finite_number(
+                    terminal_values[i][b], f"terminal_soc_value[{i}][{b}]"
+                ) * terminal_soc[i][b]
+        outside_value = _field(event_window.rl_signals, "outside_swap_value", None)
+        if outside_value is not None:
+            for request_id in pending_ids:
+                req = request_by_id[request_id]
+                terminal_value += _finite_number(
+                    outside_value(req.station, req.return_soc),
+                    f"outside_swap_value({req.station}, {req.return_soc})",
+                )
+        beta = _finite_number(p.terminal_value_weight, "terminal_value_weight")
+        adjustment_cost = _finite_number(
+            event_window.planned_adjustment_cost,
+            "planned_adjustment_cost",
+        )
+        if adjustment_cost < 0.0:
+            raise MPCInputError("planned_adjustment_cost cannot be negative")
+        objective_total = (
+            income_reservation + income_random - charging_cost
+            - adjustment_cost - reservation_failure_cost + beta * terminal_value
+        )
+
+        first_services = [_record(item) for item in self._result_items(first_execution, "services")]
+        first_segments = [
+            _record(item) for item in self._result_items(first_execution, "charging_segments")
+        ]
+        _, first_ready, _ = self._slot_matrices(
+            _field(first_execution, "state", state), st.num_stations, st.num_slots
+        )
+        first_power = [
+            [bundle.requested_power[i][b][0] for b in range(st.num_slots)]
+            for i in range(st.num_stations)
+        ]
+        first_stage = FirstStageExecution(
+            period=ell,
+            power_kw=first_power,
+            ready=first_ready,
+            available_full=[sum(row) for row in first_ready],
+            assignments=sorted(
+                first_services,
+                key=lambda item: (item.get("station", -1), item.get("slot", -1), str(item.get("request_id", ""))),
+            ),
+            charging_segments=first_segments,
+            state_after=copy.deepcopy(_field(first_execution, "state", state)),
+            execution_result=first_execution,
+        )
+        context = event_window.reference_context
+        path_search_enabled = bool(
+            _field(context, "path_search_enabled", False)
+            if context is not None
+            else False
+        )
+        status = "EVENT_PATH_ENUM_REPLAY" if path_search_enabled else "EVENT_REPLAY"
+        stats = {
+            "model_kind": (
+                "event_path_enumeration_mock"
+                if path_search_enabled
+                else "event_replay_mock"
+            ),
+            "candidate_event_count": bundle.candidate_event_count,
+            "variable_count": bundle.variable_count,
+            "constraint_count": bundle.constraint_count,
+            "runtime_sec": solve_time,
+            "mip_gap": 0.0,
+            "best_bound": objective_total,
+            "t_start": t_start,
+            "t_end": t_end,
+        }
+        return EventMPCResult(
+            period_ell=ell,
+            horizon=bundle.horizon,
+            status=status,
+            # 这是给定 Mock 功率/候选的物理可行 incumbent，而非事件位置
+            # MILP 的全局最优性声明。
+            is_optimal=False,
+            solve_time_sec=solve_time,
+            objective_total=objective_total,
+            income_reservation=income_reservation,
+            income_random=income_random,
+            charging_cost=charging_cost,
+            adjustment_cost=adjustment_cost,
+            reservation_failure_cost=reservation_failure_cost,
+            terminal_value=terminal_value,
+            terminal_value_weight=beta,
+            request_outcomes=outcomes,
+            events=all_events,
+            first_stage=first_stage,
+            terminal_state=copy.deepcopy(state),
+            pending_request_ids=pending_ids,
+            replay_initial_state=initial_state,
+            replay_requests=list(bundle.requests),
+            replay_requested_power=copy.deepcopy(first_power),
+            time_grid=bundle.time_grid,
+            event_engine=bundle.event_engine,
+            model_statistics=stats,
+        )
+
+    def replay_first_interval(self, result: EventMPCResult) -> MPCReplayReport:
+        """用同一连续事件内核重放首区间，并返回稳定字段的逐项比较。"""
+        state = copy.deepcopy(result.replay_initial_state)
+        period = result.period_ell
+        arrivals = [
+            req for req in result.replay_requests
+            if req.active
+            and self._contains_time(result.time_grid, req.arrival_time, period)
+        ]
+        try:
+            replay = self._run_event_interval(
+                result.event_engine,
+                state,
+                period,
+                copy.deepcopy(result.replay_requested_power),
+                self._engine_requests(arrivals),
+            )
+            replay_services = [
+                _record(item) for item in self._result_items(replay, "services")
+            ]
+            expected_services = self._service_signature(result.first_stage.assignments)
+            actual_services = self._service_signature(replay_services)
+            expected_state = result.first_stage.state_after
+            _, _, expected_slots = self._slot_matrices(
+                expected_state, self.params.station.num_stations, self.params.station.num_slots
+            )
+            _, _, actual_slots = self._slot_matrices(
+                _field(replay, "state", state),
+                self.params.station.num_stations, self.params.station.num_slots,
+            )
+            matches = expected_services == actual_services and expected_slots == actual_slots
+            message = "" if matches else "首区间事件服务或逐槽状态与重放不一致"
+            return MPCReplayReport(
+                matches=matches,
+                expected_services=expected_services,
+                replayed_services=actual_services,
+                expected_slots=expected_slots,
+                replayed_slots=actual_slots,
+                message=message,
+            )
+        except Exception as exc:  # 报告错误而非把重放失败伪装为匹配。
+            return MPCReplayReport(
+                matches=False,
+                expected_services=self._service_signature(result.first_stage.assignments),
+                replayed_services=tuple(),
+                expected_slots=tuple(),
+                replayed_slots=tuple(),
+                message=f"首区间重放异常: {exc}",
+            )
+
+    # ------------------------------------------------------------------
+
+
 __all__ = [
     "PaperMPCError",
     "PaperMPCSolverUnavailable",
@@ -1487,4 +2528,14 @@ __all__ = [
     "StationPattern",
     "PaperMPCSolution",
     "solve_paper_mpc",
+    "MPCError",
+    "MPCInputError",
+    "MPCNoSolutionError",
+    "MPCEventRequest",
+    "EventMPCWindowInput",
+    "MPCReplayReport",
+    "FirstStageExecution",
+    "EventMPCModelBundle",
+    "EventMPCResult",
+    "MPCController",
 ]
