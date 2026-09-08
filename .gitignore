@@ -137,3 +137,16 @@ ExpresswayBSSs/paper/**
 !ExpresswayBSSs/paper/**/*.tex
 !ExpresswayBSSs/paper/**/*.bib
 !ExpresswayBSSs/paper/figures/**
+
+# ExpresswayBSSs_v2 paper: keep section sources, styles, PDFs, and figures.
+ExpresswayBSSs_v2/paper_v2/**
+!ExpresswayBSSs_v2/paper_v2/**/
+!ExpresswayBSSs_v2/paper_v2/**/*.pdf
+!ExpresswayBSSs_v2/paper_v2/**/*.tex
+!ExpresswayBSSs_v2/paper_v2/**/*.bib
+!ExpresswayBSSs_v2/paper_v2/**/*.sty
+!ExpresswayBSSs_v2/paper_v2/**/*.cls
+!ExpresswayBSSs_v2/paper_v2/figures/**
+
+# Temporary outputs and source backup used to verify the section split.
+ExpresswayBSSs_v2/tmp/paper-section-split-verification/
