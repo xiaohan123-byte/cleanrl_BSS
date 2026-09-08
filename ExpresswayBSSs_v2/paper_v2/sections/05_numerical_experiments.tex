@@ -1,0 +1,279 @@
+% !TeX root = ../main.tex
+\section{数值实验}
+\label{exp:section}
+
+数值实验从换电路径与充电功率的联合优化、RL 终端价值和运行条件三个方面评价所提方法。各组实验使用相同的道路网络、预约用户集合、初始换电路径和初始电池状态。训练集、验证集与测试集按运营场景划分，各组对照在相同测试场景上运行。测试阶段固定价值网络参数，需求预测仅使用决策时刻可获得的信息。
+
+计算环境见表~\ref{exp:environment}，主要实验参数见表~\ref{exp:parameters}。每个时间段为 5~min，充电功率每段更新，换电路径每 15~min 允许更新一次。采用学习终端价值的主方法取 $\beta=1$。预测域长度、场景规模、机器配置和其余参数按实际实验设置填写。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{计算环境}
+  \label{exp:environment}
+  \small
+  \begin{tabularx}{0.88\linewidth}{@{}lX@{}}
+    \toprule
+    项目 & 配置 \\
+    \midrule
+    机器型号 & 待填 \\
+    CPU 型号 & 待填 \\
+    GPU 型号及显存 & 待填 \\
+    内存容量 & 待填 \\
+    操作系统 & 待填 \\
+    Python 版本 & 待填 \\
+    Gurobi 版本 & 待填 \\
+    PyTorch 版本 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption{主要实验参数}
+  \label{exp:parameters}
+  \small
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabularx}{\linewidth}{@{}Xll@{}}
+    \toprule
+    参数 & 符号或单位 & 设置 \\
+    \midrule
+    站点数量与位置 & 个，km & 待填 \\
+    各站电池数量与初始 SOC & $|\mathcal B_i|$，无量纲 & 待填 \\
+    电池容量 & $E_B$，kWh & 待填 \\
+    各站充电效率 & $\eta_i$ & 待填 \\
+    设备功率上限 & $\overline P_{i,b}^{\mathrm{ch}}$，kW & 待填 \\
+    站点总充电功率上限 & $\overline P_i^{\mathrm{sta}}$，kW & 待填 \\
+    用户等待时间 & min & 待填 \\
+    预约规模、O--D 及入口 SOC 分布 & 用户数及分布参数 & 待填 \\
+    随机用户需求与预测设置 & 到站率及预测参数 & 待填 \\
+    充电电价与换电服务单价 & $c_{i,n}^{\mathrm{ch}},c_{i,n}^{\mathrm{sw}}$，元/kWh & 待填 \\
+    路径调整与预约失败成本 & $c^{\mathrm{adj}},c^{\mathrm{fail}}$，元/次 & 待填 \\
+    时间段长度与充电更新周期 & $\delta$ & 5~min \\
+    路径更新周期 & $K\delta$ & 15~min \\
+    预测域长度 & $H$，段 & 待填 \\
+    主方法终端价值权重 & $\beta$ & 1 \\
+    需求期长度 & h & 待填 \\
+    训练、验证及测试场景数量 & 个 & 待填 \\
+    独立训练次数与测试重复次数 & 次 & 待填 \\
+    训练预算 & 运营轨迹数及更新次数 & 待填 \\
+    单次求解时限与相对最优间隙 & s，\% & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+各方法均在需求期结束后继续处理已有预约和等待请求，直至完成或失败，并采用相同的终止状态和结算方式。运营净收益为实际服务收入减去充电、路径调整和预约失败成本。预约失败率按未完成预约行程的用户数占预约用户总数计算；同一用户的预约失败只计一次。随机用户服务率为获得服务的随机请求数占实际随机请求总数的比例。平均等待时间按已获服务请求的实际服务时刻与原始到站时刻之差计算，并同时报告服务率以反映未获服务用户的情况。路径调整次数记录实际更新给用户的换电站序列变化。各项运营指标报告重复实验的均值与标准差，求解时间报告单轮平均值和第 95 百分位数。样本分母为零的指标记为“不适用”。
+
+\FloatBarrier
+\subsection{换电路径与充电功率联合优化消融实验}
+\label{exp:joint}
+
+为考察两项决策的作用，设置表~\ref{exp:joint_methods}所列四组方法。各组终端价值均取零，使用相同预测域长度、需求输入和服务规则。服务时间与满电电池匹配均由优化模型确定。采用日前路径的组别在运营过程中沿用日前计算的换电站序列；优化换电路径的组别按规定的更新周期调整在途预约用户的换电安排。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{换电路径与充电功率联合优化的对照设置}
+  \label{exp:joint_methods}
+  \small
+  \begin{tabularx}{\linewidth}{@{}Xlll@{}}
+    \toprule
+    方法 & 换电路径 & 充电功率 & 终端价值 \\
+    \midrule
+    基准方法 & 日前路径 & 基准充电规则 & 0 \\
+    仅优化换电路径 & 在线优化 & 基准充电规则 & 0 \\
+    仅优化充电功率 & 日前路径 & 在线优化 & 0 \\
+    联合优化 & 在线优化 & 在线优化 & 0 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+基准充电规则将站点总充电功率上限按设备数量等分，实际功率同时满足设备上限和电池可充电量限制：
+\begin{equation}
+ P_{i,b,n}^{\mathrm{base}}=
+ \min\left\{
+ \overline P_{i,b}^{\mathrm{ch}},\;
+ \frac{\overline P_i^{\mathrm{sta}}}{|\mathcal B_i|},\;
+ \frac{E_B(1-S_{i,b,n}^{+})}{\eta_i\delta}
+ \right\}.
+ \label{eq:baseline_power}
+\end{equation}
+该规则使用本时刻完成换电后的 SOC。每台设备保留等分得到的功率额度，满电电池对应设备的功率为零。采用基准规则的组别在预测域内施加 $P_{i,b,n}=(1-d_n^{\mathrm{end}})P_{i,b,n}^{\mathrm{base}}$，使各运营时间段使用基准功率，结束后的时间段功率为零。其分段线性表达见附录。式中 $\delta$ 以小时计，因而第三项的单位为 kW。
+
+表~\ref{exp:joint_results}记录运营指标，表~\ref{exp:joint_costs}记录收入与成本分解。通过基准方法与两组单项优化的比较，考察路径调整和充电安排各自的作用；通过两组单项优化与联合优化的比较，考察同时优化两项决策的运营表现。各项比较使用相同测试场景的配对结果。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{联合优化消融实验的运营结果}
+  \label{exp:joint_results}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabularx}{\linewidth}{@{}Xcccccc@{}}
+    \toprule
+    方法 & \shortstack{净收益\\元} & \shortstack{预约\\失败率/\%} & \shortstack{随机用户\\服务率/\%} & \shortstack{等待时间\\min} & \shortstack{调整次数\\次} & \shortstack{求解时间\\均值/P95，s} \\
+    \midrule
+    基准方法 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    仅优化换电路径 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    仅优化充电功率 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    联合优化 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption{联合优化消融实验的收入与成本分解（元）}
+  \label{exp:joint_costs}
+  \small
+  \begin{tabularx}{\linewidth}{@{}Xcccc@{}}
+    \toprule
+    方法 & 服务收入 & 充电成本 & 路径调整成本 & 预约失败成本 \\
+    \midrule
+    基准方法 & 待填 & 待填 & 待填 & 待填 \\
+    仅优化换电路径 & 待填 & 待填 & 待填 & 待填 \\
+    仅优化充电功率 & 待填 & 待填 & 待填 & 待填 \\
+    联合优化 & 待填 & 待填 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\todoresult{待填：根据运营指标和成本分解，分析换电路径优化、充电功率优化及二者联合优化的作用，并给出重复实验的统计结果。}
+
+\FloatBarrier
+\subsection{RL终端价值消融实验}
+\label{exp:terminal}
+
+本节各组均对换电路径与充电功率进行联合优化，采用相同预测长度、域内需求信息、状态观测和业务约束。对照方法仅改变预测终点的价值表达，如表~\ref{exp:value_methods}所示。终端库存反映各站的后续供给能力，未完成服务包括预测结束时仍在等待的请求，以及预约用户预计在预测域外发生的换电需求。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{终端价值的对照设置}
+  \label{exp:value_methods}
+  \small
+  \begin{tabularx}{\linewidth}{@{}p{2.6cm}XX@{}}
+    \toprule
+    方法 & 终端价值 & 比较内容 \\
+    \midrule
+    零终端价值 & $V=0$ & 终端价值的总体作用 \\
+    简单库存价值 & $c^{\mathrm{inv}}E_B\sum_{i,b}S_{i,b}^{-}$ & 人工库存估值与学习价值的差别 \\
+    RL 库存价值 & 使用库存及公共外生信息 & 库存价值学习的作用 \\
+    完整 RL 终端价值 & 使用库存、未完成服务及公共外生信息 & 未完成服务信息的作用 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+表中 SOC 均取预测终点服务发生前的值。简单库存价值的系数 $c^{\mathrm{inv}}$ 的单位为元/kWh，根据训练集或验证集确定后固定。各组终端函数在运营终止状态均取零。两组 RL 方法使用同一网络结构形式，公共外生信息包括时间、电价、后续随机需求预测和路径更新相位；RL 库存价值以终端库存及这些公共信息作为输入，完整 RL 终端价值进一步使用未完成服务及相应的用户换电安排。输入维度按各自特征确定，输入归一化参数由训练数据计算后固定。
+
+两个学习方案分别生成训练轨迹并更新价值网络，使用相同的训练场景划分、运营轨迹预算和参数更新预算。网络的最终选择依据验证集表现，测试阶段固定网络参数，并在相同测试场景上评价。表~\ref{exp:training}记录训练设置，表~\ref{exp:value_results}记录运营结果。图~\ref{exp:value_figure}预留训练过程和运营表现的展示位置。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{终端价值网络的训练设置}
+  \label{exp:training}
+  \small
+  \begin{tabularx}{\linewidth}{@{}Xcc@{}}
+    \toprule
+    项目 & RL 库存价值 & 完整 RL 终端价值 \\
+    \midrule
+    输入维度 & 待填 & 待填 \\
+    隐藏单元数 & 待填 & 待填 \\
+    参数总数 & 待填 & 待填 \\
+    训练场景数量 & 待填 & 待填 \\
+    采样批次数与每批轨迹数 & 待填 & 待填 \\
+    每批参数更新次数 & 待填 & 待填 \\
+    回归批量大小 & 待填 & 待填 \\
+    优化器与学习率 & 待填 & 待填 \\
+    独立训练次数 & 待填 & 待填 \\
+    验证频率与网络选择规则 & 待填 & 待填 \\
+    实际训练耗时 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{table}[!htbp]
+  \centering
+  \caption{RL 终端价值消融实验的运营结果}
+  \label{exp:value_results}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabularx}{\linewidth}{@{}Xcccccc@{}}
+    \toprule
+    方法 & \shortstack{净收益\\元} & \shortstack{预约\\失败率/\%} & \shortstack{随机用户\\服务率/\%} & \shortstack{等待时间\\min} & \shortstack{调整次数\\次} & \shortstack{求解时间\\均值/P95，s} \\
+    \midrule
+    零终端价值 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    简单库存价值 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    RL 库存价值 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    完整 RL 终端价值 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{figure}[!htbp]
+  \centering
+  \fbox{\begin{minipage}[c][32mm][c]{0.9\linewidth}
+    \centering
+    待填：价值网络训练过程及终端价值消融结果\\[4pt]
+    横轴与单位、各方法曲线及重复实验的不确定性范围待填。
+  \end{minipage}}
+  \caption{终端价值学习过程及运营表现（待填）}
+  \label{exp:value_figure}
+\end{figure}
+
+\todoresult{待填：比较各类终端价值对应的运营指标，分析终端库存和预测域外未完成服务的作用，并结合求解时间评价计算代价。}
+
+\FloatBarrier
+\subsection{敏感性分析}
+\label{exp:sensitivity}
+
+敏感性分析考察预测域长度、需求强度、电池库存配置和站点总充电功率上限。每组实验改变一个因素，其余设置保持基准值；充电与路径更新周期始终为 5~min 和 15~min。表~\ref{exp:sensitivity_settings}记录各因素的基准值和变化范围。预测域长度以 $H$ 个时间段表示，并同时报告对应的小时数 $H\delta$。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{敏感性分析的参数设置}
+  \label{exp:sensitivity_settings}
+  \small
+  \begin{tabularx}{\linewidth}{@{}Xlll@{}}
+    \toprule
+    因素 & 基准值 & 变化范围 & 取值数量 \\
+    \midrule
+    预测域长度 $H$ & 待填 & 待填 & 待填 \\
+    预约与随机需求相对基准的倍数 & 待填 & 待填 & 待填 \\
+    各站电池数量 $|\mathcal B_i|$ & 待填 & 待填 & 待填 \\
+    站点总充电功率上限相对基准的倍数 & 待填 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+预测域长度实验比较零终端价值与完整 RL 终端价值，对各个 $H$ 使用同一组测试场景，记录运营表现和求解时间。该比较用于分析预测域截断与终端价值之间的关系。需求实验按同一倍数调整预约规模和随机到站强度，保持两类用户的比例及其他分布参数一致。库存实验改变各站电池数量，并保持初始 SOC 分布和站点总充电功率上限一致。功率实验按同一倍数调整各站总充电功率上限，保持电池数量和设备功率上限一致。
+
+完整 RL 终端价值在需求强度、电池配置或功率配置发生变化时，使用相应配置下的训练与验证场景训练，训练预算保持一致；每组测试固定对应网络。预测域长度比较使用同一配置下固定的价值网络。所有测试场景均与训练及验证场景分离。表~\ref{exp:sensitivity_results}提供结果记录格式，每个参数取值及每种被比较的方法分别填列一行，图~\ref{exp:sensitivity_figure}展示主要指标随参数的变化。
+
+\begin{table}[!htbp]
+  \centering
+  \caption{敏感性分析结果（各参数取值分别填列）}
+  \label{exp:sensitivity_results}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabularx}{\linewidth}{@{}Xcccccc@{}}
+    \toprule
+    因素、取值及方法 & \shortstack{净收益\\元} & \shortstack{预约\\失败率/\%} & \shortstack{随机用户\\服务率/\%} & \shortstack{等待时间\\min} & \shortstack{调整次数\\次} & \shortstack{求解时间\\均值/P95，s} \\
+    \midrule
+    预测域长度：待填 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    需求强度：待填 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    电池库存配置：待填 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    站点总充电功率上限：待填 & 待填 & 待填 & 待填 & 待填 & 待填 & 待填 \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{figure}[!htbp]
+  \centering
+  \fbox{\begin{minipage}[c][36mm][c]{0.9\linewidth}
+    \centering
+    待填：预测域长度、需求强度、电池库存和站点总充电功率上限的敏感性结果\\[4pt]
+    各参数取值、运营指标曲线及求解时间曲线待填。
+  \end{minipage}}
+  \caption{不同运行条件下的运营表现与求解时间（待填）}
+  \label{exp:sensitivity_figure}
+\end{figure}
+
+\todoresult{待填：分别分析预测域长度、需求强度、电池数量和站点总充电功率上限变化时的收益、服务表现及求解时间，并说明各项结论所对应的参数范围。}
+

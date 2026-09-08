@@ -1,10 +1,10 @@
 # Fdb version 4
-["xdvipdfmx"] 1788857744.36528 "main.xdv" "main.pdf" "main" 1788857745.21506 0
-  "main.xdv" 1788857744 362644 e6dc287f7f93825f426fa5777c4581dd "xelatex"
+["xdvipdfmx"] 1788858023.32276 "main.xdv" "main.pdf" "main" 1788858024.18702 0
+  "main.xdv" 1788858023 362644 7de401fc929d12371e0c31bb032ad4cc "xelatex"
   (generated)
   "main.pdf"
   (rewritten before read)
-["xelatex"] 1788857741.50407 "d:/Myfiles/vscode_files/cleanrl_BSS/ExpresswayBSSs_v2/paper_v2/main.tex" "main.xdv" "main" 1788857745.2094 0
+["xelatex"] 1788858020.43827 "d:/Myfiles/vscode_files/cleanrl_BSS/ExpresswayBSSs_v2/paper_v2/main.tex" "main.xdv" "main" 1788858024.18072 0
   "SJTUReport.sty" 1786033179 4915 5e70733fbb4fdd507b9623bf3ed65821 ""
   "c:/Windows/Fonts/msyh.ttc" 1739321934 19704352 1e10e74402e59d54499af795caf0b135 ""
   "d:/App/texlive/2026/texmf-dist/fonts/map/fontname/texfonts.map" 1779633524 3524 cb3e574dea2d1052e39280babc910dc8 ""
@@ -220,11 +220,18 @@
   "d:/App/texlive/2026/texmf-dist/web2c/texmf.cnf" 1779632783 43630 e9fa012910491fe5ae08a72c3c2997a7 ""
   "d:/App/texlive/2026/texmf-var/web2c/xetex/xelatex.fmt" 1779635477 5949022 97b6c9b2ad03c239d304c2143b8887ee ""
   "d:/App/texlive/2026/texmf.cnf" 1779635272 713 e69b156964470283e0530f5060668171 ""
-  "d:/Myfiles/vscode_files/cleanrl_BSS/ExpresswayBSSs_v2/paper_v2/main.tex" 1788857658 65980 b1efa24647a1d76bdf161ba4012a0656 ""
-  "main.aux" 1788857744 13330 9dc6c3e969bac6b955ca3c291d5bc738 "xelatex"
-  "main.out" 1788857744 2396 191d21be9e0aaec829ca4c19cc0c0926 "xelatex"
-  "main.tex" 1788857658 65980 b1efa24647a1d76bdf161ba4012a0656 ""
-  "main.toc" 1788857744 2716 cca8b7ebddcdbdb471d48b567ff082a9 "xelatex"
+  "d:/Myfiles/vscode_files/cleanrl_BSS/ExpresswayBSSs_v2/paper_v2/main.tex" 1788858019 2743 d317ef76f536421aa49639950cd3a24f ""
+  "main.aux" 1788858023 13330 9dc6c3e969bac6b955ca3c291d5bc738 "xelatex"
+  "main.out" 1788858023 2396 191d21be9e0aaec829ca4c19cc0c0926 "xelatex"
+  "main.tex" 1788858019 2743 d317ef76f536421aa49639950cd3a24f ""
+  "main.toc" 1788858023 2716 cca8b7ebddcdbdb471d48b567ff082a9 "xelatex"
+  "sections/01_introduction.tex" 1788858019 4063 befcbfe5dce33a1fd69d32dfe9e96678 ""
+  "sections/02_problem_description.tex" 1788858019 3318 6581fa2db4128df40a1d56b480d61f89 ""
+  "sections/03_model.tex" 1788858019 25196 785f5587908c74dfdf463f666ad10994 ""
+  "sections/04_terminal_value_learning.tex" 1788858019 9231 bb7e9416ae2bf62b3ffdedd8420c1f30 ""
+  "sections/05_numerical_experiments.tex" 1788858019 15525 99b5a6b77c4f5125d240510d774c09c8 ""
+  "sections/06_conclusion.tex" 1788858019 1353 4bbc1b87413fa64b198e46fe86fe92ee ""
+  "sections/appendix_linearization.tex" 1788858019 4989 92c0b2bb701c7514a27ee413371a952e ""
   (generated)
   "main.aux"
   "main.log"

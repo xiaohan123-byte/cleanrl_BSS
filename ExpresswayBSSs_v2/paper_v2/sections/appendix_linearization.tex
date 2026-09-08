@@ -1,0 +1,81 @@
+% !TeX root = ../main.tex
+\section{线性化方法}
+\label{lin:appendix}
+
+本附录给出正文中分段线性函数、变量乘积及逻辑关系的等价约束。每轮求解时，网络参数和各表达式的有效上下界均为已知常数，新增变量仅用于表达相应关系。
+
+\paragraph{二元变量与有界连续变量的乘积。}
+设 $x\in[L,U]$、$b\in\{0,1\}$，引入连续变量 $w=bx$，其等价表达为
+\begin{equation}
+\begin{aligned}
+Lb\le w&\le Ub,\\
+x-U(1-b)\le w&\le x-L(1-b).
+\end{aligned}
+\label{lin:product}
+\end{equation}
+当 $b=0$ 时得到 $w=0$，当 $b=1$ 时得到 $w=x$。该表达适用于含负值的区间，可用于请求状态标记与连续特征的乘积。若 $d\in\{0,1\}$ 表示运营已经结束，原始网络输出为 $\widetilde V\in[L_V,U_V]$，则终端价值 $V=(1-d)\widetilde V$ 也按式~\eqref{lin:product} 表达，其中取 $b=1-d$。因此，运营结束状态的终端价值严格等于零。
+
+\paragraph{ReLU 与价值网络。}
+对 $h=\max\{0,x\}$，若 $L<0<U$，引入二元变量 $\xi$，有
+\begin{equation}
+\begin{aligned}
+h&\ge 0, & h&\ge x,\\
+h&\le U\xi, & h&\le x-L(1-\xi),
+\qquad \xi\in\{0,1\}.
+\end{aligned}
+\label{lin:relu}
+\end{equation}
+当 $U\le0$ 时直接置 $h=0$；当 $L\ge0$ 时直接置 $h=x$。对式~\eqref{eq:value_network} 中每个仿射输入 $x_m=\boldsymbol v_m^\top\Phi_\theta(s)+d_m$ 分别使用上述约束，并将对应的输出变量 $h_m$ 代入
+\begin{equation}
+\widetilde V=d_0+\boldsymbol v_0^\top\Phi_\theta(s)+\sum_m a_m h_m.
+\label{lin:network}
+\end{equation}
+上述等式和约束共同确定网络值，适用于任意符号的输出权重 $a_m$。状态编码中的分段线性特征按相同方法展开；其输出作为后续网络的输入，从而将特征提取与价值计算一并纳入优化模型。
+
+\paragraph{有限个二元条件的逻辑关系。}
+设 $b_j\in\{0,1\}$，$j\in\mathcal J$，其中 $\mathcal J$ 为有限非空集合。二元变量 $q$ 表示至少一个条件成立，二元变量 $a$ 表示全部条件成立，其等价约束分别为
+\begin{equation}
+\begin{aligned}
+q&\ge b_j\quad(j\in\mathcal J), & q&\le\sum_{j\in\mathcal J}b_j,\\
+a&\le b_j\quad(j\in\mathcal J), & a&\ge\sum_{j\in\mathcal J}b_j-|\mathcal J|+1.
+\end{aligned}
+\label{lin:logic}
+\end{equation}
+空集合对应的逻辑或取 $0$，逻辑与取 $1$。正文涉及路径改变、请求有效性及运营结束的条件可按其逻辑定义逐项使用这些约束。
+
+\paragraph{基准充电规则。}
+对式~\eqref{eq:baseline_power}，记已知常数与仿射表达式为
+\begin{equation}
+\begin{aligned}
+\bar p_{i,b}
+&=\min\left\{\overline P_{i,b}^{\mathrm{ch}},
+\frac{\overline P_i^{\mathrm{sta}}}{|\mathcal B_i|}\right\},\\
+q_{i,b,n}&=\frac{E_B(1-S_{i,b,n}^{+})}{\eta_i\delta},
+\qquad Q_i=\frac{E_B}{\eta_i\delta}.
+\end{aligned}
+\label{lin:baseline_bounds}
+\end{equation}
+由 $0\le S_{i,b,n}^{+}\le1$ 可得 $0\le q_{i,b,n}\le Q_i$。若 $\bar p_{i,b}=0$，直接置 $P_{i,b,n}^{\mathrm{base}}=0$；若 $\bar p_{i,b}\ge Q_i$，直接置 $P_{i,b,n}^{\mathrm{base}}=q_{i,b,n}$。在 $0<\bar p_{i,b}<Q_i$ 时，引入 $\zeta_{i,b,n}\in\{0,1\}$，写成
+\begin{equation}
+\begin{aligned}
+P_{i,b,n}^{\mathrm{base}}&\le\bar p_{i,b},\\
+P_{i,b,n}^{\mathrm{base}}&\le q_{i,b,n},\\
+P_{i,b,n}^{\mathrm{base}}&\ge\bar p_{i,b}\zeta_{i,b,n},\\
+P_{i,b,n}^{\mathrm{base}}&\ge q_{i,b,n}-(Q_i-\bar p_{i,b})\zeta_{i,b,n}.
+\end{aligned}
+\label{lin:baseline_min}
+\end{equation}
+当 $\zeta_{i,b,n}=1$ 时功率取设备与站级额度共同确定的上限；当 $\zeta_{i,b,n}=0$ 时功率取本段可充电量对应的值。两种情况均满足两项上界，因而精确表示二者的最小值。运营结束条件与基准功率的乘积 $P_{i,b,n}=(1-d_n^{\mathrm{end}})P_{i,b,n}^{\mathrm{base}}$ 按式~\eqref{lin:product} 表达，其中基准功率的有效区间为 $[0,\min\{\bar p_{i,b},Q_i\}]$。
+
+\paragraph{有效上下界。}
+SOC 的边界取 $[0,1]$，请求状态标记取 $[0,1]$，功率使用正文中的设备和站级上限。请求数量由当前有限请求集合限定；到站时间、截止时间和等待时间特征根据本轮已知时刻及有效等待窗口确定范围。对于含状态标记的特征，先求连续部分的边界，再使用式~\eqref{lin:product}。若某层输入向量为 $\boldsymbol e$，$x=\boldsymbol v^\top\boldsymbol e+d$ 且 $e_j\in[\underline e_j,\overline e_j]$，令 $v_j^+=\max\{v_j,0\}$、$v_j^-=\min\{v_j,0\}$，则可取
+\begin{equation}
+\begin{aligned}
+L&=d+\sum_j\left(v_j^+\underline e_j+v_j^-\overline e_j\right),\\
+U&=d+\sum_j\left(v_j^+\overline e_j+v_j^-\underline e_j\right).
+\end{aligned}
+\label{lin:interval}
+\end{equation}
+ReLU 输出的区间为 $[\max\{0,L\},\max\{0,U\}]$。依次传递各层区间，可得到隐藏单元和最终输出的有限上下界，并据此固定本轮线性化常数。若求解前能够由业务约束得到更紧的边界，则使用相应边界以缩小连续松弛范围。
+
+

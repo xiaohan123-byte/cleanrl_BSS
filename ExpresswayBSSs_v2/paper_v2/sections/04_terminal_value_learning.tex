@@ -1,0 +1,106 @@
+% !TeX root = ../main.tex
+\section{终端价值学习}
+\label{sec:value}
+
+强化学习用于估计预测域的终端价值，重点考虑终端库存和预测域外未完成服务。相同的电池总电量可能对应不同的满电供应能力；相同的库存也可能面对不同的预约到站时间、等待窗口和后续换电需求。价值函数将这些信息共同映射为一个终端评价，并通过实际运营轨迹中的累计净收益进行训练。
+
+\subsection{状态与终端价值}
+\label{sec:value_state}
+
+以 $s(\tau)$ 表示时刻 $\tau$ 的完整运营状态，包括电池 SOC、真实等待请求、未完成预约及其换电安排，以及时间、电价和需求预测。已进入高速公路的预约还具有位置、SOC 和 ETA 等观测。对于预测终端，使用式~\eqref{eq:battery_dynamics} 的库存、式~\eqref{eq:terminal_pending}--\eqref{eq:terminal_random} 的未完成请求以及终点等待标记构造相同含义的状态。下文的用户和请求集合均取该状态时刻的集合，$\mathcal K^p$ 表示该时刻 O--D 对 $p$ 下的预约用户集合，省略其时间标记。
+
+为适应不同数量的请求，采用共享分段线性函数和求和生成固定维度表示。对任意状态时刻 $\tau$，令 $\nu_r(\tau)$ 汇集请求站点和前一站的位置、用户 O--D、退回 SOC、相对到站与截止时间，以及该请求是否正在等待。预约记录还包含该用户当前换电站序和可得车辆信息；在预测终端采用本轮确定的站序及给定车辆预测。终端需要继续完成的站点用
+\begin{equation}
+x_i^{p,k,\mathrm{end}}=\sum_{r\in\R_{p,k}^A:\,i(r)=i}w_r
+\label{eq:terminal_visits}
+\end{equation}
+表示，其中保留仍在等待的当前站点。站序按下游方向排列，已完成的站点随 $w_r=0$ 移除；请求等待特征取 $Q_{r,\ell+H}$。由此，终端站序和等待状态直接由本轮决策确定，其余车辆预测与时刻特征为给定输入。用户编号仅用于将同一用户的请求归组。
+
+以 $w_r(\tau)$ 表示该状态下请求仍有效且尚未完成，以 $Q_r(\tau)$ 表示其中已经进入等待的请求。真实状态取观测和现有预约，预测终端分别取 $w_r$ 和 $Q_{r,\ell+H}$。令 $\xi(\tau)$ 包含运营时间、距离需求期结束的时间、当前与后续电价、随机需求预测和路径更新相位。路径更新相位由时间索引模 $K$ 得到；终端以 $\ell+H$ 的相位计算。状态编码为
+\begin{equation}
+\begin{aligned}
+f_B(\tau)&=\mathop{\mathrm{concat}}_{i\in\mathcal S}
+\left(\sum_{b\in\mathcal B_i}\phi_B(S_{i,b}^{-}(\tau))\right),\\
+h_{p,k}(\tau)&=\sum_{r\in\R_{p,k}^A}w_r(\tau)\psi_A\bigl(\nu_r(\tau)\bigr),\\
+f_A(\tau)&=\sum_{p\in\mathcal P}\sum_{k\in\mathcal K^p}
+\left[\phi_A(h_{p,k}(\tau))-\phi_A(0)\right],\\
+f_R(\tau)&=\sum_{r\in\R^R}w_r(\tau)\psi_R\bigl(\nu_r(\tau)\bigr),\\
+\Phi_\theta(s(\tau))&=\bigl[f_B(\tau),f_A(\tau),f_R(\tau),\xi(\tau)\bigr].
+\end{aligned}
+\label{eq:state_encoding}
+\end{equation}
+其中 $\phi_B,\phi_A,\psi_A,\psi_R$ 为固定维度的分段线性映射，使用仿射变换和 ReLU 构造。站内电池使用共享映射，以反映 SOC 分布；预约先按用户汇总再整体编码，以保留同一行程多次换电的关联。$\phi_A(h_{p,k})-\phi_A(0)$ 使已经没有后续服务的用户贡献为零。等待状态作为请求自身的一个特征，预约等待请求在 $f_A$ 中记录一次。域外随机需求作为 $\xi$ 的预测输入。
+
+以 $s_\ell=s(t_\ell)$、$s_{\ell+H}=s(t_{\ell+H})$ 分别表示当前状态及预测终端状态。真实与预测状态采用相同特征定义和归一化参数，归一化参数由训练集确定后固定。式~\eqref{eq:state_encoding} 将完整状态映射为固定维度的网络输入，其表示能力通过第 5 节的终端价值消融实验评价。
+
+原始网络输出及实际使用的价值函数定义为
+\begin{equation}
+\begin{aligned}
+\widetilde V_\theta(s)
+&=d_0+\boldsymbol v_0^\top\Phi_\theta(s)
++\sum_{m=1}^{M}a_m\max\{0,\boldsymbol v_m^\top\Phi_\theta(s)+d_m\},\\
+V_\theta(s)&=(1-d^{\mathrm{end}}(s))\widetilde V_\theta(s).
+\end{aligned}
+\label{eq:value_network}
+\end{equation}
+结束标记在当前状态由实际服务记录确定，在预测终端由式~\eqref{eq:operating_end} 确定。价值函数的训练参数 $\theta$ 包含网络和状态映射中的参数。每轮优化时固定这些参数，终端库存和未完成请求则随本轮决策变化。状态映射中的有界变量乘积、ReLU 及结束标记乘积按附录展开后，终端价值与业务约束共同进入同一个优化问题。
+
+\subsection{实际收益与状态更新}
+\label{sec:reward}
+每轮由优化模型返回当前路径、功率及相应服务方案，首段执行结果决定实际收益。令 $\mathcal H_\ell^{\mathrm{sw}}$ 为在 $t_\ell$ 实际获得服务的请求，$\mathcal H_\ell^{\mathrm{fail}}$ 为截止时刻位于 $\mathcal I_\ell$ 内且实际超时的预约请求，$N_\ell^{\mathrm{adj}}$ 为本轮实际改变换电站序的用户数，则
+\begin{equation}
+\begin{aligned}
+r_\ell={}&E_B\sum_{r\in\mathcal H_\ell^{\mathrm{sw}}}
+c_{i(r),\ell}^{\mathrm{sw}}(1-\rho_r)\\
+&-\delta\sum_{i\in\mathcal S}c_{i,\ell}^{\mathrm{ch}}
+\sum_{b\in\mathcal B_i}P_{i,b,\ell}^{*}
+-c^{\mathrm{adj}}N_\ell^{\mathrm{adj}}
+-c^{\mathrm{fail}}|\mathcal H_\ell^{\mathrm{fail}}|.
+\end{aligned}
+\label{eq:actual_reward}
+\end{equation}
+其中 $\rho_r$ 为实际退回 SOC，当前功率为执行值。实际在站请求参与首段服务，预测中的未来服务和失败在其真实发生后进入对应时间段的收益。跨边界等待请求在实际服务时记录一次收入；失败预约的后续请求结束，失败成本只记录一次。
+
+设 $a_\ell^*$ 汇集本轮实际执行的路径更新、功率和服务安排，以 $\varepsilon_{\ell+1}$ 表示该时间段到站记录、车辆观测及下一轮预测的更新，则
+\begin{equation}
+s_{\ell+1}=\mathcal F(s_\ell,a_\ell^*,\varepsilon_{\ell+1}).
+\label{eq:state_transition}
+\end{equation}
+映射 $\mathcal F$ 按第~\ref{sec:model}~节的换电、充电、等待及结算规则更新完整运营记录；价值评价时再按式~\eqref{eq:state_encoding} 编码。预测中尚未真实发生的到站以新观测校正，因此训练样本来自实际执行的状态和收益。求解器返回的匹配直接用于该时间段执行，状态转移保留相应电池变化。
+
+每个运营场景包含规定的新增需求期。需求期结束后继续处理已给定预约和等待请求，直至全部服务完成或用户失败。后续服务所需的电价和 ETA 信息延伸至该场景结束。剩余电池残值取零。若场景在第 $L$ 个状态结束，采用未折扣回报
+\begin{equation}
+G_\ell=\sum_{n=\ell}^{L-1}r_n,\qquad G_L=0.
+\label{eq:return_target}
+\end{equation}
+该回报与式~\eqref{eq:objective} 的金额单位和结算项目一致，预测域内收益与终端之后的价值按时间划分。
+
+\subsection{价值函数训练}
+\label{sec:training}
+采用交替采样与价值拟合的训练过程。首先使用零终端价值的滚动时域优化生成完整运营轨迹。随后，以各状态对应的回报 $G_\ell$ 训练价值网络，损失函数为
+\begin{equation}
+\mathcal L(\theta)=\frac{1}{|\mathcal D|}
+\sum_{(s_\ell,G_\ell)\in\mathcal D}
+\bigl(V_\theta(s_\ell)-G_\ell\bigr)^2.
+\label{eq:value_loss}
+\end{equation}
+其中 $\mathcal D$ 保存当前采样批次的完整状态记录与回报，训练时按当前参数 $\theta$ 重新计算 $\Phi_\theta(s_\ell)$，以同时更新状态映射和价值网络。网络更新后，将新价值函数用于下一批场景中的滚动时域优化，再采集轨迹并拟合。这样，优化模型根据当前终端价值生成决策，价值学习根据这些决策的实际结果更新评价。
+
+\begin{table}[!htbp]
+\centering
+\caption{终端价值学习流程}
+\label{tab:training_algorithm}
+\begin{tabularx}{\linewidth}{@{}lX@{}}
+\toprule 步骤 & 内容 \\ \midrule
+1 & 固定训练、验证和测试场景划分，初始化用于优化的终端价值为零。\\
+2 & 在一个采样批次内固定价值函数及特征提取参数，按 5~min 与 15~min 的更新安排执行滚动时域优化，记录完整运营轨迹。\\
+3 & 由式~\eqref{eq:actual_reward} 计算各段实际收益，按式~\eqref{eq:return_target} 从场景结束向前累计回报。\\
+4 & 最小化式~\eqref{eq:value_loss}，更新状态映射和价值网络；归一化统计在训练阶段确定并固定。\\
+5 & 用更新后的价值函数重复采样和拟合，按验证场景的实际净收益选择网络。\\
+6 & 固定选定网络，在独立测试场景上评价运营表现和求解时间。\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+该过程可视为由滚动时域优化生成策略、由回报拟合进行评价的近似策略迭代。每次求解期间价值函数保持固定，参数更新发生在采样批次之间。训练场景覆盖不同需求强度、SOC 分布和等待情况，网络结构、批次规模和训练预算在实验设置中记录。价值近似与滚动优化之间的相互作用通过验证场景的实际运营表现评价。
+
