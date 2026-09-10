@@ -4,19 +4,23 @@
 除特别说明外，用户集合、请求集合及可用路径网络均指当前优化轮对应的集合，其轮次索引予以省略。各集合随滚动过程更新，用户与请求的标识保持不变。
 
 将运营时间划分为长度为 $\delta$ 的时间段，记
-\begin{equation}
-t_n=n\delta,\qquad \mathcal I_n=[t_n,t_{n+1}),\qquad
-\mathcal T_\ell=\{\ell,\ldots,\ell+H-1\}.
-\label{eq:time_grid}
-\end{equation}
+\begin{subequations}\label{eq:time_grid}
+\begin{align}
+t_n&=n\delta,\label{eq:time_points}\\
+\mathcal I_n&=[t_n,t_{n+1}),\label{eq:time_intervals}\\
+\mathcal T_\ell&=\{\ell,\ldots,\ell+H-1\}.\label{eq:prediction_indices}
+\end{align}
+\end{subequations}
 其中 $\ell$ 为当前轮，$H$ 为预测时间段数。本轮预测范围为 $[t_\ell,t_{\ell+H})$，在 $t_n$ 处理服务及换电，随后在 $\mathcal I_n$ 内充电。每轮只执行当前时间段，并在下一时刻使用新观测重新优化。默认 $\delta=5$~min，能量计算时取 $\delta=1/12$~h。
 
 充电功率每段更新，换电路径每 $K$ 段允许更新一次。以运营起点为共同基准，定义已知参数
-\begin{equation}
-g_\ell=\ind\{\ell\bmod K=0\},\qquad K=3.
-\label{eq:update_clock}
-\end{equation}
-因此路径更新周期为 $K\delta=15$~min。$g_\ell=1$ 时联合优化在途用户的路径与充电功率；$g_\ell=0$ 时，整段预测采用当前换电站序并优化充电功率。尚未进入高速公路的用户沿用日前路径，进入后在下一路径更新时刻参与调整。图~\ref{fig:updates} 示意两种决策的更新安排。
+\begin{subequations}\label{eq:update_clock}
+\begin{align}
+g_\ell&=\ind\{\ell\bmod K=0\},\label{eq:path_update_indicator}\\
+K&=3.\label{eq:path_update_interval}
+\end{align}
+\end{subequations}
+因此，两类预约用户的路径均每 $K\delta=15$~min 允许更新一次。$g_\ell=1$ 时联合优化全部预约用户的路径与充电功率；$g_\ell=0$ 时，在途用户保持最近发布的换电安排，尚未进入高速公路的用户保持上一次优化后保留的计划，仅优化充电功率。未进入高速的用户首次参与优化时，以日前路径作为初始计划。进入高速前，优化后的计划不向用户发布，也不产生实际调整费用。图~\ref{fig:updates} 示意两种决策的更新安排。
 
 \begin{figure}[!htbp]
 \centering
@@ -36,7 +40,7 @@ g_\ell=\ind\{\ell\bmod K=0\},\qquad K=3.
 \label{fig:updates}
 \end{figure}
 
-表~\ref{tab:notation} 按集合与索引、参数、决策变量及辅助状态变量、派生量与价值函数列出主要符号。预约用户按 O--D 对分组，以 $\mathcal P$ 表示 O--D 对集合，$p\in\mathcal P$ 为组索引，$k$ 为该组内的用户索引。用户由 $(p,k)$ 唯一标识，编号在滚动过程中保持不变。到站请求统一以 $r$ 标识；某一请求所在站点记为 $i(r)$。费用和价格参数统一采用小写 $c$，合计费用采用大写 $C$，服务收入记为 $I$。
+表~\ref{tab:notation} 按集合与索引、输入参数、决策变量、由决策计算的量与价值函数列出主要符号。预约用户按 O--D 对分组，以 $\mathcal P$ 表示 O--D 对集合，$p\in\mathcal P$ 为组索引，$k$ 为该组内的用户索引。用户由 $(p,k)$ 唯一标识，编号在滚动过程中保持不变。到站请求统一以 $r$ 标识；某一请求所在站点记为 $i(r)$。费用和价格参数统一采用小写 $c$，合计费用采用大写 $C$，服务收入记为 $I$。
 
 \begin{longtable}{@{}p{4.4cm}p{11.1cm}@{}}
 \caption{主要符号}\label{tab:notation}\\
@@ -48,7 +52,7 @@ g_\ell=\ind\{\ell\bmod K=0\},\qquad K=3.
 \bottomrule\endfoot
 \multicolumn{2}{@{}l@{}}{\textbf{集合与索引}}\\*
 $\mathcal S;\ i,j$ & 换电站集合及站点索引 \\
-$\mathcal B_i;\ b$ & 站点 $i$ 的电池槽位集合及槽位索引 \\
+$\mathcal B_i;\ b$ & 站点 $i$ 的电池充电槽集合及充电槽索引 \\
 $\mathcal P;\ p$ & O--D 对集合及索引 \\
 $\mathcal K^{\mathrm{fut},p},\mathcal K^{\mathrm{enr},p}$ & O--D 对 $p$ 下本轮尚未进入、已经进入高速公路的预约用户集合 \\
 $\mathcal K^p;\ k$ & O--D 对 $p$ 下本轮预约用户集合及组内用户索引, $\mathcal K^p=\mathcal K^{\mathrm{fut},p}\cup\mathcal K^{\mathrm{enr},p}$ \\
@@ -57,37 +61,43 @@ $\R_i^A,\R_i^R$ & 站点 $i$ 的预约请求集合与随机请求集合 \\
 $\mathcal V^{p,k},\mathcal A^{p,k}$ & 用户 $(p,k)$ 本轮路径网络的节点集合与可用弧集 \\
 $\mathcal T_\ell;\ n,\ell$ & 本轮预测时间段集合；$n$ 为时段索引，$\ell$ 为当前轮索引 \\
 \midrule
-\multicolumn{2}{@{}l@{}}{\textbf{参数}}\\*
-$\delta$ & 时间段长度；默认 5~min，能量计算时以 h 计 \\
+\multicolumn{2}{@{}l@{}}{\textbf{输入参数}}\\*
+$\delta$ & 时间段长度 \\
 $H,K$ & 预测域长度与路径更新间隔，均以时间段数计 \\
 $o^{p,k},d^p$ & 用户 $(p,k)$ 本轮路径的起点与出口节点 \\
 $v_{i,j}^p$ & O--D 对 $p$ 中节点 $i$ 至 $j$ 的行驶 SOC 消耗 \\
 $E_B$ & 电池容量（kWh） \\
 $\eta_i$ & 站点 $i$ 的充电效率 \\
 $\rho_r$ & 请求 $r$ 对应的退回电池 SOC \\
-$S_{i,b}^{\mathrm{obs}}$ & 本轮开始时槽位 $b$ 中电池的观测 SOC \\
+$S_{i,b}^{\mathrm{obs}}$ & 本轮开始时充电槽 $b$ 中电池的观测 SOC \\
 $\overline P_{i,b}^{\mathrm{ch}},\overline P_i^{\mathrm{sta}}$ & 设备充电功率上限与站点总充电功率上限（kW） \\
-$t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}}$ & 请求 $r$ 的到站时刻与等待截止时刻；未来到站采用本轮 ETA \\
+$\bar t_r^{\mathrm{arr}}$ & 当前等待请求的实际到站时刻，或不需要先在本轮完成另一次换电的请求的预计到站时刻 \\
+$\tau_{j,i}^{p,k}$ & 用户 $(p,k)$ 从换电站 $j$ 到下一换电站 $i$ 的预测行驶时间，本轮求解时已知且为正 \\
 $\Delta$ & 请求自到站起允许的最大等待时间 \\
 $\bar y_{i,j}^{p,k}$ & 用户 $(p,k)$ 的日前换电路径是否使用弧 $(i,j)$ \\
 $c_{i,n}^{\mathrm{ch}},c_{i,n}^{\mathrm{sw}}$ & 充电电价与换电服务单价（元/kWh） \\
-$c^{\mathrm{adj}},c^{\mathrm{fail}}$ & 单次路径调整成本与单次预约失败成本（元/次） \\
+$c^{\mathrm{adj}},c^{\mathrm{fail}}$ & 单次路径调整惩罚与单次预约失败成本（元/次） \\
+$\bar x_i^{p,k},\widehat x_i^{p,k},x_i^{p,k,\mathrm{pub}}$ & 本轮开始时已知的日前路径、保留计划和最近发布路径对应的换电站安排 \\
+$\bar{\boldsymbol c}_r,\boldsymbol c_{r,m}$ & 本轮求解前根据车辆行驶预测计算的候选终端车辆信息 \\
 $\beta$ & 终端价值权重\\
 \midrule
-\multicolumn{2}{@{}l@{}}{\textbf{决策变量及辅助状态变量}}\\*
+\multicolumn{2}{@{}l@{}}{\textbf{决策变量}}\\*
 $y_{i,j}^{p,k}$ & 用户 $(p,k)$ 的本轮换电路径是否经过弧 $(i,j)$，二元变量 \\
 $P_{i,b,n}$ & 站点 $i$ 的设备 $b$ 在时间段 $n$ 的充电功率（kW） \\
-$\alpha_{b,r,n}$ & 是否在 $t_n$ 用槽位 $b$ 的电池服务请求 $r$，二元变量 \\
-$S_{i,b,n}^{-},S_{i,b,n}^{+}$ & 槽位 $b$ 中电池在 $t_n$ 换电前、后的 SOC，由状态递推确定 \\
-$\chi_{p,k}$ & 用户 $(p,k)$ 的换电站序在本轮是否改变的二元标记 \\
-$f_r$ & 预约请求 $r$ 是否在本预测域内触发用户失败的二元标记 \\
-$Q_{r,n}$ & 请求 $r$ 在 $t_n$ 是否已到站、可等待服务的二元标记 \\
-$w_r$ & 请求 $r$ 在预测终点是否仍有效且尚未完成的二元标记 \\
+$\alpha_{b,r,n}$ & 是否在 $t_n$ 用充电槽 $b$ 的电池服务请求 $r$，二元变量 \\
 \midrule
-\multicolumn{2}{@{}l@{}}{\textbf{派生量与价值函数}}\\*
-$z_{r,n},Z_r(n),Z_r$ & 请求 $r$ 在 $t_n$ 的服务量、该时刻前的累计服务量及整个预测域内的累计服务量，均由匹配变量汇总 \\
-$I$ & 本预测域内的服务收入（元） \\
-$C^{\mathrm{ch}},C^{\mathrm{adj}},C^{\mathrm{fail}}$ & 预测域内的充电费用、本轮路径调整费用及预测域内的预约失败费用（元） \\
+\multicolumn{2}{@{}l@{}}{\textbf{由决策计算的量与价值函数}}\\*
+$S_{i,b,n}^{-}$ & 充电槽 $b$ 中电池在 $t_n$ 当次换电前的 SOC，由初始电量、换电安排和充电功率确定 \\
+$\chi_{p,k}$ & 本轮的换电站安排是否与日前路径（未进入高速）或最近发布路径（在途）不同，由路径比较确定 \\
+$f_r$ & 预约请求 $r$ 是否在本轮预测期内导致用户失败，由是否需要服务、截止时刻和换电次数确定 \\
+$Q_{r,n}$ & 请求 $r$ 在 $t_n$ 是否已到站且仍在等待换电，由到站时间和此前换电次数确定 \\
+$w_r$ & 请求 $r$ 在预测终点是否仍需服务，由本轮换电和失败情况确定 \\
+$t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}}$ & 请求的到站时刻与等待截止时刻；后站到站时刻随前站换电安排确定 \\
+$B_r$ & 在本轮预测终点是否能够确定请求 $r$ 的到站时刻，由前站换电安排确定 \\
+$e_{r,n},h_r$ & 分别表示 $t_n$ 是否处于到站至截止时间内，以及截止时刻是否早于预测终点；到站时间尚未确定时均为 $0$ \\
+$Z_r(n),Z_r$ & 分别表示请求 $r$ 在本轮预测中 $t_n$ 之前的累计换电次数，以及本轮预测期内的累计换电次数。 \\
+$I$ & 本轮预测期内的服务收入（元） \\
+$C^{\mathrm{ch}},C^{\mathrm{adj}},C^{\mathrm{fail}}$ & 本轮预测期内的充电费用、本轮路径调整惩罚及本轮预测期内的预约失败费用（元） \\
 $s_\ell,s_{\ell+H}$ & 本轮观测运营状态与由本轮决策确定的预测终端状态 \\
 $V_\theta(s)$ & 强化学习估计的状态终端价值（元） \\
 \end{longtable}
@@ -100,13 +110,25 @@ $o^p\to i_1\to\cdots\to i_q\to d^p$
 
 节点集合为 $\mathcal V^p=\{o^p\}\cup\mathcal S^p\cup\{d^p\}$，所有节点沿下游方向排列。以 $D_{i,j}^p$ 和 $v_{i,j}^p$ 表示节点间距离和行驶 SOC 消耗，以 $\underline s_d^p$ 表示出口 SOC 下限。最小换电间距 $\underline D$ 用于优先排除距离过近的首段和站间换电安排，出口末段按续航条件处理。对每个 SOC 区间 $h$，按以下四步生成候选网络。
 \begin{enumerate}[label=\textbf{步骤\arabic*.},leftmargin=4.2em]
-\item \textbf{生成原始弧。}若以该 SOC 区间上限电量能够从入口到达下游站点 $j$，则连接入口与 $j$；若 $v_{i,j}^p\le1$，则连接下游站点 $i,j$；若 $v_{i,d^p}^p+\underline s_d^p\le1$，则连接站点与出口。入口可直接到达出口时加入相应弧。
+\item \textbf{生成原始弧。}若以该 SOC 区间上限电量能够从入口到达下游站点 $j$，则连接入口与 $j$；若 $v_{i,j}^p\le1$，则连接下游站点 $i,j$；若 $v_{i,d^p}^p+\underline s_d^p\le1$，则连接站点与出口。以该 SOC 区间上限电量从入口直接驶向出口后仍满足出口 SOC 下限时，加入相应弧。
 \item \textbf{生成完整路径。}在原始网络中枚举所有入口至出口的完整路径。
 \item \textbf{剪枝过近换电弧。}找出距离小于 $\underline D$ 的首段弧和站间弧，按距离从小到大考察。若当前仍存在至少一条不包含该弧的完整路径，则删除该弧；否则保留。
 \item \textbf{形成候选网络。}合并最终保留路径中的弧，得到 SOC 区间对应的弧集 $\mathcal A^{h,p}$。
 \end{enumerate}
 
-在线使用时，根据用户实际入口 SOC 进一步检查首段续航。对在途用户，删除已经经过的节点，以实时位置建立虚拟起点，按实时 SOC 检查其到下游站点的首段弧。最小换电间距始终以入口或最近一次实际换电位置为基准。对已经在站等待的用户，将当前站作为后续路径起点，后续行程以该次换电完成后的满电状态计算；当前等待请求在第~\ref{sec:model}~节中保留，并与后续服务关联。由此得到用户弧集 $\mathcal A^{p,k}$、起点 $o^{p,k}$ 以及对应出口 $d^p$。
+在线使用时，根据用户实际入口 SOC 进一步检查首段续航。对在途用户，删除已经经过的节点，以实时位置建立虚拟起点，按实时 SOC 检查其到下游站点的首段弧。最小换电间距始终以入口或最近一次实际换电位置为基准。对已经在站等待的用户，将当前站作为后续路径起点，后续行程以该次换电完成后的满电状态计算；当前等待请求在第~\ref{sec:model}~节中保留，并与后续服务关联。
+
+从本轮起点 $o^{p,k}$ 直接驶向出口 $d^p$ 的弧，只有满足以下相应条件时才予以保留：
+\begin{equation}
+\begin{cases}
+s_{\mathrm{dep}}^{p,k}-v_{o^{p,k},d^p}^{p,k}\ge\underline s_d^p,
+&\text{用户正在行驶或尚未进入高速},\\
+1-v_{o^{p,k},d^p}^{p}\ge\underline s_d^p,
+&\text{用户当前在站等待换电}.
+\end{cases}
+\label{eq:direct_exit_soc}
+\end{equation}
+式~\eqref{eq:direct_exit_soc} 第一行使用本轮起点的已知车辆 SOC $s_{\mathrm{dep}}^{p,k}$，其中 $v_{o^{p,k},d^p}^{p,k}$ 为从该起点直接驶向出口的 SOC 消耗。第二行使用当前站换电后的满电状态。两种情况都要求车辆到达出口时的 SOC 不低于 $\underline s_d^p$。由此得到用户弧集 $\mathcal A^{p,k}$、起点 $o^{p,k}$ 以及对应出口 $d^p$。
 
 \subsection{日前换电路径计算}
 \label{sec:dayahead}
@@ -122,7 +144,7 @@ $o^p\to i_1\to\cdots\to i_q\to d^p$
 \label{sec:model}
 
 \paragraph{请求与输入信息。}
-对每个 $p\in\mathcal P$，令 $\mathcal K^p=\mathcal K^{\mathrm{fut},p}\cup\mathcal K^{\mathrm{enr},p}$。对于用户 $k\in\mathcal K^p$，对每条以换电站 $i$ 为终点的可用弧 $(j,i)\in\mathcal A^{p,k}$，建立记录 $r=(p,k,j,i)$，其站点为 $i(r)=i$，到站时刻由用户在该站的 ETA 给定，退回 SOC 为
+对于用户 $k\in\mathcal K^p$，对每条到达换电站 $i$ 的可用弧 $(j,i)\in\mathcal A^{p,k}$，建立请求 $r=(p,k,j,i)$，其站点为 $i(r)=i$，退回 SOC 为
 \begin{equation}
 \rho_r=
 \begin{cases}
@@ -131,49 +153,86 @@ s_{\mathrm{dep}}^{p,k}-v_{o^{p,k},i}^{p,k},&j=o^{p,k},\ \text{用户正在行驶
 \end{cases}
 \label{eq:return_soc}
 \end{equation}
-其中 $v_{o^{p,k},i}^{p,k}$ 为本轮起点到站点 $i$ 的已知 SOC 消耗，$s_{\mathrm{dep}}^{p,k}$ 为本轮起点的已知车辆 SOC，未到用户使用预约信息及入口前观测，在途用户使用实时值。用户当前在站等待时，后续首段按第二种情况计算。各记录的 $\rho_r$ 在求解前已知，并由可达弧筛选保证 $0\le\rho_r<1$。
+其中 $v_{o^{p,k},i}^{p,k}$ 为本轮起点到站点 $i$ 的已知 SOC 消耗，$s_{\mathrm{dep}}^{p,k}$ 为本轮起点的已知车辆 SOC，未到用户使用预约信息及入口前观测，在途用户使用实时值。用户当前在站等待时，后续首段按第二种情况计算。各记录的 $\rho_r$ 在求解前已知，并由第~\ref{sec:network}~节的网络生成规则保证 $0\le\rho_r<1$。
 
-真实等待请求使用独立记录，保留观测到站时间、原截止时间和退回 SOC，预约等待记录同时保留所属用户 $(p,k)$；当前站在路径网络中作为起点，因此同一次正在等待的换电只出现一条记录。随机请求包括当前真实等待请求和预测在 $[t_\ell,t_{\ell+H})$ 到站的请求。令 $\R_i^A,\R_i^R$ 分别为站点 $i$ 的预约和随机请求记录，$\R_i=\R_i^A\cup\R_i^R$，并以 $\R^A,\R^R,\R$ 表示各站相应集合的并集。预约集合覆盖本轮路径上全部可能的后续换电，包括 ETA 位于预测域外的记录；域外随机需求以第 4 节的预测特征提供。
+令 $\R_i^A,\R_i^R$ 分别为站点 $i$ 的预约请求集合和随机请求集合，$\R_i=\R_i^A\cup\R_i^R$，并以 $\R^A,\R^R,\R$ 表示各站相应集合的并集。
 
-以 $\R_{p,k}^A$ 表示用户 $(p,k)$ 的全部预约记录。对于普通路径记录，定义选择量 $a_r=y_{j,i}^{p,k}$；真实等待请求和随机请求取 $a_r=1$。同一用户同一站点对应的不同入弧是互斥的路径选择。等待截止时刻及服务窗口参数为
+以 $\R_{p,k}^A$ 表示预约用户 $(p,k)$ 在本轮模型中的所有换电请求。这些请求包括当前在站等待的换电请求，以及后续行程中可能产生的换电请求。本轮可用弧对应的预约请求组成集合
 \begin{equation}
-t_r^{\mathrm{ddl}}=t_r^{\mathrm{arr}}+\Delta,
-\qquad e_{r,n}=\ind\{t_r^{\mathrm{arr}}\le t_n\le t_r^{\mathrm{ddl}}\}.
-\label{eq:service_window}
+\begin{aligned}
+\R^{\mathrm{path}}=\bigl\{(p,k,j,i)\in\R:\;&
+p\in\mathcal P,\ k\in\mathcal K^p,\\
+&(j,i)\in\mathcal A^{p,k},\ i\in\mathcal S\bigr\}.
+\end{aligned}
+\label{eq:path_request_set}
 \end{equation}
-当前时刻 $e_{r,\ell}$ 由真实到站和等待记录确定，只有实际在站且仍在等待窗口内的请求取 $1$。以后时段采用式~\eqref{eq:service_window} 的预测值。新预测请求的 ETA 根据当前观测更新，真实等待请求保持原始时刻。
+式~\eqref{eq:path_request_set} 包含所有预约用户沿本轮可用弧可能产生的换电请求。对于已经在站等待的预约用户，当前站是本轮路径的起点，驶入该站的弧不在本轮可用弧集合中。该用户当前等待的请求单独保留，后续沿可用弧产生的请求仍属于 $\R^{\mathrm{path}}$。因此，$\R\setminus\R^{\mathrm{path}}$ 由当前在站等待的预约请求和全部随机请求组成。
 
-\paragraph{决策变量。}
-主要变量为路径 $y_{i,j}^{p,k}\in\{0,1\}$ 和充电功率 $P_{i,b,n}\ge0$。以 $\alpha_{b,r,n}\in\{0,1\}$ 表示在 $t_n$ 用站点 $i(r)$ 的槽位 $b$ 服务请求 $r$，其中 $b\in\mathcal B_{i(r)}$。换电前后 SOC 分别为 $S_{i,b,n}^{-},S_{i,b,n}^{+}$。另设路径改变标记 $\chi_{p,k}$、预约失败标记 $f_r$、排队标记 $Q_{r,n}$ 和终端未完成服务标记 $w_r$，均为二元变量。服务量及其累计值定义为
+为描述同一用户的换电先后顺序，定义集合
 \begin{equation}
-z_{r,n}=\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n},\qquad
-Z_r(n)=\sum_{\substack{m\in\mathcal T_\ell\\m<n}}z_{r,m},\qquad
-Z_r=\sum_{n\in\mathcal T_\ell}z_{r,n}.
-\label{eq:service_sums}
+\mathcal P_r=
+\begin{cases}
+\bigl\{q\in\R_{p,k}^A:i(q)=j\bigr\},
+&r=(p,k,j,i)\in\R^{\mathrm{path}},\\
+\varnothing,&r\in\R\setminus\R^{\mathrm{path}},
+\end{cases}
+\qquad r\in\R.
+\label{eq:predecessor_request_set}
 \end{equation}
-这些量由匹配变量直接计算。满足下述容量约束时，$z_{r,n},Z_r(n),Z_r$ 均取 $0$ 或 $1$。
+其中，$q$ 表示用户 $(p,k)$ 的一个换电请求，$i(q)$ 为该请求所在的站点。式~\eqref{eq:predecessor_request_set} 第一行将该用户在前一站 $j$ 的所有可能换电请求放入 $\mathcal P_r$。用户可能通过不同路径到达 $j$，但所选路径至多采用其中一个请求。若用户当前已在 $j$ 等待换电，则从 $j$ 前往下一换电站的请求，其 $\mathcal P_r$ 只包含这次等待请求。
+
+当前等待请求自身和随机请求按式~\eqref{eq:predecessor_request_set} 第二行取空集。对于从入口或当前行驶位置出发的首次换电请求，本轮起点没有尚需服务的换电请求，第一行得到的集合也为空。$\mathcal P_r=\varnothing$ 表示在本轮安排请求 $r$ 换电之前，不需要先完成该用户的另一次换电。本轮开始前已经完成的换电不再包含在请求集合中。上述集合均在求解前确定。
+
+以 $a_r$ 表示是否需要为请求 $r$ 安排换电。对于后续可能发生的换电请求 $r=(p,k,j,i)$，所选路径经过弧 $(j,i)$ 时取 $a_r=1$，否则取 $a_r=0$，即 $a_r=y_{j,i}^{p,k}$。当前在站等待的请求和随机请求不受预约用户路径选择的影响，均取 $a_r=1$。$a_r=1$ 表示有这项换电需求，是否完成换电还取决于后续服务约束。
+
+当前在站等待的请求使用实际到站时刻。对于用户当前未在站等待时的下一次换电，以及随机请求，预计到站时刻由本轮观测和预测给定。上述时刻记为 $\bar t_r^{\mathrm{arr}}$，在本轮求解中保持不变。已经到站的请求保留原始到站时刻；尚未到站的首次请求和随机请求在下一轮根据新观测更新预测。
+
+同一用户后续站点的到站时刻由前一站的换电时刻与站间行驶时间共同确定。以 $\tau_{j,i}^{p,k}>0$ 表示用户 $(p,k)$ 从换电站 $j$ 到下一换电站 $i$ 的预测行驶时间。该参数在本轮求解前给定，求解过程中保持不变，下一轮根据新观测更新。前一站等待时间的变化通过换电时刻传递到后一站。到站时间、等待截止时间及其与服务安排的关系在下文约束中定义。
+
+\paragraph{决策变量与计算量。}
+本轮优化选择预约用户的换电路径、各请求的换电时刻和所用电池，以及各充电槽的充电功率。用二元变量 $y_{i,j}^{p,k}\in\{0,1\}$ 表示用户 $(p,k)$ 的换电路径是否经过弧 $(i,j)$。一组满足流平衡的 $y$ 变量唯一确定该用户依次访问的换电站。用非负连续变量 $P_{i,b,n}\ge0$ 表示站点 $i$ 的充电槽 $b$ 在时间段 $n$ 内的充电功率。
+
+以 $\alpha_{b,r,n}\in\{0,1\}$ 表示是否在 $t_n$ 用站点 $i(r)$ 的充电槽 $b$ 中的电池服务请求 $r$，其中 $b\in\mathcal B_{i(r)}$。电池在 $t_n$ 当次换电前的 SOC 记为 $S_{i,b,n}^{-}$，由初始电量、换电安排和充电功率递推得到。
+
+下文的路径改变标记 $\chi_{p,k}$、预约失败标记 $f_r$、等待标记 $Q_{r,n}$ 和终端未完成服务标记 $w_r$ 均由相应定义确定，取值为 $0$ 或 $1$。$\chi_{p,k}$ 比较本轮选择的换电站与已有路径：未进入高速的用户与日前路径比较，在途用户与最近发布的路径比较。
+
+$f_r=1$ 表示请求 $r$ 需要服务、等待截止时刻早于本轮预测终点，且仍未完成换电，从而导致该用户预约失败。$Q_{r,n}=1$ 表示请求在 $t_n$ 已到站、尚未超过等待截止时刻，并且此前尚未换电。$w_r=1$ 表示预测终点仍需继续处理该请求。同一用户失败后，其后续请求不再保留。
+
+本轮开始时的日前路径、保留计划和最近发布路径均为已知输入。其余计算量在对应约束中定义；求解时所需的辅助变量和线性化按附录~\ref{lin:appendix} 处理。
 
 \paragraph{目标函数。}
-本轮目标为
+
 \begin{equation}
 \max\quad I-C^{\mathrm{ch}}-C^{\mathrm{adj}}-C^{\mathrm{fail}}
 +\beta V_\theta(s_{\ell+H}),
 \label{eq:objective}
 \end{equation}
-其中各项分别为
+其中，各项分别为
 \begin{subequations}\label{eq:objective_terms}
 \begin{align}
 I&=E_B\sum_{n\in\mathcal T_\ell}\sum_{r\in\R}
-c_{i(r),n}^{\mathrm{sw}}(1-\rho_r)z_{r,n},\label{eq:income}\\
+c_{i(r),n}^{\mathrm{sw}}(1-\rho_r)\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n},\label{eq:income}\\
 C^{\mathrm{ch}}&=\delta\sum_{n\in\mathcal T_\ell}\sum_{i\in\mathcal S}
 c_{i,n}^{\mathrm{ch}}\sum_{b\in\mathcal B_i}P_{i,b,n},\label{eq:charging_cost}\\
-C^{\mathrm{adj}}&=c^{\mathrm{adj}}\sum_{p\in\mathcal P}\sum_{k\in\mathcal K^{\mathrm{enr},p}}\chi_{p,k},\label{eq:adjustment_cost}\\
+C^{\mathrm{adj}}&=c^{\mathrm{adj}}\sum_{p\in\mathcal P}\sum_{k\in\mathcal K^p}\chi_{p,k},\label{eq:adjustment_cost}\\
 C^{\mathrm{fail}}&=c^{\mathrm{fail}}\sum_{r\in\R^A}f_r.\label{eq:failure_cost}
 \end{align}
 \end{subequations}
-单位服务收入按交付电量 $E_B(1-\rho_r)$ 计算，充电费用按输入电量计算，路径调整和预约失败分别以用户的一次调整和一次失败计费。终端价值由第 4 节的模型评价终端库存及预测域外未完成服务，默认 $\beta=1$。各收入与费用按实际发生时刻所在时间段归属。
 
-\paragraph{（1）路径和续航约束。}
+式~\eqref{eq:income} 中，$I$ 为本轮预测期内的换电服务收入。每次换电交付满电电池，并收回 SOC 为 $\rho_r$ 的电池，因此按补充电量 $E_B(1-\rho_r)$ 与换电时刻对应的服务单价计费。
+
+式~\eqref{eq:charging_cost} 中，$C^{\mathrm{ch}}$ 为本轮预测期内的充电费用。其中，$c_{i,n}^{\mathrm{ch}}$ 表示站点 $i$ 在时间段 $n$ 的充电电价，充电槽 $b$ 在时间段 $n$ 内从电网输入的电量为 $\delta P_{i,b,n}$。
+
+式~\eqref{eq:adjustment_cost} 中，$C^{\mathrm{adj}}$ 为本轮优化中的路径调整惩罚。尚未进入高速公路的用户与日前路径比较，在途用户与最近一次向其发布的路径比较。只要新增或取消任意一个换电站，就对该用户计一次 $c^{\mathrm{adj}}$，改变多个站点也只计一次。
+
+未进入高速的用户偏离日前路径时，该惩罚只用于本轮优化，不计入实际运营费用，也不在多轮之间累计结算。实际调整费用只在向在途用户发布不同于原安排的路径时计入，具体见式~\eqref{eq:actual_reward}。
+
+式~\eqref{eq:failure_cost} 中，$C^{\mathrm{fail}}$ 为本轮预测期内的预约失败费用。当预约请求因超过等待截止时刻仍未完成换电而导致预约失败时计入一次费用 $c^{\mathrm{fail}}$。
+
+$V_\theta(s_{\ell+H})$ 估计从预测终点状态出发的后续累计净收益。其输入 $s_{\ell+H}$ 由式~\eqref{eq:terminal_state} 定义，价值函数在第~\ref{sec:value}~节的式~\eqref{eq:value_network} 中给出。它考虑终点时的电池电量和未完成换电请求，使本轮决策也考虑预测范围之外的充电与服务需求。$\beta$ 调整后续净收益在目标函数中的权重。
+
+
+\paragraph{（1）流平衡约束。}
 对每个用户，路径满足
 \begin{equation}
 \sum_{j:(i,j)\in\mathcal A^{p,k}}y_{i,j}^{p,k}
@@ -181,167 +240,258 @@ C^{\mathrm{fail}}&=c^{\mathrm{fail}}\sum_{r\in\R^A}f_r.\label{eq:failure_cost}
 =\begin{cases}
 1,&i=o^{p,k},\\-1,&i=d^p,\\0,&\text{其他节点},
 \end{cases}
-\quad p\in\mathcal P,\ k\in\mathcal K^p.
+\quad i\in\mathcal V^{p,k},\ p\in\mathcal P,\ k\in\mathcal K^p.
 \label{eq:flow}
 \end{equation}
-式~\eqref{eq:flow} 对 $i\in\mathcal V^{p,k}$ 成立，其中 $\mathcal V^{p,k}$ 为 $\mathcal A^{p,k}$ 的节点集合，当前用户满足 $o^{p,k}\ne d^p$。全文空集合求和取零。弧沿下游方向排列，式~\eqref{eq:flow} 因而确定一条起点至出口的路径。可用弧按第~\ref{sec:network}~节检查首段 SOC、站间满电续航和出口 SOC。构造 $\mathcal A^{p,k}$ 时，对能直接驶向出口并满足出口 SOC 要求的节点，仅保留其通向出口的出弧。当前站等待请求作为必须处理的记录保留，其服务完成条件通过式~\eqref{eq:predecessor} 连接后续换电。
+式~\eqref{eq:flow} 确定一条起点至出口的路径。
 
-令 $x_i^{p,k}=\sum_{j:(j,i)\in\mathcal A^{p,k}}y_{j,i}^{p,k}$ 表示后续是否访问站点 $i$。$\bar x_i^{p,k}$ 为日前站序对应量，$x_i^{p,k,\mathrm{pub}}$ 为当前已经向用户确定的站序对应量；两者都先剔除已经完成的换电，当前正在等待的站点由其独立请求保留。比较集合取当前与参照站序所涉及站点的并集，缺少的访问量补零。对各 $p\in\mathcal P$，按用户状态和更新时间施加
+\paragraph{（2）路径调整约束。}
+令 $x_i^{p,k}=\sum_{j:(j,i)\in\mathcal A^{p,k}}y_{j,i}^{p,k}$ 表示预约用户 $(p,k)$ 是否在站点 $i$ 换电。$\bar x_i^{p,k}$ 表示日前路径是否安排该用户在该站换电。对于尚未进入高速公路的用户，以 $\widehat x_i^{p,k}$ 表示本轮开始时保留的计划是否安排其在该站换电；首次参与优化时取 $\widehat x_i^{p,k}=\bar x_i^{p,k}$，以后使用上一轮保留的计划。对于在途用户，$x_i^{p,k,\mathrm{pub}}$ 表示最近一次向其发布的路径是否安排其在该站换电。已经完成的换电和当前正在等待的换电不参与路径调整，比较各条路径时同时去除这些站点；当前等待请求单独保留。各路径未安排换电的站点取 $0$。
+
+两类用户都只能在式~\eqref{eq:update_clock} 规定的时刻调整路径，因此对各 $i\in\mathcal S$、$p\in\mathcal P$，有
 \begin{equation}
 \begin{aligned}
-x_i^{p,k}&=\bar x_i^{p,k},
+|x_i^{p,k}-\widehat x_i^{p,k}|&\le g_\ell,
 &&k\in\mathcal K^{\mathrm{fut},p},\\
 |x_i^{p,k}-x_i^{p,k,\mathrm{pub}}|&\le g_\ell,
 &&k\in\mathcal K^{\mathrm{enr},p}.
 \end{aligned}
 \label{eq:path_freeze}
 \end{equation}
-单向道路上的访问站点决定站序，因此该关系保持实际换电安排，并允许起点随车辆位置更新。对在途用户定义差异量 $D_i^{p,k}=|x_i^{p,k}-x_i^{p,k,\mathrm{pub}}|$，其精确线性表达及路径改变标记为
+式~\eqref{eq:path_freeze} 在 $g_\ell=0$ 时要求未进入高速的用户保持已保留的计划，在途用户保持最近发布的路径。$g_\ell=1$ 时，两类用户都可以重新选择换电站。
+
+路径调整惩罚按以下关系计算：
 \begin{equation}
-\begin{aligned}
-D_i^{p,k}&\ge x_i^{p,k}-x_i^{p,k,\mathrm{pub}},&
-D_i^{p,k}&\ge x_i^{p,k,\mathrm{pub}}-x_i^{p,k},\\
-D_i^{p,k}&\le x_i^{p,k}+x_i^{p,k,\mathrm{pub}},&
-D_i^{p,k}&\le 2-x_i^{p,k}-x_i^{p,k,\mathrm{pub}},\\
-\chi_{p,k}&\ge D_i^{p,k}\quad(\text{各 }i),&
-\chi_{p,k}&\le\sum_iD_i^{p,k},\qquad 0\le D_i^{p,k}\le1.
-\end{aligned}
+\chi_{p,k}=\begin{cases}
+\displaystyle\max_{i\in\mathcal S}|x_i^{p,k}-\bar x_i^{p,k}|,
+&k\in\mathcal K^{\mathrm{fut},p},\\
+\displaystyle\max_{i\in\mathcal S}|x_i^{p,k}-x_i^{p,k,\mathrm{pub}}|,
+&k\in\mathcal K^{\mathrm{enr},p},
+\end{cases}
+\qquad p\in\mathcal P.
 \label{eq:path_change}
 \end{equation}
-因此 $\chi_{p,k}$ 精确表示站序是否变化。每轮仅评价本次可执行的路径调整。
+式~\eqref{eq:path_change} 中，任意一个站点的换电安排与比较路径不同，就有 $\chi_{p,k}=1$。未进入高速的用户可以根据供需变化提前调整计划，但在进入高速前不发布，以避免反复通知用户。惩罚始终相对日前计划计算，以固定的比较依据限制不必要的路径调整。式~\eqref{eq:path_freeze} 和式~\eqref{eq:path_change} 的线性化方法见附录~\ref{lin:appendix}。
 
-\paragraph{（2）服务容量和前后关系。}
-每个请求至多获得一次服务，每个槽位在同一时刻至多交付一次：
+\paragraph{（3）换电次数约束。}
+式~\eqref{eq:path_request_set} 中的 $\R^{\mathrm{path}}$ 表示本轮可用弧对应的预约请求，其余请求为当前在站等待的预约请求和随机请求。用 $a_r$ 表示是否需要为请求 $r$ 安排换电，其取值为
 \begin{equation}
-Z_r\le a_r\quad(r\in\R),\qquad
-\sum_{r\in\R_i}\alpha_{b,r,n}\le1
-\quad(i\in\mathcal S,b\in\mathcal B_i,n\in\mathcal T_\ell).
-\label{eq:assignment_capacity}
-\end{equation}
-对普通预约记录 $r=(p,k,j,i)$，以前一站 $j$ 的服务作为其后续服务条件。令 $\mathcal P_r$ 为用户 $(p,k)$ 在站点 $j$ 的所有可能换电记录；当前正在该站等待时，$\mathcal P_r$ 只包含该真实等待记录。随机请求、真实等待请求，以及非在站等待用户从本轮起点到达的首次请求，均取 $\mathcal P_r=\varnothing$。已在此前完成的服务由当前起点状态继承。定义
-\begin{equation}
-B_{r,n}=\begin{cases}
-1,&\mathcal P_r=\varnothing,\\
-\displaystyle\sum_{q\in\mathcal P_r}Z_q(n),&\mathcal P_r\ne\varnothing,
+a_r=\begin{cases}
+y_{j,i}^{p,k},&r=(p,k,j,i)\in\R^{\mathrm{path}},\\
+1,&r\in\R\setminus\R^{\mathrm{path}},
 \end{cases}
-\qquad z_{r,n}\le B_{r,n}.
+\qquad r\in\R.
+\label{eq:request_selection}
+\end{equation}
+式~\eqref{eq:request_selection} 第一行规定：所选路径经过弧 $(j,i)$ 时，$a_r=1$；否则 $a_r=0$。第二行将当前在站等待的请求和随机请求的 $a_r$ 固定为 $1$。因此，$a_r$ 的取值由上述等式确定；取 $1$ 时能否完成换电，还需满足后续服务约束。
+
+请求 $r$ 在 $t_n$ 之前的累计换电次数定义为
+\begin{equation}
+Z_r(n)=\sum_{\substack{m\in\mathcal T_\ell\\m<n}}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,m}.
+\label{eq:service_sums}
+\end{equation}
+式~\eqref{eq:service_sums} 适用于 $n\in\mathcal T_\ell\cup\{\ell+H\}$，只计算从 $t_\ell$ 到 $t_n$ 之前完成的换电，不包含 $t_n$ 当次的换电。为简化记号，记 $Z_r=Z_r(\ell+H)$，表示请求 $r$ 在本轮预测期内的累计换电次数。
+
+每个请求在本轮预测期内最多完成一次换电，同一充电槽在同一时刻最多交付一块电池。$\alpha_{b,r,n}=1$ 表示在 $t_n$ 用充电槽 $b$ 中的电池为请求 $r$ 换电。相应约束为
+\begin{subequations}\label{eq:assignment_capacity}
+\begin{align}
+Z_r&\le a_r\quad(r\in\R),\label{eq:request_service_limit}\\
+\sum_{r\in\R_i}\alpha_{b,r,n}&\le1
+\quad(i\in\mathcal S,b\in\mathcal B_i,n\in\mathcal T_\ell).
+\label{eq:battery_service_limit}
+\end{align}
+\end{subequations}
+式~\eqref{eq:request_service_limit} 规定：$a_r=0$ 时，该请求不能获得服务；$a_r=1$ 时，最多获得一次服务。式~\eqref{eq:battery_service_limit} 将同一充电槽在 $t_n$ 服务的请求数限制为最多一个。其中，$\R$ 为本轮全部请求集合，$\R_i$ 为站点 $i$ 的请求集合，$\mathcal B_i$ 为该站的充电槽集合；约束对所有站点 $i\in\mathcal S$ 和本轮各时刻 $t_n$（$n\in\mathcal T_\ell$）成立。
+
+\paragraph{（4）到站时刻与等待期限。}
+用户到站后才能换电，超过等待截止时刻后不再安排服务。对于需要在多个站点换电的用户，下一站的到站时刻取决于前一站的换电时刻。若前一站在本轮预测期内没有换电，下一站的到站时间暂时不能确定。
+
+用 $B_r$ 表示在本轮预测终点是否能够确定请求 $r$ 的到站时刻，定义
+\begin{equation}
+B_r=\begin{cases}
+1,&\mathcal P_r=\varnothing,\\
+\displaystyle\sum_{q\in\mathcal P_r}Z_q,&\mathcal P_r\ne\varnothing,
+\end{cases}
+\qquad r\in\R.
 \label{eq:predecessor}
 \end{equation}
-路径和容量约束使 $B_{r,n}$ 为二元量，后一站服务只能在前一站完成后的时间段发生。本轮 ETA 给出预测到站窗口，式~\eqref{eq:predecessor} 表达服务的先后关系；车辆行驶和等待对 ETA 的后续影响由下一轮观测更新。预测窗口是给定 ETA 下的运营近似。
+其中，$\mathcal P_r$ 是同一用户在前一站的所有可能换电请求，见式~\eqref{eq:predecessor_request_set}。$\mathcal P_r=\varnothing$ 时，到站时刻由输入给定，所以 $B_r=1$。否则，式~\eqref{eq:predecessor} 对前一站请求在本轮预测期内的换电次数求和。所选路径至多采用其中一个请求，因此前一站完成换电时 $B_r=1$，未完成时 $B_r=0$。
 
-\paragraph{（3）预约失败与随机流失。}
-设 $h_r=\ind\{t_r^{\mathrm{ddl}}<t_{\ell+H}\}$。真实等待请求在本轮开始时仍有效，所有记录的截止时刻均不早于 $t_\ell$。对预约请求，定义此前截止的失败数量
-\begin{equation}
-F_r^{\mathrm{pre}}=
-\sum_{\substack{q\in\R_{p,k}^A\\t_q^{\mathrm{ddl}}<t_r^{\mathrm{ddl}}}}f_q,
-\qquad
-F_{p,k}=\sum_{r\in\R_{p,k}^A}f_r\le1.
-\label{eq:failure_order}
-\end{equation}
-其中 $(p,k)$ 为请求 $r$ 对应用户。$h_r=0$ 时取 $f_r=0$；$h_r=1$ 时施加
+$t_r^{\mathrm{arr}}$ 和 $t_r^{\mathrm{ddl}}$ 分别表示请求 $r$ 的到站时刻和等待截止时刻。若用户 $(p,k)$ 需要先在站点 $j$ 换电，再前往站点 $i$，则到达 $i$ 的时刻等于在 $j$ 的换电时刻加上该用户的预测行驶时间 $\tau_{j,i}^{p,k}$。对所有 $r\in\R$，有
 \begin{equation}
 \begin{aligned}
-f_r&\le a_r,& f_r&\le1-Z_r,& f_r&\le1-F_r^{\mathrm{pre}},\\
-f_r&\ge a_r-Z_r-F_r^{\mathrm{pre}}.
+t_r^{\mathrm{arr}}&=\begin{cases}
+\bar t_r^{\mathrm{arr}},&\mathcal P_r=\varnothing,\\
+\displaystyle\sum_{q\in\mathcal P_r}\sum_{m\in\mathcal T_\ell}
+(t_m+\tau_{j,i}^{p,k})\sum_{b\in\mathcal B_j}\alpha_{b,q,m},
+&\mathcal P_r\ne\varnothing,
+\end{cases}\\
+t_r^{\mathrm{ddl}}&=t_r^{\mathrm{arr}}+\Delta B_r.
 \end{aligned}
+\label{eq:arrival_time}
+\end{equation}
+式~\eqref{eq:arrival_time} 第一种情况使用给定的实际或预计到站时刻。第二种情况使用本轮安排的前站换电时刻。例如，前一站在 10:25 换电、站间行驶需 30~min，则下一站在 10:55 到站，等待截止时刻再加上 $\Delta$。
+
+$B_r=0$ 时，式~\eqref{eq:arrival_time} 将到站和截止时刻都填为 $0$，表示尚不能确定这两个时刻。该请求只要属于所选路径且用户尚未失败，仍作为未完成需求保留，由终端价值评价后续服务。
+
+用 $e_{r,n}$ 表示 $t_n$ 是否位于请求到站之后、等待截止之前，包含两个端点。对所有 $r\in\R$ 和未来时刻 $n\in\{\ell+1,\ldots,\ell+H\}$，定义
+\begin{equation}
+e_{r,n}=B_r\ind\{t_r^{\mathrm{arr}}\le t_n\le t_r^{\mathrm{ddl}}\}.
+\label{eq:service_window}
+\end{equation}
+式~\eqref{eq:service_window} 在到站时间已确定且时间条件满足时取 $1$，其余情况取 $0$。$B_r=0$ 时不会把填零的时刻误当作实际到站或截止时刻。$e_{r,n}=1$ 只说明时间条件满足，能否换电还要看其他约束。到站时刻由本轮服务安排确定，因此未来的 $e_{r,n}$ 也随这些决策变化。
+
+当前的 $e_{r,\ell}$ 由真实到站和等待情况确定：只有已经在站等待且尚未超过等待截止时刻的请求取 $1$。因此，当前只服务实际已经到站的请求；未来时刻按式~\eqref{eq:service_window} 计算，预测终点只计算状态。
+
+\paragraph{（5）预约失败与随机流失。}
+用 $h_r$ 表示请求的等待截止时刻是否早于本轮预测终点，定义
+\begin{equation}
+h_r=B_r\ind\{t_r^{\mathrm{ddl}}<t_{\ell+H}\},
+\qquad r\in\R.
+\label{eq:deadline_passed}
+\end{equation}
+式~\eqref{eq:deadline_passed} 只比较截止时刻与预测终点，不判断请求是否已经获得服务，也不比较服务时刻与截止时刻。例如，预测终点为 11:00、截止时刻为 10:30，即使请求已经在 10:20 换电，仍有 $h_r=1$。到站时间尚不能确定时，$B_r=0$，相应的 $h_r=0$。截止恰好等于预测终点时也取 $0$，因为该请求仍有在该时刻换电的机会。当前实际在站等待的请求均未超过截止时刻；所有使用给定到站时刻的请求满足 $\bar t_r^{\mathrm{arr}}+\Delta\ge t_\ell$。
+
+预约失败标记由
+\begin{equation}
+f_r=a_rh_r(1-Z_r),\qquad r\in\R^A
 \label{eq:failure_exact}
 \end{equation}
-同一用户沿所选路径的 ETA 和截止时刻依次递增，以上关系使第一个超过窗口且未获服务的请求产生一次失败，后续请求随该用户退出服务过程。截止恰好等于预测终点时，由下一轮处理。随机请求的流失量直接定义为 $h_r(1-Z_r)$。
+确定。式~\eqref{eq:failure_exact} 表示：只有请求需要服务、截止时刻早于预测终点，且仍未完成换电时，才取 $f_r=1$。已经按时完成换电的请求，即使 $h_r=1$，也因 $Z_r=1$ 而有 $f_r=0$。式~\eqref{eq:queue_status} 和式~\eqref{eq:queue_service} 将换电限制在 $e_{r,n}=1$ 的时刻，因此不允许在等待截止之后服务。
 
-\paragraph{（4）等待和服务顺序。}
-为按每个时刻实际可参与分配的请求确定优先顺序，定义
+每位预约用户在本轮预测期内至多失败一次，记
 \begin{equation}
-F_{p,k,n}=\sum_{\substack{q\in\R_{p,k}^A\\t_q^{\mathrm{ddl}}<t_n}}f_q,
-\qquad
-F_{r,n}=\begin{cases}F_{p,k,n},&r\in\R_{p,k}^A,\\0,&r\in\R^R.\end{cases}
-\label{eq:failure_before_time}
+F_{p,k}=\sum_{r\in\R_{p,k}^A}f_r\le1,
+\qquad p\in\mathcal P,\ k\in\mathcal K^p.
+\label{eq:failure_order}
 \end{equation}
-恰在 $t_n$ 截止的请求先参加当次服务，因此此处使用严格小于。排队标记 $Q_{r,n}$ 满足
-\begin{equation}
-\begin{aligned}
-Q_{r,n}&\le a_r,& Q_{r,n}&\le e_{r,n},&
-Q_{r,n}&\le1-Z_r(n),\\
-Q_{r,n}&\le B_{r,n},& Q_{r,n}&\le1-F_{r,n},\\
-Q_{r,n}&\ge a_r+e_{r,n}+B_{r,n}-Z_r(n)-F_{r,n}-2,\\
-z_{r,n}&\le Q_{r,n}.
-\end{aligned}
-\label{eq:queue}
-\end{equation}
-这些约束精确表示所选请求已经到站、尚未服务、前一次必要换电已经完成且用户尚未失败。$Q_{r,n}$ 使用该时刻之前的失败结果。
+$F_{p,k}$ 表示该用户是否在本轮预测期内失败，用于在终端状态中取消其后续需求。前一站失败意味着该站没有完成换电，后续站点的到站时刻因而尚未确定，相应的 $h_r$ 和 $f_r$ 均为 $0$，失败费用只计算一次。
 
-在同一站点定义 $q\prec r$：当 $q$ 为预约而 $r$ 为随机请求，或者二者同类且 $t_q^{\mathrm{arr}}<t_r^{\mathrm{arr}}$ 时成立。服务顺序满足
+截止不早于预测终点时，不能因为本轮尚未安排换电就提前判为失败。仍需服务的请求保留在终端状态，由后续滚动优化继续安排。随机请求的流失量为 $h_r(1-Z_r)$，即截止早于预测终点且仍未服务时计为流失。
+
+\paragraph{（6）等待和服务顺序。}
+本组确定每个时刻哪些请求正在等待换电，并规定多人同时等待时的服务优先顺序。等待标记和服务安排满足
+\begin{subequations}\label{eq:queue}
 \begin{equation}
-z_{r,n}\le 1-Q_{q,n}+z_{q,n},
-\qquad q\prec r,\quad q,r\in\R_i,\quad n\in\mathcal T_\ell.
+Q_{r,n}=a_re_{r,n}[1-Z_r(n)],
+\qquad r\in\R,\quad n\in\mathcal T_\ell\cup\{\ell+H\}.
+\label{eq:queue_status}
+\end{equation}
+\begin{equation}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n}\le Q_{r,n},
+\qquad r\in\R,\quad n\in\mathcal T_\ell.
+\label{eq:queue_service}
+\end{equation}
+\end{subequations}
+式~\eqref{eq:queue_status} 表示：请求需要服务、已经到站且尚未超过截止时刻，并且此前尚未换电时，才取 $Q_{r,n}=1$。$Z_r(n)$ 不包含 $t_n$ 当次换电，所以本次获得服务的请求在服务前仍有 $Q_{r,n}=1$。式~\eqref{eq:queue_service} 只允许为正在等待的请求换电，但不要求每个等待请求都立即获得服务。预测终点只计算 $Q_{r,\ell+H}$，不安排当次换电。
+
+对于需要先在前一站换电的请求，式~\eqref{eq:arrival_time} 与式~\eqref{eq:service_window} 已保证：只有前一站换电并经过正的行驶时间后，$e_{r,n}$ 才能取 $1$。因此，前站尚未换电时不能服务后站，同一用户也不能在同一时刻完成前后两次换电。若某站预约在 $t_n$ 之前已经失败，该请求因超过截止时刻而有 $e_{r,n}=0$。在该用户所选路径上，后续请求因前站未换电而有 $e_{r,n}=0$，更早的请求已经服务，$Z_r(n)=1$；未选择的请求则有 $a_r=0$。这些条件已使失败用户的请求退出等待，无需另设逐时刻的用户失败标记。上述乘积关系均为准确的定义，取值为 $0$ 或 $1$，线性化按附录~\ref{lin:appendix} 处理。
+
+在同一站点定义 $q\prec r$：当 $q$ 为预约而 $r$ 为随机请求，或者二者同类且 $t_q^{\mathrm{arr}}<t_r^{\mathrm{arr}}$ 时成立。同类请求的先后顺序由式~\eqref{eq:arrival_time} 中本轮确定的到站时刻比较得到。对任意两个不同请求，施加以下条件约束：
+\begin{equation}
+\begin{gathered}
+q\prec r\quad\Longrightarrow\quad
+\sum_{b\in\mathcal B_i}\alpha_{b,r,n}
+\le 1-Q_{q,n}+\sum_{b\in\mathcal B_i}\alpha_{b,q,n},\\
+q,r\in\R_i,\quad q\ne r,\quad i\in\mathcal S,\quad n\in\mathcal T_\ell.
+\end{gathered}
 \label{eq:priority}
 \end{equation}
-较高优先级请求仍在等待时，较低优先级请求的服务以较高优先级请求同刻获得服务为条件。运营者可以在窗口内选择服务时点；同刻有多个服务时，由匹配变量决定各自使用的电池。
+式~\eqref{eq:priority} 要求：较高优先级请求仍在等待时，只有它在同一时刻获得服务，才能服务较低优先级请求。尚未到站、已经服务或已经失效的请求，其 $Q_{q,n}=0$，不会阻止其他请求服务。同类请求同时到站时不规定二者的先后。每个到站时刻只可能取给定时刻、有限个 $t_m+\tau_{j,i}^{p,k}$ 或未确定时的零值，因此上述严格先后关系可按有限个已知时刻的组合精确展开。运营者可以在等待期限内选择换电时刻，并通过 $\alpha_{b,r,n}$ 确定各请求使用的电池。
 
-\paragraph{（5）满电交付和充电。}
-槽位初始状态取观测 SOC。充电与换电满足
+\paragraph{（7）满电交付和充电。}
+在每个时刻 $t_n$，先换电，再在随后的时间段 $\mathcal I_n$ 内充电。以 $S_{i,b,n}^{-}$ 表示充电槽 $b$ 中电池在 $t_n$ 当次换电前的 SOC，将换电与随后充电的影响直接写入下一时刻的电量：
 \begin{subequations}\label{eq:battery_dynamics}
 \begin{align}
 S_{i,b,\ell}^{-}&=S_{i,b}^{\mathrm{obs}},\label{eq:initial_soc}\\
 S_{i,b,n}^{-}&\ge\alpha_{b,r,n},
 &&r\in\R_i,\label{eq:full_delivery}\\
-S_{i,b,n}^{+}&=S_{i,b,n}^{-}
--\sum_{r\in\R_i}(1-\rho_r)\alpha_{b,r,n},\label{eq:swap_soc}\\
-S_{i,b,n+1}^{-}&=S_{i,b,n}^{+}
+S_{i,b,n+1}^{-}&=S_{i,b,n}^{-}
+-\sum_{r\in\R_i}(1-\rho_r)\alpha_{b,r,n}
 +\frac{\eta_i\delta}{E_B}P_{i,b,n},\label{eq:charge_soc}\\
-0\le S_{i,b,n}^{-},S_{i,b,n}^{+}&\le1,
-\qquad 0\le S_{i,b,\ell+H}^{-}\le1,\label{eq:soc_bounds}\\
+0\le S_{i,b,n}^{-}&\le1,
+&&n\in\mathcal T_\ell\cup\{\ell+H\},\label{eq:soc_bounds}\\
 0\le P_{i,b,n}&\le\overline P_{i,b}^{\mathrm{ch}},\label{eq:device_power}\\
-\sum_{b\in\mathcal B_i}P_{i,b,n}&\le\overline P_i^{\mathrm{sta}}.
-\label{eq:station_power}
+\sum_{b\in\mathcal B_i}P_{i,b,n}&\le\overline P_i^{\mathrm{sta}}.\label{eq:station_power}
 \end{align}
 \end{subequations}
-除已标注的请求索引外，上述关系对所有 $i\in\mathcal S,b\in\mathcal B_i,n\in\mathcal T_\ell$ 成立。式~\eqref{eq:full_delivery} 与 SOC 上界保证交付前电池达到 $1$，式~\eqref{eq:swap_soc} 将退回 SOC 写入相应槽位。功率在当前时间段内保持恒定，SOC 上界限制本段输入电量。每个请求可以选择任意满足条件的槽位，模型同时确定其后续充电功率。
+上述关系对所有 $i\in\mathcal S$ 和 $b\in\mathcal B_i$ 成立；站点总功率约束对各站点成立。除初始时刻和式~\eqref{eq:soc_bounds} 另有规定外，时间索引均取 $n\in\mathcal T_\ell$。
 
-\paragraph{（6）终端库存与未完成服务。}
-预测终端库存取 $S_{i,b,\ell+H}^{-}$，即终点服务之前的状态。对预约请求，未完成服务标记定义为
+式~\eqref{eq:initial_soc} 将初始 SOC 固定为当前观测值。式~\eqref{eq:full_delivery} 保证满电交付：$\alpha_{b,r,n}=1$ 时，结合式~\eqref{eq:soc_bounds} 得到 $S_{i,b,n}^{-}=1$；$\alpha_{b,r,n}=0$ 时，不要求该电池满电，也不要求满电电池必须交付。
+
+式~\eqref{eq:charge_soc} 中，下一时刻的 SOC 等于当前 SOC，减去换电造成的下降量，再加上本时段充电带来的增量。由式~\eqref{eq:battery_service_limit}，同一充电槽在同一时刻最多服务一个请求。若服务请求 $r$，满电电池被取走，退回电池的 SOC 为 $\rho_r$，因此扣减 $1-\rho_r$；若没有换电，求和项为 $0$。由于 $0\le\rho_r<1$，换电后槽内电池的 SOC 自然位于 $0$ 与 $1$ 之间。
+
+充电功率 $P_{i,b,n}$ 是从电网输入的功率，$\delta P_{i,b,n}$ 为输入电量，乘以充电效率 $\eta_i$ 后得到存入电池的电量，再除以容量 $E_B$，得到 SOC 增量。功率以 kW 计、容量以 kWh 计，因此 $\delta$ 以小时计。例如，容量为 $60$~kWh、效率为 $0.9$、功率为 $40$~kW 时，充电 $5$~min 使 SOC 增加 $0.05$，即 $5$ 个百分点；若换电后电池的 SOC 为 $0.30$，下一时刻就是 $0.35$。
+
+式~\eqref{eq:soc_bounds} 覆盖本轮各换电时刻和预测终点，保证电量非负且不超过容量。终点的 SOC 已包含最后一个时间段的充电结果，因此同样需要这一上界。
+
+式~\eqref{eq:device_power} 限制单个充电槽的功率，取 $0$ 表示该时间段不充电。所选功率在该时间段内保持恒定，并与 SOC 上界共同限制充电量。式~\eqref{eq:station_power} 限制同一站点各充电槽的总功率。例如，两台设备的功率上限各为 $60$~kW，而站点上限为 $80$~kW 时，两台设备不能同时以 $60$~kW 充电。每个请求可以选择任意满足条件的充电槽，模型同时确定其后续充电功率。
+
+\paragraph{（8）终端状态。}
+目标函数~\eqref{eq:objective} 中的 $V_\theta(s_{\ell+H})$ 根据本轮预测终点的状态评价后续净收益。本组确定终点时的电池电量、未完成请求及其等待情况、用户的车辆与路径信息，并将它们汇总为 $s_{\ell+H}$。这些信息如何编码以及价值函数如何计算，在第~\ref{sec:value}~节说明。
+
+终端电池状态取 $S_{i,b,\ell+H}^{-}$，由式~\eqref{eq:battery_dynamics} 递推得到。它包含本轮最后一个时间段的充电结果，不包含预测终点当时的换电，用于评价后续满电电池的供应能力和充电需求。
+
+用 $w_r=1$ 表示请求 $r$ 在预测终点仍需继续安排换电。对预约请求，定义
 \begin{equation}
-\begin{aligned}
-w_r&\le a_r,&w_r&\le1-Z_r,&w_r&\le1-F_{p,k},\\
-w_r&\ge a_r-Z_r-F_{p,k},
-&&r\in\R_{p,k}^A.
-\end{aligned}
+w_r=a_r(1-Z_r)(1-F_{p,k}),\qquad r\in\R_{p,k}^A.
 \label{eq:terminal_pending}
 \end{equation}
-因此，所选路径中尚未服务且用户仍有效的请求均被保留，包括前一站尚未服务的后续预约及预计在预测域外到站的预约。对随机请求，取
+式~\eqref{eq:terminal_pending} 表示：请求需要服务、尚未完成换电，并且该用户没有失败时，才保留该请求。因此，前一站尚未换电而到站时间尚不能确定的后续预约，以及预计在本轮预测期之后到站的预约，只要仍需服务，都保留在终端状态中。同一用户一旦失败，其后续请求均不再保留。
+
+对随机请求，取
 \begin{equation}
 w_r=(1-h_r)(1-Z_r),\qquad r\in\R^R.
 \label{eq:terminal_random}
 \end{equation}
-在式~\eqref{eq:queue} 中排队标记的上下界取 $n=\ell+H$，利用该时刻以前的累计服务和失败量，得到终端等待标记 $Q_{r,\ell+H}$；此时只计算状态。$Q_{r,\ell+H}=1$ 的预约属于 $w_r=1$ 的未完成服务，状态编码中以同一条记录及其等待标记表示。
+式~\eqref{eq:terminal_random} 表示：尚未完成换电且等待截止时刻不早于预测终点的随机请求，仍需继续服务。已经完成换电或已经流失的随机请求取 $w_r=0$。
 
-以 $t^{\mathrm{end}}$ 表示新增需求停止的时刻，已给定预约及其全部后续请求仍在集合中保留。为统一预测域内和预测终点的运营结束条件，将未完成服务标记扩展到各边界 $n\in\mathcal T_\ell\cup\{\ell+H\}$：
-\begin{equation}
-w_r(n)=\begin{cases}
-a_r[1-Z_r(n)][1-F_{p,k,n}],&r\in\R_{p,k}^A,\\
-\ind\{t_r^{\mathrm{ddl}}\ge t_n\}[1-Z_r(n)],&r\in\R^R.
-\end{cases}
-\label{eq:pending_each_boundary}
-\end{equation}
-其中 $w_r=w_r(\ell+H)$，上述二元乘积在终点与式~\eqref{eq:terminal_pending}--\eqref{eq:terminal_random} 一致。定义各边界的结束标记及终端结束标记
-\begin{equation}
-d_n^{\mathrm{end}}=
-\ind\{t_n\ge t^{\mathrm{end}}\}
-\prod_{r\in\R}[1-w_r(n)],\qquad
-d^{\mathrm{end}}=d_{\ell+H}^{\mathrm{end}}.
-\label{eq:operating_end}
-\end{equation}
-新增需求停止且全部服务完成或失败后，运营在首个满足 $d_n^{\mathrm{end}}=1$ 的决策边界结束。最后一次服务所在时间段完成既定状态转移，后续时间段的功率满足
-\begin{equation}
-P_{i,b,n}\le\overline P_{i,b}^{\mathrm{ch}}(1-d_n^{\mathrm{end}}),
-\qquad i\in\mathcal S,\ b\in\mathcal B_i,\ n\in\mathcal T_\ell.
-\label{eq:power_at_end}
-\end{equation}
-结束后的服务收入与各项费用均为零。上述二元标记和乘积关系按附录线性化。最后一次换电完成后驶向出口的用户已经完成全部服务。终端状态由电池 SOC、上述未完成请求及等待标记、换电安排、时间、电价和后续需求预测共同构成，其具体编码在第 4 节给出。
+在式~\eqref{eq:queue_status} 中取 $n=\ell+H$，得到终端等待标记 $Q_{r,\ell+H}$。$w_r=1$ 表示后续还需服务，$Q_{r,\ell+H}=1$ 则进一步表示该请求在预测终点已经到站、尚未超过等待截止时刻，并且仍在等待换电。两者描述同一个请求，不重复计为两项需求。对于保留的请求，还使用 $B_r$、$t_r^{\mathrm{arr}}$ 和 $t_r^{\mathrm{ddl}}$ 说明到站与等待期限：$B_r=1$ 时，两个时刻由式~\eqref{eq:arrival_time} 确定；取 $0$ 时，两个时刻填零，表示到站时间尚不能确定。
 
-式~\eqref{eq:flow}--\eqref{eq:power_at_end}、变量范围和第 4 节价值函数共同构成优化问题。主要约束为线性关系，价值计算及其中有界变量乘积按附录表示后，得到混合整数线性优化模型。
+对每位预约用户，保留 $w_r=1$ 的请求所在站点，并按道路下游方向排列，即得到预测终点尚需完成的换电安排，其中包括仍在等待的当前站点。
+
+以 $\boldsymbol c_{p,k}(\tau)$ 表示时刻 $\tau$ 的车辆位置、车辆 SOC、是否已进入高速公路，以及计算最小换电间距所用的入口或最近一次实际换电位置。这些信息用于判断后续仍可选择哪些换电站，真实状态使用当前观测。对于预测终端，先根据给定的车辆行驶预测规则计算以下候选值。若 $\mathcal P_r=\varnothing$，以 $\bar{\boldsymbol c}_r$ 表示车辆从本轮观测状态驶向请求 $r$ 所在站点、到站后保持等待时的终端车辆信息；若当前已在该站等待，则保持当前车辆位置和 SOC。计算换电间距的基准位置保持本轮观测值。若 $\mathcal P_r\ne\varnothing$，以 $\boldsymbol c_{r,m}$ 表示车辆在 $t_m$ 于前一站完成换电后，以满电状态驶向请求 $r$ 所在站点、到站后保持等待时的终端车辆信息。此时计算换电间距的基准位置更新为前一站 $i(q)=j$。这些候选值是本轮已知输入，由对应用户的预测行驶时间、沿途能耗和初始车辆信息在求解前计算。预测终端取
+\begin{equation}
+\begin{aligned}
+\boldsymbol c_{p,k}(t_{\ell+H})={}&
+\sum_{\substack{r\in\R_{p,k}^A\\\mathcal P_r=\varnothing}}
+w_r\bar{\boldsymbol c}_r\\
+&+\sum_{\substack{r\in\R_{p,k}^A\\\mathcal P_r\ne\varnothing}}
+w_r\sum_{m\in\mathcal T_\ell}\sum_{q\in\mathcal P_r}
+\sum_{b\in\mathcal B_{i(q)}}\alpha_{b,q,m}\boldsymbol c_{r,m}.
+\end{aligned}
+\label{eq:terminal_vehicle_state}
+\end{equation}
+式~\eqref{eq:terminal_vehicle_state} 只保留所选路径中最前面的未完成请求对应的候选值。该请求之前的换电已经完成，其后的请求则因前一站尚未完成换电而没有对应的服务项。因此，只要用户仍有未完成服务，上式恰有一个候选值被选中；本轮换电时刻改变时，终端车辆位置和 SOC 也随之改变。全部服务完成或用户失败时，所有 $w_r=0$，车辆信息填零，该用户不再作为仍需服务的用户保留。
+
+对于仍需服务的预约用户，终端状态同时保留上述车辆信息、日前换电路径、最近发布的剩余路径及当前保留的计划。当前计划采用本轮选择的路径，已完成的站点从剩余安排中移除。日前路径保留原值，发布记录按前述路径发布规则保留；尚未发布的计划与已发布路径分别保存。这些信息用于评价后续可行的换电安排及可能产生的路径调整费用。
+
+以 $\xi(\tau)$ 表示时刻 $\tau$ 的时间与预测信息，包括当前时刻、当前及后续的充电电价和换电服务单价、随机需求预测，以及路径更新相位。预测终点的路径更新相位为 $(\ell+H)\bmod K$。这些信息用于判断后续需求、充电与服务的收益和费用，以及下一次允许调整路径的时刻。
+
+将上述信息汇总，目标函数~\eqref{eq:objective} 使用的终端状态定义为
+\begin{equation}
+\begin{aligned}
+s_{\ell+H}=\Bigl(&
+\bigl\{S_{i,b,\ell+H}^{-}\bigr\}_{i\in\mathcal S,\,b\in\mathcal B_i},\\
+&
+\bigl\{(r,Q_{r,\ell+H},B_r,
+t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}},\rho_r)\bigr\}_{r\in\R:\,w_r=1},\\
+&
+\bigl\{(\boldsymbol c_{p,k}(t_{\ell+H}),\text{日前路径},\text{已发布路径},\text{保留计划})\bigr\}_{
+\substack{p\in\mathcal P,\,k\in\mathcal K^p\\
+\sum_{r\in\R_{p,k}^A}w_r>0}},\quad
+\xi(t_{\ell+H})\Bigr).
+\end{aligned}
+\label{eq:terminal_state}
+\end{equation}
+式~\eqref{eq:terminal_state} 的四部分依次为各充电槽的电池 SOC、未完成请求、仍需服务的预约用户信息，以及时间与预测信息。请求 $r$ 连同其预约或随机类型、所属用户、所在站点及前一换电站等属性一并保留；站点位置、各用户的预测站间行驶时间和退回 SOC 沿用本轮给定输入。$w_r$ 决定保留哪些请求，同一用户的多个请求通过 $(p,k)$ 关联。终端状态中的电量、保留请求、到站时刻、车辆状态和换电安排随本轮决策确定，因此 $V_\theta(s_{\ell+H})$ 能够评价这些决策对后续服务的影响。
+
+式~\eqref{eq:flow}--\eqref{eq:terminal_state}、变量范围和第~\ref{sec:value}~节的价值函数共同构成优化问题。到站、等待和截止条件由给定时刻及离散服务安排精确确定；服务先后关系按有限个候选到站时刻展开。再将绝对值、最大值、价值计算及有界变量乘积按附录~\ref{lin:appendix} 转换为线性约束，得到混合整数线性优化模型。
 
 \paragraph{滚动执行与记账。}
-在 $t_\ell$ 读取真实在站请求、电池状态、车辆位置和最新预测，建立本轮模型。路径更新时刻向在途用户确定新的换电安排，并据此记录调整成本；其他时刻保持已确定的站序。执行模型选择的当前服务和匹配后，在 $\mathcal I_\ell$ 内使用当前充电功率。区间内到站记录在下一格点进入服务安排，原到站时刻用于计算等待时间。截止位于 $\mathcal I_\ell$ 内且尚未服务的真实请求在该段结算超时；恰在下一格点截止的请求留到下一轮先参加服务。
+在 $t_\ell$ 读取真实在站请求、电池状态、车辆位置、保留的计划和最新预测，建立本轮模型。路径更新时刻同时优化两类预约用户的路径。未进入高速的用户只保存优化后的计划，用于后续预测和下一轮的 $\widehat x_i^{p,k}$，不发布也不计入实际费用。在途用户的路径若与最近发布的安排不同，则发布新路径、计入一次实际调整费用，并将新路径作为后续比较的依据。非路径更新时刻，两类用户都保持各自已有的安排。
 
-下一轮电池状态由实际服务和充电更新；真实等待请求保留原标识及截止时间；车辆位置和 ETA 由新观测更新。未来预测记录在实际到站后以对应观测替换，状态中始终区分已观测请求与预测请求。若上游预约实际失败，该用户后续服务一起结束。新的当前状态成为下一轮初始条件，新的路径更新参数按式~\eqref{eq:update_clock} 计算。
+按模型确定的请求和电池安排执行当前换电后，在 $\mathcal I_\ell$ 内使用当前充电功率。区间内到站请求在下一时刻参与换电安排，原到站时刻用于计算等待时间。截止位于 $\mathcal I_\ell$ 内且尚未完成换电的请求在该时段判定超时；恰在下一时刻截止的请求留到下一轮先参与换电安排。
 
+下一轮电池状态由实际服务和充电更新，真实等待请求保留原标识及截止时间。车辆位置、下一次换电的预计到站时刻和站间行驶时间根据新观测更新；仍需先完成前站换电的后续请求继续由式~\eqref{eq:arrival_time} 计算到站时刻。预测请求在实际到站后使用真实到站时刻，状态中始终区分已观测请求与预测请求。若上游预约实际失败，该用户后续服务一起结束。新的当前状态成为下一轮初始条件，新的路径更新参数按式~\eqref{eq:update_clock} 计算。

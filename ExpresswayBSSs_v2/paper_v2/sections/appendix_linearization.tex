@@ -4,6 +4,50 @@
 
 本附录给出正文中分段线性函数、变量乘积及逻辑关系的等价约束。每轮求解时，网络参数和各表达式的有效上下界均为已知常数，新增变量仅用于表达相应关系。
 
+\paragraph{路径调整。}
+对各 $p\in\mathcal P$ 和 $i\in\mathcal S$，式~\eqref{eq:path_freeze} 中的绝对值不等式可直接写为
+\begin{equation}
+\begin{aligned}
+-g_\ell\le x_i^{p,k}-\widehat{x}_i^{p,k}&\le g_\ell,
+&&k\in\mathcal K^{\mathrm{fut},p},\\
+-g_\ell\le x_i^{p,k}-x_i^{p,k,\mathrm{pub}}&\le g_\ell,
+&&k\in\mathcal K^{\mathrm{enr},p},
+\end{aligned}
+\label{lin:path_freeze}
+\end{equation}
+其中，$\widehat{x}_i^{p,k}$ 表示尚未进入高速公路的用户在上一轮保留的未发布计划，初始取日前安排 $\bar x_i^{p,k}$；$x_i^{p,k,\mathrm{pub}}$ 表示在途用户最近一次已发布路径中尚未完成的换电安排。两者在本轮求解时均已知。比较范围与正文一致，各条路径均去除已经完成的换电和当前正在等待的换电。$g_\ell=0$ 时，式~\eqref{lin:path_freeze} 要求保持这些安排；$g_\ell=1$ 时，允许调整换电站点。
+
+计算式~\eqref{eq:path_change} 中的路径改变标记时，尚未进入高速公路的用户与日前路径比较，在途用户与最近一次已发布的剩余路径比较。为简化本附录的表达，记
+\begin{equation}
+x_i^{p,k,\mathrm{ref}}=
+\begin{cases}
+\bar x_i^{p,k}, & k\in\mathcal K^{\mathrm{fut},p},\\
+x_i^{p,k,\mathrm{pub}}, & k\in\mathcal K^{\mathrm{enr},p},
+\end{cases}
+\label{lin:path_reference}
+\end{equation}
+对上述两类用户的每个站点引入连续变量 $D_i^{p,k}$，用以下约束表示 $D_i^{p,k}=|x_i^{p,k}-x_i^{p,k,\mathrm{ref}}|$：
+\begin{equation}
+\begin{aligned}
+D_i^{p,k}&\ge x_i^{p,k}-x_i^{p,k,\mathrm{ref}},&
+D_i^{p,k}&\ge x_i^{p,k,\mathrm{ref}}-x_i^{p,k},\\
+D_i^{p,k}&\le x_i^{p,k}+x_i^{p,k,\mathrm{ref}},&
+D_i^{p,k}&\le 2-x_i^{p,k}-x_i^{p,k,\mathrm{ref}},\\
+0&\le D_i^{p,k}\le1.
+\end{aligned}
+\label{lin:path_difference}
+\end{equation}
+由于 $x_i^{p,k}$ 和 $x_i^{p,k,\mathrm{ref}}$ 均取 $0$ 或 $1$，式~\eqref{lin:path_difference} 在两者相同时要求 $D_i^{p,k}=0$，在两者不同时要求 $D_i^{p,k}=1$。对各 $p\in\mathcal P$ 和 $k\in\mathcal K^{\mathrm{fut},p}\cup\mathcal K^{\mathrm{enr},p}$，再加入
+\begin{equation}
+\begin{aligned}
+\chi_{p,k}&\ge D_i^{p,k}\quad(i\in\mathcal S),\\
+\chi_{p,k}&\le\sum_{i\in\mathcal S}D_i^{p,k},
+\qquad \chi_{p,k}\in\{0,1\},
+\end{aligned}
+\label{lin:path_change}
+\end{equation}
+即可得到式~\eqref{eq:path_change} 的等价线性约束。式~\eqref{lin:path_change} 要求：只要有一个站点的换电安排与比较路径不同，$\chi_{p,k}$ 就取 $1$；所有站点的安排均相同时，$\chi_{p,k}$ 取 $0$。因此，即使目标函数中的路径调整费用系数为零，这些约束仍能确定正确的路径改变标记。
+
 \paragraph{二元变量与有界连续变量的乘积。}
 设 $x\in[L,U]$、$b\in\{0,1\}$，引入连续变量 $w=bx$，其等价表达为
 \begin{equation}

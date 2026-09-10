@@ -7,47 +7,47 @@
 \subsection{状态与终端价值}
 \label{sec:value_state}
 
-以 $s(\tau)$ 表示时刻 $\tau$ 的完整运营状态，包括电池 SOC、真实等待请求、未完成预约及其换电安排，以及时间、电价和需求预测。已进入高速公路的预约还具有位置、SOC 和 ETA 等观测。对于预测终端，使用式~\eqref{eq:battery_dynamics} 的库存、式~\eqref{eq:terminal_pending}--\eqref{eq:terminal_random} 的未完成请求以及终点等待标记构造相同含义的状态。下文的用户和请求集合均取该状态时刻的集合，$\mathcal K^p$ 表示该时刻 O--D 对 $p$ 下的预约用户集合，省略其时间标记。
+以 $s(\tau)$ 表示时刻 $\tau$ 的完整运营状态，包括电池 SOC、真实等待请求、未完成预约及其换电安排，以及时间、电价和需求预测。预约用户的信息还包括是否已进入高速公路。对未进入高速的用户，保存日前路径和最近优化后保留的未发布计划；对在途用户，保存最近发布的剩余路径以及位置、SOC 和下一换电站预计到站时刻等观测。预测终端状态已经由式~\eqref{eq:terminal_state} 定义，本节说明如何将这些信息编码并用于价值计算。下文的用户和请求集合均取该状态时刻的集合，$\mathcal K^p$ 表示该时刻 O--D 对 $p$ 下的预约用户集合，省略其时间标记。
 
-为适应不同数量的请求，采用共享分段线性函数和求和生成固定维度表示。对任意状态时刻 $\tau$，令 $\nu_r(\tau)$ 汇集请求站点和前一站的位置、用户 O--D、退回 SOC、相对到站与截止时间，以及该请求是否正在等待。预约记录还包含该用户当前换电站序和可得车辆信息；在预测终端采用本轮确定的站序及给定车辆预测。终端需要继续完成的站点用
+为适应不同数量的请求，采用共享分段线性函数和求和生成固定维度表示。对任意状态时刻 $\tau$，令 $\nu_r(\tau)$ 汇集请求站点和前一换电站的位置、该用户在两站之间的预测行驶时间、用户 O--D、退回 SOC、下述时间特征，以及该请求是否正在等待。不存在前一换电站的请求，相应的站点和行驶时间分量填零。预约请求的信息还包含对应用户的车辆信息 $\boldsymbol c_{p,k}(\tau)$、日前路径、最近发布路径和当前保留的计划。预测终端尚需完成的换电站由 $w_r=1$ 的请求确定，车辆状态按式~\eqref{eq:terminal_vehicle_state} 计算，同一用户的请求使用相同的车辆信息。保留的计划与最近发布的路径分别记录，尚未发布的优化结果不替代已发布路径。
+
+以 $B_r(\tau)$ 表示在状态时刻 $\tau$ 是否已经能够确定请求 $r$ 的到站时刻。真实状态中，已到站请求使用实际到站时刻，车辆下一次换电和随机需求预测使用给定预计到站时刻，均取 $B_r(\tau)=1$；对于还需先完成前一站换电的后续请求，取 $B_r(\tau)=0$。预测终端取 $B_r(t_{\ell+H})=B_r$，到站时刻按式~\eqref{eq:arrival_time} 计算：没有前次换电要求的请求使用给定时刻，其余请求在本轮前一站换电后，由该次换电时刻加上该用户的预测站间行驶时间确定。$\nu_r(\tau)$ 中的时间特征取为
 \begin{equation}
-x_i^{p,k,\mathrm{end}}=\sum_{r\in\R_{p,k}^A:\,i(r)=i}w_r
-\label{eq:terminal_visits}
+\left(B_r(\tau),\quad
+B_r(\tau)\bigl(t_r^{\mathrm{arr}}-\tau\bigr),\quad
+B_r(\tau)\bigl(t_r^{\mathrm{ddl}}-\tau\bigr)\right).
+\label{eq:request_time_features}
 \end{equation}
-表示，其中保留仍在等待的当前站点。站序按下游方向排列，已完成的站点随 $w_r=0$ 移除；请求等待特征取 $Q_{r,\ell+H}$。由此，终端站序和等待状态直接由本轮决策确定，其余车辆预测与时刻特征为给定输入。用户编号仅用于将同一用户的请求归组。
+式~\eqref{eq:request_time_features} 的第一项说明到站时刻是否已经确定，后两项分别表示到站时刻和等待截止时刻相对 $\tau$ 的时间差。这里的 $t_r^{\mathrm{arr}}$ 和 $t_r^{\mathrm{ddl}}$ 均取对应状态中的值。$B_r(\tau)=0$ 时，两个时刻填零，式中后两项也取零；零值不表示用户已到站或已经超过等待截止时刻。这样的后续请求只要仍需服务，就继续保留其站点、行驶时间和退回 SOC 等信息。对于预测终端，式~\eqref{eq:request_time_features} 中的时间随本轮服务安排变化。
 
-以 $w_r(\tau)$ 表示该状态下请求仍有效且尚未完成，以 $Q_r(\tau)$ 表示其中已经进入等待的请求。真实状态取观测和现有预约，预测终端分别取 $w_r$ 和 $Q_{r,\ell+H}$。令 $\xi(\tau)$ 包含运营时间、距离需求期结束的时间、当前与后续电价、随机需求预测和路径更新相位。路径更新相位由时间索引模 $K$ 得到；终端以 $\ell+H$ 的相位计算。状态编码为
+以 $w_r(\tau)$ 表示该状态下请求仍有效且尚未完成，以 $Q_r(\tau)$ 表示其中已经进入等待的请求。真实状态取观测和现有预约，预测终端分别取 $w_r$ 和 $Q_{r,\ell+H}$。时间与预测信息 $\xi(\tau)$ 沿用式~\eqref{eq:terminal_state} 前的定义。状态编码为
 \begin{equation}
 \begin{aligned}
 f_B(\tau)&=\mathop{\mathrm{concat}}_{i\in\mathcal S}
 \left(\sum_{b\in\mathcal B_i}\phi_B(S_{i,b}^{-}(\tau))\right),\\
-h_{p,k}(\tau)&=\sum_{r\in\R_{p,k}^A}w_r(\tau)\psi_A\bigl(\nu_r(\tau)\bigr),\\
 f_A(\tau)&=\sum_{p\in\mathcal P}\sum_{k\in\mathcal K^p}
-\left[\phi_A(h_{p,k}(\tau))-\phi_A(0)\right],\\
+\left[\phi_A\!\left(\sum_{r\in\R_{p,k}^A}w_r(\tau)\psi_A\bigl(\nu_r(\tau)\bigr)\right)-\phi_A(0)\right],\\
 f_R(\tau)&=\sum_{r\in\R^R}w_r(\tau)\psi_R\bigl(\nu_r(\tau)\bigr),\\
 \Phi_\theta(s(\tau))&=\bigl[f_B(\tau),f_A(\tau),f_R(\tau),\xi(\tau)\bigr].
 \end{aligned}
 \label{eq:state_encoding}
 \end{equation}
-其中 $\phi_B,\phi_A,\psi_A,\psi_R$ 为固定维度的分段线性映射，使用仿射变换和 ReLU 构造。站内电池使用共享映射，以反映 SOC 分布；预约先按用户汇总再整体编码，以保留同一行程多次换电的关联。$\phi_A(h_{p,k})-\phi_A(0)$ 使已经没有后续服务的用户贡献为零。等待状态作为请求自身的一个特征，预约等待请求在 $f_A$ 中记录一次。域外随机需求作为 $\xi$ 的预测输入。
+其中 $\phi_B,\phi_A,\psi_A,\psi_R$ 为固定维度的分段线性映射，使用仿射变换和 ReLU 构造。站内电池使用共享映射，以反映 SOC 分布；预约先按用户汇总再整体编码，以保留同一行程多次换电的关联。对每位用户减去 $\phi_A(0)$，使已经没有后续服务的用户贡献为零。等待状态作为请求自身的一个特征，预约等待请求在 $f_A$ 中记录一次。域外随机需求作为 $\xi$ 的预测输入。
 
 以 $s_\ell=s(t_\ell)$、$s_{\ell+H}=s(t_{\ell+H})$ 分别表示当前状态及预测终端状态。真实与预测状态采用相同特征定义和归一化参数，归一化参数由训练集确定后固定。式~\eqref{eq:state_encoding} 将完整状态映射为固定维度的网络输入，其表示能力通过第 5 节的终端价值消融实验评价。
 
-原始网络输出及实际使用的价值函数定义为
+价值函数定义为
 \begin{equation}
-\begin{aligned}
-\widetilde V_\theta(s)
-&=d_0+\boldsymbol v_0^\top\Phi_\theta(s)
-+\sum_{m=1}^{M}a_m\max\{0,\boldsymbol v_m^\top\Phi_\theta(s)+d_m\},\\
-V_\theta(s)&=(1-d^{\mathrm{end}}(s))\widetilde V_\theta(s).
-\end{aligned}
+V_\theta(s)
+=d_0+\boldsymbol v_0^\top\Phi_\theta(s)
++\sum_{m=1}^{M}a_m\max\{0,\boldsymbol v_m^\top\Phi_\theta(s)+d_m\}.
 \label{eq:value_network}
 \end{equation}
-结束标记在当前状态由实际服务记录确定，在预测终端由式~\eqref{eq:operating_end} 确定。价值函数的训练参数 $\theta$ 包含网络和状态映射中的参数。每轮优化时固定这些参数，终端库存和未完成请求则随本轮决策变化。状态映射中的有界变量乘积、ReLU 及结束标记乘积按附录展开后，终端价值与业务约束共同进入同一个优化问题。
+价值函数的训练参数 $\theta$ 包含网络和状态映射中的参数。每轮优化时固定这些参数，终端库存、未完成请求、到站和截止时间特征及车辆信息则随本轮决策变化。式~\eqref{eq:terminal_vehicle_state} 的候选值均为已知常数，所含变量乘积为二元变量的乘积。它们与状态映射中的有界变量乘积及 ReLU 一并按附录展开后，终端价值与业务约束共同进入同一个优化问题。
 
 \subsection{实际收益与状态更新}
 \label{sec:reward}
-每轮由优化模型返回当前路径、功率及相应服务方案，首段执行结果决定实际收益。令 $\mathcal H_\ell^{\mathrm{sw}}$ 为在 $t_\ell$ 实际获得服务的请求，$\mathcal H_\ell^{\mathrm{fail}}$ 为截止时刻位于 $\mathcal I_\ell$ 内且实际超时的预约请求，$N_\ell^{\mathrm{adj}}$ 为本轮实际改变换电站序的用户数，则
+每轮由优化模型返回当前路径、功率及相应服务方案，首段执行结果决定实际收益。令 $\mathcal H_\ell^{\mathrm{sw}}$ 为在 $t_\ell$ 实际获得服务的请求，$\mathcal H_\ell^{\mathrm{fail}}$ 为截止时刻位于 $\mathcal I_\ell$ 内且实际超时的预约请求，$N_\ell^{\mathrm{adj}}$ 为本轮实际向其发布了不同换电路径的在途用户人数，则
 \begin{equation}
 \begin{aligned}
 r_\ell={}&E_B\sum_{r\in\mathcal H_\ell^{\mathrm{sw}}}
@@ -59,21 +59,27 @@ c_{i(r),\ell}^{\mathrm{sw}}(1-\rho_r)\\
 \end{aligned}
 \label{eq:actual_reward}
 \end{equation}
-其中 $\rho_r$ 为实际退回 SOC，当前功率为执行值。实际在站请求参与首段服务，预测中的未来服务和失败在其真实发生后进入对应时间段的收益。跨边界等待请求在实际服务时记录一次收入；失败预约的后续请求结束，失败成本只记录一次。
+其中 $\rho_r$ 为实际退回 SOC，当前功率为执行值。实际在站请求参与首段服务，预测中的未来服务和失败在其真实发生后进入对应时间段的收益。跨边界等待请求在实际服务时记录一次收入；失败预约的后续请求结束，失败成本只记录一次。式~\eqref{eq:actual_reward} 中的路径调整费用只按实际发布计算；尚未进入高速的用户即使在式~\eqref{eq:path_change} 中取 $\chi_{p,k}=1$，也不计入 $N_\ell^{\mathrm{adj}}$。
 
-设 $a_\ell^*$ 汇集本轮实际执行的路径更新、功率和服务安排，以 $\varepsilon_{\ell+1}$ 表示该时间段到站记录、车辆观测及下一轮预测的更新，则
+设 $a_\ell^*$ 汇集本轮为未进入高速的用户保存的计划，以及实际发布的在途路径、执行的功率和服务安排，以 $\varepsilon_{\ell+1}$ 表示该时间段到站记录、车辆观测及下一轮预测的更新，则
 \begin{equation}
 s_{\ell+1}=\mathcal F(s_\ell,a_\ell^*,\varepsilon_{\ell+1}).
 \label{eq:state_transition}
 \end{equation}
-映射 $\mathcal F$ 按第~\ref{sec:model}~节的换电、充电、等待及结算规则更新完整运营记录；价值评价时再按式~\eqref{eq:state_encoding} 编码。预测中尚未真实发生的到站以新观测校正，因此训练样本来自实际执行的状态和收益。求解器返回的匹配直接用于该时间段执行，状态转移保留相应电池变化。
+映射 $\mathcal F$ 按第~\ref{sec:model}~节的换电、充电、等待、路径保存及发布规则更新完整运营记录；价值评价时再按式~\eqref{eq:state_encoding} 编码。实际到站记录确定等待截止时刻；车辆完成前一站换电后，再根据实际出发时刻、该用户的预测站间行驶时间和新观测更新下一换电站的预计到站时刻。前一站尚未换电的后续请求继续取 $B_r(\tau)=0$，车辆信息使用新的位置和 SOC 观测。因此，训练样本来自实际执行的状态和收益，并与预测终端采用相同的时间和车辆信息定义。当前时段按求解器确定的请求和电池安排执行换电，并保留相应电池变化。未进入高速的用户只更新保留的计划。
 
-每个运营场景包含规定的新增需求期。需求期结束后继续处理已给定预约和等待请求，直至全部服务完成或用户失败。后续服务所需的电价和 ETA 信息延伸至该场景结束。剩余电池残值取零。若场景在第 $L$ 个状态结束，采用未折扣回报
+对采集的完整运营轨迹，以 $L$ 表示末端状态的索引，轨迹覆盖期间的电价、车辆观测和行驶时间信息随场景给定。剩余电池残值取零。采用未折扣回报
+\begin{subequations}\label{eq:return_target}
 \begin{equation}
-G_\ell=\sum_{n=\ell}^{L-1}r_n,\qquad G_L=0.
-\label{eq:return_target}
+G_\ell=\sum_{n=\ell}^{L-1}r_n,
+\label{eq:return_sum}
 \end{equation}
-该回报与式~\eqref{eq:objective} 的金额单位和结算项目一致，预测域内收益与终端之后的价值按时间划分。
+\begin{equation}
+G_L=0.
+\label{eq:return_terminal}
+\end{equation}
+\end{subequations}
+式~\eqref{eq:return_sum} 只累计式~\eqref{eq:actual_reward} 中实际发生的净收益，因此 $V_\theta$ 估计的也是后续实际净收益。式~\eqref{eq:objective} 对未进入高速的用户另行计入相对日前路径的惩罚，这部分只用于优化，不进入 $r_\ell$ 或 $G_\ell$，也不作为未来实际调整费用的提前结算。
 
 \subsection{价值函数训练}
 \label{sec:training}
@@ -93,7 +99,7 @@ G_\ell=\sum_{n=\ell}^{L-1}r_n,\qquad G_L=0.
 \begin{tabularx}{\linewidth}{@{}lX@{}}
 \toprule 步骤 & 内容 \\ \midrule
 1 & 固定训练、验证和测试场景划分，初始化用于优化的终端价值为零。\\
-2 & 在一个采样批次内固定价值函数及特征提取参数，按 5~min 与 15~min 的更新安排执行滚动时域优化，记录完整运营轨迹。\\
+2 & 在一个采样批次内固定价值函数及特征提取参数，按充电功率每 5~min、两类预约用户路径每 15~min 的安排执行滚动时域优化，记录完整运营轨迹。\\
 3 & 由式~\eqref{eq:actual_reward} 计算各段实际收益，按式~\eqref{eq:return_target} 从场景结束向前累计回报。\\
 4 & 最小化式~\eqref{eq:value_loss}，更新状态映射和价值网络；归一化统计在训练阶段确定并固定。\\
 5 & 用更新后的价值函数重复采样和拟合，按验证场景的实际净收益选择网络。\\
