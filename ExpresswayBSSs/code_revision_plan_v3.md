@@ -1,14 +1,42 @@
 # MPC 连续事件代码修订执行计划（RL 输出暂用 Mock）
 
-> 状态：核心可执行链路已实施（2026-08-30；RL 训练仍明确不在本轮范围）  
 > 需求基线：以 `paper/manuscript_revision_plan_v3.md` 为主，以 `paper/manuscript_revision_plan_v2.md` 补充实现细节  
 > 适用范围：MPC、连续事件执行、Mock 信号、测试、配置和可再生成的六站模拟数据；不实现 RL 训练，不修改论文正文
 
-> 实施落点：已新增统一时间/领域/事件/账本内核、六站 seed 模拟数据与受限 Mock、严格“到站即有满电池”的连续日前基准、参考预约事件适配和 schema-3 滚动执行入口；滚动状态会刷新已观测车辆快照、枚举并回放评价在途剩余路径、发布赢家站序、替换真实未执行 rollout、重建依赖图，并移出已完成/失败用户。`run_mpc.py` 现调用 Mock 候选路径枚举回放分支。当前 61 项不依赖旧 Gurobi 离散分支的测试全部通过（含无 Gurobi runtime 的事件路径分支测试）；另 3 个旧离散测试方法（其中一个含 2 个子场景）因运行账户与本机许可证用户名不一致而无法启动；默认落盘的 mock、日前计划、滚动结果和统计已同步重生为 schema 2/2/3/1。
->
-> 当前 MPC 边界：运行模式已升级为 `EVENT_PATH_ENUM_REPLAY`。它从实时虚拟起点枚举可行剩余路径，以固定 Mock 功率和共享连续事件内核逐候选回放评分，并把赢家路径写入真实执行；搜索采用确定性逐用户 coordinate enumeration。P1-6 规划中的联合“事件位置驱动 MILP”仍未落地，因此结果只能称为给定候选集上的 Mock 路径搜索结果，不得标注为全局最优解。
+## 当前状态（2026-09-03 集中更新）
 
-> 阶段状态说明：下文保留的是完整目标计划，而不是“全部已完成”的声明。已完成 P0-1、P0-2、P0-3、P1-4 和 P1-5 的核心链路；P1-7 已完成六站 Mock 滚动、候选剩余路径优化、首区间回放、路径发布和真实账本。P1-6 的联合事件位置 MILP 与 P2-8 的遗留代码清理仍待实施。P0-0 仅完成环境固定，未创建历史 golden fixture。
+**阶段完成度**：P0-1、P0-2、P0-3、P1-4、P1-5、P1-6、P1-7、P2-8 均已完成；
+P0-0 仅完成环境固定，未创建历史 golden fixture。RL 训练仍明确不在本
+计划范围内。
+
+**当前实现链路**：`run_mpc.py` → `src.continuous_runner.run_continuous_rolling_mpc`
+→ `src.paper_mpc.solve_paper_mpc`（运行模式 `PAPER_GUROBI_OPTIMAL`）：每轮
+由本机 Gurobi 联合优化路径流 y、访问量 x、调整指示 d、预约
+激活/服务/失败/未决 a/s/f/omega、随机请求结果、边界存活 A 与未决交付 w；
+附录 B--C 的排队、连续充电和槽位分配用站级事件模式扩展式表示，解后由
+统一 ContinuousEventEngine 回放核验。
+
+**2026-08-31**：路径—事件联合 MILP（`src/paper_mpc.py`）接入，运行模式
+从 EVENT_PATH_ENUM_REPLAY 升级为 PAPER_GUROBI_OPTIMAL；默认六站 12 轮
+全部 OPTIMAL（Gurobi 12.0.1，许可证 2791221）。压力验收：联合共享库存
+产生一次优化改路成本；60 kW 场景产生 0.175438596491 h 等待；0 kW 场景
+产生一次 1000 的预约失败成本且下游失活。
+
+**2026-09-03**：P2-8 清理完成。`src/mpc_model.py` 的事件接口与精简版
+`MPCController` 并入 `src/paper_mpc.py`，旧离散 MILP 及旧类型
+（`ReservationObservation`、`FixedCommitment`、`MPCWindowInput` 等）全部
+删除；`run_mpc.py` 由 956 行瘦至 236 行，删除无调用方的旧路径函数；
+`src/dayahead_plan.py` 删除旧离散日前实现（约 950 → 278 行），公开接口
+委托 `src.continuous_dayahead`；`data_generation_test/parameter.py` 删除
+`station_power_limit_kw`、`delta_hours`、`full_soc_tolerance`、
+`full_power_tolerance_kw` 迁移兼容接口；`src/reference_rollout.py` 删除
+`entry_*` 旧字段回退。
+
+**验证基线**：`python -m unittest discover -s tests` 64 项全绿（1 项
+跳过）；`python run_mpc.py --seed 42` 12 轮全部 PAPER_GUROBI_OPTIMAL、
+首区间回放全部通过，总收益 505.387、调整成本 13、违约 0。RL
+actor/critic 仍未训练，P_hat、终端 SOC 系数和域外交付系数继续使用 Mock
+参数（输出标注 `signal_source="mock"`，不得作为 RL 性能结论）。
 
 ## 0. 目标、依据与完成定义
 
@@ -54,8 +82,8 @@ v3 中“只修改 `paper/main.tex`”是该论文修订任务的文件边界，
 | 队列优先级 | 预约优先于随机；两类内部均按 `(arrival_time, stable_id)`；未来尚未到站的预约不占用电池。 |
 | 槽位规则 | 每次服务选择编号最小的已满槽位；服务后该槽位立即写入退回 SOC。 |
 | 请求功率 | 每个外层区间、每站、每槽一个固定请求功率；未满时实际功率等于请求值，满电立即变为 0，换入低 SOC 电池后恢复该请求值。 |
-| 动作投影 | 先逐槽裁剪到 `[0, slot_power_limit_kw]`；若 `interval_hours * sum(P_hat) > station_energy_limit_kwh[i][q]`，按同一比例缩放该站全部已裁剪功率。 |
-| 站级限制 | 使用逐区间站级能量上限；删除当前代码额外采用的站级瞬时功率上限，不新增充电器数量约束。 |
+| 动作投影 | 先逐槽裁剪到 `[0, slot_power_limit_kw]`；若 `sum(P_hat) > station_power_limit_kw[i][q]`，按同一比例缩放该站全部已裁剪功率。 |
+| 站级限制 | 使用逐区间站级总功率上限 `station_power_limit_kw`（kW，比较时直接对功率求和，不乘 `interval_hours`）；不新增充电器数量约束。 |
 | 路径差异 | 当前网络是单向下游 DAG，站点位置严格递增，因此站点访问向量唯一确定剩余站序；输入校验不满足这一性质时直接拒绝实例。 |
 | 未到用户基准 | 始终使用日前初始发布路径；内部预测改路不发布、不覆盖基准、不进入实际 reward。 |
 | 在途用户基准 | 使用最近一次实际发布路径的未执行站序；虚拟起点移动但站序不变时 `d=0`。 |
@@ -211,11 +239,11 @@ v3 中“只修改 `paper/main.tex`”是该论文修订任务的文件边界，
 具体任务：
 
 1. `BusinessParameters.delta_hours` 改为 `interval_hours`。
-2. 新增 `max_wait_hours` 和 `station_energy_limit_kwh[station][interval]`。
+2. 新增 `max_wait_hours` 和 `station_power_limit_kw[station][interval]`。
 3. `max_wait_hours` 是模拟参数快照的必填字段，不提供静默默认值；默认六站样例由生成器显式写入 0.25 h，并在输出元数据标记为 synthetic。
 4. 默认站点改为 6 站 × 5 槽；站点 ID、位置和两个 O-D 按第 3.6 节固定，所有按站二维数组同步扩为 6 行；默认时间轴同时改为 12 个 1 h 区间、预测域 H=4。
-5. 默认测试实例令 `station_energy_limit_kwh[i][q] = 240 * interval_hours`，只保持现有测试容量量级，不再把 240 解释为站级瞬时功率上限。
-6. 保留 `slot_power_limit_kw`；删除 `station_power_limit_kw`、`full_soc_tolerance`、`power_needed_to_full_kw`、`full_power_tolerance_kw` 和容差补足描述。
+5. 默认测试实例令 `station_power_limit_kw[i][q] = 240`（kW），即论文的站级总功率上限，不再乘 `interval_hours` 换算为能量。
+6. 保留 `slot_power_limit_kw`；删除 `full_soc_tolerance`、`power_needed_to_full_kw`、`full_power_tolerance_kw` 和容差补足描述。
 7. 通用 `validate()` 按传入的 `num_stations` 校验连续 ID、位置、能量矩阵形状、正值、价格长度、站点严格下游排序和单向 DAG 前提，不把 6 硬编码为所有测试实例的下限；只由默认生成器和 S25 断言 6 站。
 8. 所有请求由连续到站时刻派生区间，不持久化重复的 `arrival_period` 真相字段。
 9. 建立 future/enroute/queue 状态和全日唯一事件 ID。
@@ -404,7 +432,7 @@ v3 中“只修改 `paper/main.tex`”是该论文修订任务的文件边界，
 8. 每两个相邻断点建立 `segment_duration`、`charge_on[i,b,m]` 和 `charged_duration[i,b,m]`。用四条标准 binary×bounded-continuous 线性化使 `charged_duration=segment_duration` 当且仅当该槽未满且 episode 激活，否则为 0；`P_hat` 是参数，因此 SOC 增量与成本 `P_hat*charged_duration` 均保持线性。每个 `M_duration` 取当前区间长度，不用全日常数。
 9. 充满事件要求对应 episode 的事件前 SOC 精确达到 1，并把 `ready` 置 true；事件后所有后续充电段关闭，直到服务把低 SOC 电池换入。若 episode 在预测右端达到 1，只写终端 `soc=1, ready=false, completion_due_at=t_end`，不激活当前轮充满/服务事件。
 10. 服务事件要求被匹配槽位 `ready=true`，随后写入 `return_soc`、`ready=false` 并激活该槽下一充电 episode；这样同槽可重复服务，但每两次服务之间必须存在匹配的充满事件。
-11. 每站每区间的 `sum(P_hat*charged_duration)` 同时用于实际电量和充电成本，并校验不超过 `station_energy_limit_kwh[i][q]`；电价或请求功率跨内部区间边界时必须切段，不能用单一平均价覆盖。
+11. 每站每区间的 `sum(P_hat*charged_duration)` 同时用于实际电量和充电成本；站级校验为功率口径 `sum(P_hat) <= station_power_limit_kw[i][q]`。电价或请求功率跨内部区间边界时必须切段，不能用单一平均价覆盖。
 12. 预约优先、类内 FCFS、最小槽位和“有资源立即服务”作为硬约束，不用目标函数打破平局；同刻规则与执行器完全一致。
 13. 终端状态取 `t_end^-`；当前轮结果区分真实携带 `WAITING`、未到 future/enroute 和求解态 `PENDING_AT_HORIZON`，三者不得互相覆盖。
 
@@ -488,7 +516,7 @@ Big-M 规则：
 
 - 不再出现 `FixedCommitment`、`_EVENT_FIX`、`is_new_arrival`、`full_soc_tolerance`、`full_power_tolerance_kw`、`pow_defer`、`pow_fill`。
 - 不再出现“先充完整时段再服务”“退回电池下一时段充电”“随机请求当期立即拒绝”的代码分支。
-- `station_power_limit_kw` 被逐区间 `station_energy_limit_kwh` 替代。
+- 逐区间 `station_energy_limit_kwh`（每区间能量上限）已改回站级总功率上限 `station_power_limit_kw`（kW；[station][interval] 结构保留作为超集）。
 - 实际执行路径中不读取预测 `MPCResult.assignments` 作为真实发生事件。
 - 默认端到端输入和结果均声明 6 个站、`data_source="synthetic"`、`signal_source="mock"`。
 - 增加六站端到端回归：至少一个真实或预测事件触达每个站点，且最远 O-D 能在 12 h 模拟日内走完。
@@ -643,13 +671,3 @@ P0-2 + P0-3
 - 不实现或修改 `RL/ppo.py`、`src/env_bss.py`、actor/critic、Gymnasium 适配、训练循环、checkpoint 或策略评估。
 - 不接入 `data_generation_rl` 或任何真实数据抽取流程；本轮外部参数和观测一律来自可复现的模拟快照。
 - 不实现完美信息全日上界、正式消融和绘图；这些在核心口径通过后另立实验计划。
-# 2026-08-31 实施更新：论文路径—事件 MILP 已接入
-
-当前公开滚动入口已从 EVENT_PATH_ENUM_REPLAY 升级为 PAPER_GUROBI_OPTIMAL：每轮由本机 Gurobi 在同一个模型中联合优化全部用户的路径流 y、访问量 x、调整指示 d、预约激活/服务/失败/未决变量 a/s/f/omega、随机请求结果、边界存活 A 与未决交付 w。附录 B--C 的确定性排队、连续充电和槽位分配使用完整站级事件模式扩展式表示，并在解后由统一 ContinuousEventEngine 联合回放核验。
-
-- 新增实现：src/paper_mpc.py。
-- 滚动接入：src/continuous_runner.py 与 run_mpc.py。
-- 本机验证：Gurobi 12.0.1、许可证 ID 2791221；默认六站 12 轮均为 OPTIMAL。
-- 压力验收：联合共享库存会产生一次优化改路成本；60 kW 场景产生 0.175438596491 h 等待；0 kW 场景产生一次 1000 的预约失败成本且下游失活。
-- 结果：data_generation_test/output/mpc_run_result.json、mpc_run_statistics.md、paper_mpc_gurobi_validation.md。
-- 边界：RL actor/critic 仍未训练，P_hat、终端 SOC 系数和域外交付系数继续使用 Mock 参数。

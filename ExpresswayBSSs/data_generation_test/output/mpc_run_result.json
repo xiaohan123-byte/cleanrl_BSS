@@ -22,7 +22,7 @@
     "path_source": "gurobi_joint_path_flow",
     "path_search_optimality": "global_when_solver_status_optimal",
     "event_formulation": "complete_station_pattern_extended_milp",
-    "station_energy_limit": "per_station_per_interval_kwh"
+    "station_power_limit": "per_station_per_interval_kw"
   },
   "rounds": [
     {
@@ -63,16 +63,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 1625.9884257750005,
-        "gurobi_runtime_sec": 0.00599980354309082,
-        "pattern_generation_time_sec": 0.0655625,
-        "total_optimization_time_sec": 0.07156230354309082,
-        "selected_pattern_replay_time_sec": 0.002009099999999986,
+        "gurobi_runtime_sec": 0.029000043869018555,
+        "pattern_generation_time_sec": 0.0721885000821203,
+        "total_optimization_time_sec": 0.10118854395113885,
+        "selected_pattern_replay_time_sec": 0.0021144000347703695,
         "selected_pattern_replay_validated": true,
         "variable_count": 300,
         "constraint_count": 509,
@@ -277,7 +277,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.084539
+          "runtime_sec": 0.11651459988206625
         }
       },
       "replay": {
@@ -1663,7 +1663,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.084539
+        "runtime_sec": 0.11651459988206625
       },
       "path_decisions": [
         {
@@ -2812,7 +2812,7 @@
           0
         ]
       ],
-      "solve_time_sec": 0.08720049999999999
+      "solve_time_sec": 0.1207804000005126
     },
     {
       "period": 1,
@@ -2829,7 +2829,7 @@
         "charging_cost": 102.25252253157896,
         "adjustment_cost": 4.0,
         "reservation_failure_cost": 0.0,
-        "terminal_value": 1572.5297011133332,
+        "terminal_value": 1572.5297011133334,
         "pending_request_ids": [],
         "request_outcomes": {
           "predicted:0:P0_1_0": "SERVED_IN_HORIZON",
@@ -2838,30 +2838,31 @@
           "reservation:0:4:0:0": "SERVED_IN_HORIZON",
           "reservation:0:3:0:0": "SERVED_IN_HORIZON",
           "predicted:3:P3_2_0": "SERVED_IN_HORIZON",
-          "reservation:0:3:1:1": "SERVED_IN_HORIZON",
+          "reservation:1:2:0:1": "SERVED_IN_HORIZON",
+          "reservation:0:4:1:1": "SERVED_IN_HORIZON",
           "predicted:1:P1_3_0": "SERVED_IN_HORIZON",
           "reservation:1:0:0:2": "SERVED_IN_HORIZON",
-          "reservation:1:2:0:2": "SERVED_IN_HORIZON",
+          "reservation:1:2:1:2": "SERVED_IN_HORIZON",
           "reservation:0:1:0:1": "SERVED_IN_HORIZON",
           "reservation:1:5:1:2": "SERVED_IN_HORIZON",
-          "reservation:0:4:1:2": "SERVED_IN_HORIZON"
+          "reservation:0:3:1:2": "SERVED_IN_HORIZON"
         },
-        "event_count": 13
+        "event_count": 14
       },
       "model_statistics": {
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2467.4826269117543,
-        "gurobi_runtime_sec": 0.012000083923339844,
-        "pattern_generation_time_sec": 0.38586030000000004,
-        "total_optimization_time_sec": 0.3978603839233399,
-        "selected_pattern_replay_time_sec": 0.0019320999999999922,
+        "gurobi_runtime_sec": 0.0070002079010009766,
+        "pattern_generation_time_sec": 0.42293579992838204,
+        "total_optimization_time_sec": 0.429936007829383,
+        "selected_pattern_replay_time_sec": 0.0024087000638246536,
         "selected_pattern_replay_validated": true,
         "variable_count": 624,
         "constraint_count": 612,
@@ -2936,10 +2937,10 @@
             ],
             [
               0,
-              1
+              2
             ],
             [
-              1,
+              2,
               "exit"
             ]
           ],
@@ -2950,10 +2951,10 @@
             ],
             [
               0,
-              2
+              1
             ],
             [
-              2,
+              1,
               "exit"
             ]
           ],
@@ -2974,14 +2975,14 @@
           "1:2": [
             [
               "virtual_origin",
+              1
+            ],
+            [
+              1,
               2
             ],
             [
               2,
-              3
-            ],
-            [
-              3,
               4
             ],
             [
@@ -3018,8 +3019,8 @@
         },
         "selected_station_pattern": {
           "0": "s0_p7",
-          "1": "s1_p108",
-          "2": "s2_p94",
+          "1": "s1_p94",
+          "2": "s2_p139",
           "3": "s3_p0",
           "4": "s4_p0",
           "5": "s5_p0"
@@ -3045,7 +3046,7 @@
             "charging_cost": -7.105427357601002e-14,
             "adjustment_cost": 0.0,
             "reservation_failure_cost": 0.0,
-            "terminal_value": 160.0
+            "terminal_value": 159.99999999999977
           },
           "first_interval_authority": "continuous_event_replay",
           "optimization_authority": "gurobi_milp"
@@ -3058,7 +3059,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.41401770000000004
+          "runtime_sec": 0.4572707999031991
         }
       },
       "replay": {
@@ -3781,7 +3782,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.41401770000000004
+        "runtime_sec": 0.4572707999031991
       },
       "path_decisions": [
         {
@@ -3827,7 +3828,7 @@
           ],
           "proposed_station_sequence": [
             0,
-            1
+            2
           ],
           "proposed_path": [
             [
@@ -3836,10 +3837,10 @@
             ],
             [
               0,
-              1
+              2
             ],
             [
-              1,
+              2,
               "exit"
             ]
           ],
@@ -3862,7 +3863,7 @@
           ],
           "proposed_station_sequence": [
             0,
-            2
+            1
           ],
           "proposed_path": [
             [
@@ -3871,10 +3872,10 @@
             ],
             [
               0,
-              2
+              1
             ],
             [
-              2,
+              1,
               "exit"
             ]
           ],
@@ -3932,21 +3933,21 @@
             5
           ],
           "proposed_station_sequence": [
+            1,
             2,
-            3,
             4
           ],
           "proposed_path": [
             [
               "virtual_origin",
+              1
+            ],
+            [
+              1,
               2
             ],
             [
               2,
-              3
-            ],
-            [
-              3,
               4
             ],
             [
@@ -5094,14 +5095,14 @@
             "last_published_remaining_path": [
               [
                 "virtual_origin",
+                1
+              ],
+              [
+                1,
                 2
               ],
               [
                 2,
-                3
-              ],
-              [
-                3,
                 4
               ],
               [
@@ -5354,10 +5355,10 @@
           "reservation:1:0:0:2": [
             "reservation:1:0:1:4"
           ],
-          "reservation:1:2:0:2": [
-            "reservation:1:2:1:3"
+          "reservation:1:2:0:1": [
+            "reservation:1:2:1:2"
           ],
-          "reservation:1:2:1:3": [
+          "reservation:1:2:1:2": [
             "reservation:1:2:2:4"
           ],
           "reservation:1:5:0:0": [
@@ -5378,7 +5379,7 @@
           5
         ]
       ],
-      "solve_time_sec": 0.41661650000000006
+      "solve_time_sec": 0.45996570005081594
     },
     {
       "period": 2,
@@ -5420,16 +5421,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2744.184268739441,
-        "gurobi_runtime_sec": 0.026999950408935547,
-        "pattern_generation_time_sec": 0.4734754,
-        "total_optimization_time_sec": 0.5004753504089355,
-        "selected_pattern_replay_time_sec": 0.0022618000000000915,
+        "gurobi_runtime_sec": 0.03099989891052246,
+        "pattern_generation_time_sec": 0.5057128998450935,
+        "total_optimization_time_sec": 0.536712798755616,
+        "selected_pattern_replay_time_sec": 0.0023683002218604088,
         "selected_pattern_replay_validated": true,
         "variable_count": 726,
         "constraint_count": 636,
@@ -5630,7 +5631,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.5223221
+          "runtime_sec": 0.5466528001707047
         }
       },
       "replay": {
@@ -6110,7 +6111,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.5223221
+        "runtime_sec": 0.5466528001707047
       },
       "path_decisions": [
         {
@@ -6265,8 +6266,8 @@
           "search_method": "gurobi_joint_paper_milp",
           "phase": "enroute",
           "previous_station_sequence": [
+            1,
             2,
-            3,
             4
           ],
           "proposed_station_sequence": [
@@ -6782,14 +6783,14 @@
             "last_published_remaining_path": [
               [
                 "virtual_origin",
+                1
+              ],
+              [
+                1,
                 2
               ],
               [
                 2,
-                3
-              ],
-              [
-                3,
                 4
               ],
               [
@@ -7042,10 +7043,10 @@
           "reservation:1:0:0:2": [
             "reservation:1:0:1:4"
           ],
-          "reservation:1:2:0:2": [
-            "reservation:1:2:1:3"
+          "reservation:1:2:0:1": [
+            "reservation:1:2:1:2"
           ],
-          "reservation:1:2:1:3": [
+          "reservation:1:2:1:2": [
             "reservation:1:2:2:4"
           ],
           "reservation:1:5:0:0": [
@@ -7827,7 +7828,7 @@
           4
         ]
       ],
-      "solve_time_sec": 0.5263726
+      "solve_time_sec": 0.550807400373742
     },
     {
       "period": 3,
@@ -7866,16 +7867,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2253.259471986672,
-        "gurobi_runtime_sec": 0.018000125885009766,
-        "pattern_generation_time_sec": 0.3024719,
-        "total_optimization_time_sec": 0.3204720258850098,
-        "selected_pattern_replay_time_sec": 0.0016754000000001046,
+        "gurobi_runtime_sec": 0.019999980926513672,
+        "pattern_generation_time_sec": 0.3304514999035746,
+        "total_optimization_time_sec": 0.35045148083008826,
+        "selected_pattern_replay_time_sec": 0.0018627000972628593,
         "selected_pattern_replay_validated": true,
         "variable_count": 549,
         "constraint_count": 596,
@@ -8056,7 +8057,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.3338618
+          "runtime_sec": 0.3654547000769526
         }
       },
       "replay": {
@@ -8457,7 +8458,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.3338618
+        "runtime_sec": 0.3654547000769526
       },
       "path_decisions": [
         {
@@ -10200,7 +10201,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.3361772999999999
+      "solve_time_sec": 0.36802790011279285
     },
     {
       "period": 4,
@@ -10239,16 +10240,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2052.4914994645724,
-        "gurobi_runtime_sec": 0.006999969482421875,
-        "pattern_generation_time_sec": 0.14756959999999997,
-        "total_optimization_time_sec": 0.15456956948242184,
-        "selected_pattern_replay_time_sec": 0.002073400000000003,
+        "gurobi_runtime_sec": 0.009999990463256836,
+        "pattern_generation_time_sec": 0.1652909000404179,
+        "total_optimization_time_sec": 0.17529089050367475,
+        "selected_pattern_replay_time_sec": 0.0025893000420182943,
         "selected_pattern_replay_validated": true,
         "variable_count": 376,
         "constraint_count": 500,
@@ -10429,7 +10430,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.16630849999999997
+          "runtime_sec": 0.1867233000230044
         }
       },
       "replay": {
@@ -10615,7 +10616,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.16630849999999997
+        "runtime_sec": 0.1867233000230044
       },
       "path_decisions": [
         {
@@ -12394,7 +12395,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.16880040000000007
+      "solve_time_sec": 0.1893617999739945
     },
     {
       "period": 5,
@@ -12434,16 +12435,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 1966.5939537323627,
-        "gurobi_runtime_sec": 0.003000020980834961,
-        "pattern_generation_time_sec": 0.05653079999999999,
-        "total_optimization_time_sec": 0.05953082098083495,
-        "selected_pattern_replay_time_sec": 0.001981600000000139,
+        "gurobi_runtime_sec": 0.0019998550415039062,
+        "pattern_generation_time_sec": 0.06449969997629523,
+        "total_optimization_time_sec": 0.06649955501779914,
+        "selected_pattern_replay_time_sec": 0.001974700018763542,
         "selected_pattern_replay_validated": true,
         "variable_count": 242,
         "constraint_count": 389,
@@ -12624,7 +12625,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.06700680000000014
+          "runtime_sec": 0.07591510005295277
         }
       },
       "replay": {
@@ -12873,7 +12874,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.06700680000000014
+        "runtime_sec": 0.07591510005295277
       },
       "path_decisions": [
         {
@@ -14634,7 +14635,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.06930159999999996
+      "solve_time_sec": 0.07904290012083948
     },
     {
       "period": 6,
@@ -14669,16 +14670,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 1631.8374120989251,
-        "gurobi_runtime_sec": 0.0009999275207519531,
-        "pattern_generation_time_sec": 0.023822100000000068,
-        "total_optimization_time_sec": 0.02482202752075202,
-        "selected_pattern_replay_time_sec": 0.001619000000000037,
+        "gurobi_runtime_sec": 0.0019998550415039062,
+        "pattern_generation_time_sec": 0.027071299962699413,
+        "total_optimization_time_sec": 0.02907115500420332,
+        "selected_pattern_replay_time_sec": 0.0016787999775260687,
         "selected_pattern_replay_validated": true,
         "variable_count": 163,
         "constraint_count": 281,
@@ -14840,7 +14841,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.031485100000000044
+          "runtime_sec": 0.03441110020503402
         }
       },
       "replay": {
@@ -15339,7 +15340,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.031485100000000044
+        "runtime_sec": 0.03441110020503402
       },
       "path_decisions": [
         {
@@ -16979,7 +16980,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.03360490000000005
+      "solve_time_sec": 0.0369248001370579
     },
     {
       "period": 7,
@@ -17012,16 +17013,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 1789.91657527261,
         "gurobi_runtime_sec": 0.0,
-        "pattern_generation_time_sec": 0.011600400000000066,
-        "total_optimization_time_sec": 0.011600400000000066,
-        "selected_pattern_replay_time_sec": 0.0013676000000000244,
+        "pattern_generation_time_sec": 0.014078000094741583,
+        "total_optimization_time_sec": 0.014078000094741583,
+        "selected_pattern_replay_time_sec": 0.0016579998191446066,
         "selected_pattern_replay_validated": true,
         "variable_count": 102,
         "constraint_count": 170,
@@ -17157,7 +17158,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.01617579999999985
+          "runtime_sec": 0.019340000115334988
         }
       },
       "replay": {
@@ -17504,7 +17505,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.01617579999999985
+        "runtime_sec": 0.019340000115334988
       },
       "path_decisions": [
         {
@@ -19003,7 +19004,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.018296699999999833
+      "solve_time_sec": 0.02274570008739829
     },
     {
       "period": 8,
@@ -19037,16 +19038,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2118.825248317654,
-        "gurobi_runtime_sec": 0.0009999275207519531,
-        "pattern_generation_time_sec": 0.007528600000000107,
-        "total_optimization_time_sec": 0.00852852752075206,
-        "selected_pattern_replay_time_sec": 0.0015460000000000473,
+        "gurobi_runtime_sec": 0.0,
+        "pattern_generation_time_sec": 0.008035700069740415,
+        "total_optimization_time_sec": 0.008035700069740415,
+        "selected_pattern_replay_time_sec": 0.001832999987527728,
         "selected_pattern_replay_validated": true,
         "variable_count": 79,
         "constraint_count": 131,
@@ -19171,7 +19172,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.011892400000000025
+          "runtime_sec": 0.012832900043576956
         }
       },
       "replay": {
@@ -19600,7 +19601,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.011892400000000025
+        "runtime_sec": 0.012832900043576956
       },
       "path_decisions": [
         {
@@ -20972,7 +20973,7 @@
         }
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.013969400000000132
+      "solve_time_sec": 0.015188500052317977
     },
     {
       "period": 9,
@@ -21003,16 +21004,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2317.0021931631577,
         "gurobi_runtime_sec": 0.0,
-        "pattern_generation_time_sec": 0.004237499999999894,
-        "total_optimization_time_sec": 0.004237499999999894,
-        "selected_pattern_replay_time_sec": 0.001028299999999982,
+        "pattern_generation_time_sec": 0.004682499915361404,
+        "total_optimization_time_sec": 0.004682499915361404,
+        "selected_pattern_replay_time_sec": 0.0019121000077575445,
         "selected_pattern_replay_validated": true,
         "variable_count": 44,
         "constraint_count": 56,
@@ -21104,7 +21105,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.006768099999999944
+          "runtime_sec": 0.009041100041940808
         }
       },
       "replay": {
@@ -21370,7 +21371,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.006768099999999944
+        "runtime_sec": 0.009041100041940808
       },
       "path_decisions": [],
       "state_start": {
@@ -22615,7 +22616,7 @@
         "reservation_dependencies": {}
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.008022999999999891
+      "solve_time_sec": 0.010378299979493022
     },
     {
       "period": 10,
@@ -22646,16 +22647,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 2557.832107950877,
-        "gurobi_runtime_sec": 0.0,
-        "pattern_generation_time_sec": 0.0030831000000000053,
-        "total_optimization_time_sec": 0.0030831000000000053,
-        "selected_pattern_replay_time_sec": 0.0016640999999999462,
+        "gurobi_runtime_sec": 0.0009999275207519531,
+        "pattern_generation_time_sec": 0.00416909996420145,
+        "total_optimization_time_sec": 0.0051690274849534035,
+        "selected_pattern_replay_time_sec": 0.0011920998804271221,
         "selected_pattern_replay_validated": true,
         "variable_count": 44,
         "constraint_count": 56,
@@ -22747,7 +22748,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.00625029999999982
+          "runtime_sec": 0.006844700081273913
         }
       },
       "replay": {
@@ -22973,7 +22974,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.00625029999999982
+        "runtime_sec": 0.006844700081273913
       },
       "path_decisions": [],
       "state_start": {
@@ -24231,7 +24232,7 @@
         "reservation_dependencies": {}
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.007219099999999923
+      "solve_time_sec": 0.007974700070917606
     },
     {
       "period": 11,
@@ -24260,16 +24261,16 @@
         "model_kind": "paper_continuous_event_station_pattern_milp",
         "formulation": "complete_station_pattern_extended_formulation",
         "solver_backend": "gurobi",
-        "solver_version": "12.0.1",
+        "solver_version": "13.0.2",
         "solver_status": "OPTIMAL",
         "is_optimal": true,
         "has_incumbent": true,
         "mip_gap": 0.0,
         "best_bound": 1971.285575448421,
         "gurobi_runtime_sec": 0.0,
-        "pattern_generation_time_sec": 0.002969400000000011,
-        "total_optimization_time_sec": 0.002969400000000011,
-        "selected_pattern_replay_time_sec": 0.0008871999999999769,
+        "pattern_generation_time_sec": 0.003513399977236986,
+        "total_optimization_time_sec": 0.003513399977236986,
+        "selected_pattern_replay_time_sec": 0.001043899916112423,
         "selected_pattern_replay_validated": true,
         "variable_count": 40,
         "constraint_count": 46,
@@ -24361,7 +24362,7 @@
           "search_complete": true,
           "global_milp_optimality_claimed": true,
           "solver_status": "OPTIMAL",
-          "runtime_sec": 0.0050040000000000084
+          "runtime_sec": 0.006009100005030632
         }
       },
       "replay": {
@@ -24536,7 +24537,7 @@
         "search_complete": true,
         "global_milp_optimality_claimed": true,
         "solver_status": "OPTIMAL",
-        "runtime_sec": 0.0050040000000000084
+        "runtime_sec": 0.006009100005030632
       },
       "path_decisions": [],
       "state_start": {
@@ -25811,7 +25812,7 @@
         "reservation_dependencies": {}
       },
       "newly_enroute": [],
-      "solve_time_sec": 0.00553820000000016
+      "solve_time_sec": 0.006571700097993016
     }
   ],
   "summary": {

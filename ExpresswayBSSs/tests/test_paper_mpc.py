@@ -91,7 +91,7 @@ def _engine(params, grid: TimeGrid) -> ContinuousEventEngine:
         params.station.charging_efficiency,
         params.max_wait_hours,
         slot_power_limit_kw=params.station.slot_power_limit_kw,
-        station_energy_limit_kwh=params.station_energy_limit_kwh,
+        station_power_limit_kw=params.station_power_limit_kw,
     )
 
 

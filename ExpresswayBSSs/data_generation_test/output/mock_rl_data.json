@@ -304,7 +304,7 @@
         1.2
       ]
     ],
-    "station_energy_limit_kwh": [
+    "station_power_limit_kw": [
       [
         240.0,
         240.0,
@@ -448,7 +448,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -503,7 +503,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -558,7 +558,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -613,7 +613,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -668,7 +668,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -723,7 +723,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,

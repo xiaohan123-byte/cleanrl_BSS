@@ -304,7 +304,23 @@
         1.2
       ]
     ],
-    "station_energy_limit_kwh": [
+    "path_adjustment_penalty": 1.0,
+    "reservation_failure_penalty": 1000.0,
+    "terminal_value_weight": 1.0,
+    "min_swap_spacing_km": 100.0,
+    "max_wait_hours": 0.25,
+    "time_epsilon": 1e-09,
+    "seed": 42,
+    "data_source": "synthetic",
+    "generator_version": "six-station-synthetic-v2",
+    "solver": {
+      "threads": 1,
+      "time_limit_sec": 30.0,
+      "output_flag": 0,
+      "mip_gap": 0.0,
+      "feasibility_tol": 1e-08
+    },
+    "station_power_limit_kw": [
       [
         240.0,
         240.0,
@@ -389,23 +405,7 @@
         240.0,
         240.0
       ]
-    ],
-    "path_adjustment_penalty": 1.0,
-    "reservation_failure_penalty": 1000.0,
-    "terminal_value_weight": 1.0,
-    "min_swap_spacing_km": 100.0,
-    "max_wait_hours": 0.25,
-    "time_epsilon": 1e-09,
-    "seed": 42,
-    "data_source": "synthetic",
-    "generator_version": "six-station-synthetic-v2",
-    "solver": {
-      "threads": 1,
-      "time_limit_sec": 30.0,
-      "output_flag": 0,
-      "mip_gap": 0.0,
-      "feasibility_tol": 1e-08
-    }
+    ]
   },
   "stations": [
     {
@@ -448,7 +448,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -503,7 +503,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -558,7 +558,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -613,7 +613,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -668,7 +668,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,
@@ -723,7 +723,7 @@
         1.2,
         1.2
       ],
-      "station_energy_limit_kwh": [
+      "station_power_limit_kw": [
         240.0,
         240.0,
         240.0,

@@ -205,11 +205,11 @@ def project_requested_power(
     requested_power: Sequence[Sequence[float]] | Mapping[int, Sequence[float]],
     *,
     slot_power_limit_kw: Any = None,
-    station_energy_limit_kwh: Any = None,
+    station_power_limit_kw: Any = None,
     interval_hours: float,
     shape: Sequence[int] | None = None,
 ) -> PowerProjection:
-    """Clip slot powers then proportionally enforce each station energy cap.
+    """Clip slot powers then proportionally enforce each station power cap.
 
     The projection is deterministic and only constrains the requested power
     over a complete interval.  The event engine may subsequently deliver less
@@ -252,18 +252,18 @@ def project_requested_power(
             if upper < 0:
                 raise EventEngineError("slot power limit must be non-negative")
             clipped.append(min(max(0.0, raw), upper))
-        requested_energy = sum(clipped) * interval_hours
-        energy_limit = _station_value(station_energy_limit_kwh, station, float("inf"))
-        if not isfinite(energy_limit) and energy_limit != float("inf"):
-            raise EventEngineError("station energy limit must be finite or omitted")
-        if energy_limit < 0:
-            raise EventEngineError("station energy limit must be non-negative")
-        if requested_energy > energy_limit + _POWER_EPSILON and requested_energy > 0:
-            scale = energy_limit / requested_energy
+        total_power = sum(clipped)
+        power_limit = _station_value(station_power_limit_kw, station, float("inf"))
+        if not isfinite(power_limit) and power_limit != float("inf"):
+            raise EventEngineError("station power limit must be finite or omitted")
+        if power_limit < 0:
+            raise EventEngineError("station power limit must be non-negative")
+        if total_power > power_limit + _POWER_EPSILON and total_power > 0:
+            scale = power_limit / total_power
             clipped = [power * scale for power in clipped]
-            requested_energy = sum(clipped) * interval_hours
+            total_power = sum(clipped)
         projected.append(clipped)
-        energy.append(requested_energy)
+        energy.append(total_power * interval_hours)
     return PowerProjection(projected, energy)
 
 
@@ -291,7 +291,7 @@ class ContinuousEventEngine:
         max_wait_hours: float | None = None,
         *,
         slot_power_limit_kw: Any = None,
-        station_energy_limit_kwh: Any = None,
+        station_power_limit_kw: Any = None,
     ) -> None:
         if not isfinite(battery_capacity_kwh) or battery_capacity_kwh <= 0:
             raise EventEngineError("battery_capacity_kwh must be positive")
@@ -306,30 +306,30 @@ class ContinuousEventEngine:
         self.charging_efficiency = float(charging_efficiency)
         self.max_wait_hours = None if max_wait_hours is None else float(max_wait_hours)
         self.slot_power_limit_kw = slot_power_limit_kw
-        self.station_energy_limit_kwh = station_energy_limit_kwh
+        self.station_power_limit_kw = station_power_limit_kw
 
     def project_power(
         self, requested_power: Any, state: RollingState, interval_index: int | None = None
     ) -> PowerProjection:
         """Apply the configured per-slot and per-station request projection."""
 
-        energy_limit = self.station_energy_limit_kwh
-        # Parameters commonly carry [station][interval] energy limits.  Select
+        power_limit = self.station_power_limit_kw
+        # Parameters commonly carry [station][interval] power limits.  Select
         # the requested interval while retaining scalar/vector compatibility.
-        if interval_index is not None and isinstance(energy_limit, (list, tuple)):
+        if interval_index is not None and isinstance(power_limit, (list, tuple)):
             selected: List[Any] = []
-            for station_value in energy_limit:
+            for station_value in power_limit:
                 if isinstance(station_value, (list, tuple)):
                     if interval_index >= len(station_value):
-                        raise EventEngineError("station energy limit lacks requested interval")
+                        raise EventEngineError("station power limit lacks requested interval")
                     selected.append(station_value[interval_index])
                 else:
                     selected.append(station_value)
-            energy_limit = selected
+            power_limit = selected
         return project_requested_power(
             requested_power,
             slot_power_limit_kw=self.slot_power_limit_kw,
-            station_energy_limit_kwh=energy_limit,
+            station_power_limit_kw=power_limit,
             interval_hours=self.time_grid.interval_hours,
             shape=[len(row) for row in state.slots],
         )
@@ -894,8 +894,8 @@ class ContinuousEventEngine:
 
         cancelled: List[str] = []
         pending = list(state.reservation_dependencies.get(upstream_event_id, []))
-        # A few legacy callers key dependencies by request ID rather than event
-        # ID; accepting both preserves the one-way cancellation semantics.
+        # Dependencies may be keyed by request ID rather than event ID;
+        # accepting both preserves the one-way cancellation semantics.
         if ":" in upstream_event_id:
             pending.extend(state.reservation_dependencies.get(upstream_event_id.rsplit(":", 1)[-1], []))
         seen: set[str] = set()

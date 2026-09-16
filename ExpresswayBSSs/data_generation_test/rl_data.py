@@ -9,7 +9,7 @@
 * 兼容既有调用的 ``generate_mock_data``、``RLSignals`` 和四参数
   ``get_signals(params, period_ell, horizon, soc_obs)``。
 
-所有外部参数、价格、能量上限、预约、随机需求和车辆快照均写入同一份
+所有外部参数、价格、功率上限、预约、随机需求和车辆快照均写入同一份
 synthetic 输入快照。当前 schema 为 2；它只适用于代码联调，不能用于论文
 性能结论。
 """
@@ -422,7 +422,7 @@ def generate_synthetic_scenario(
             "charging_efficiency": params.station.charging_efficiency,
             "electricity_price": list(params.electricity_price[i]),
             "swap_service_price": list(params.swap_service_price[i]),
-            "station_energy_limit_kwh": list(params.station_energy_limit_kwh[i]),
+            "station_power_limit_kw": list(params.station_power_limit_kw[i]),
         }
         for i in range(params.station.num_stations)
     ]
@@ -493,7 +493,7 @@ def project_requested_power(
     requested_power: Sequence[Sequence[Sequence[float]]],
     start_period: int = 0,
 ) -> List[List[List[float]]]:
-    """执行统一动作投影：逐槽裁剪，再按站级区间能量同比缩放。"""
+    """执行统一动作投影：逐槽裁剪，再按站级功率上限同比缩放。"""
     station = params.station
     if len(requested_power) != station.num_stations:
         raise ValueError("requested_power 站点维度与参数不一致")
@@ -531,23 +531,23 @@ def project_requested_power(
             [result[i][b][h] for b in range(station.num_slots)]
             for i in range(station.num_stations)
         ]
-        energy_limit = [
-            params.station_energy_limit_at(i, period)
+        power_limit = [
+            params.station_power_limit_at(i, period)
             for i in range(station.num_stations)
         ]
         if _project_interval_power is not None:
             projected = _project_interval_power(
                 one_interval,
                 slot_power_limit_kw=station.slot_power_limit_kw,
-                station_energy_limit_kwh=energy_limit,
+                station_power_limit_kw=power_limit,
                 interval_hours=params.interval_hours,
             ).power_kw
         else:  # pragma: no cover - see import fallback above
             projected = one_interval
             for i in range(station.num_stations):
-                requested_kwh = params.interval_hours * sum(projected[i])
-                if requested_kwh > energy_limit[i] and requested_kwh > 0.0:
-                    scale = energy_limit[i] / requested_kwh
+                requested_kw = sum(projected[i])
+                if requested_kw > power_limit[i] and requested_kw > 0.0:
+                    scale = power_limit[i] / requested_kw
                     projected[i] = [value * scale for value in projected[i]]
         for i in range(station.num_stations):
             for b in range(station.num_slots):

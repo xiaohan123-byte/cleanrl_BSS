@@ -1,0 +1,7 @@
+name: py310
+channels:
+  - defaults
+dependencies:
+  - python=3.10.19
+  - numpy=2.2.6
+  - gurobipy=13.0.2

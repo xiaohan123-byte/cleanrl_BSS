@@ -42,5 +42,14 @@ class TimeGridTest(unittest.TestCase):
             grid.interval_of(2.0)
 
 
+    def test_five_minute_grid_has_exact_boundary_ownership(self):
+        grid = TimeGrid(interval_hours=1/12, num_intervals=144)
+        for n in range(144):
+            boundary = n * grid.interval_hours
+            self.assertEqual(grid.interval_of(boundary), n)
+            if n:
+                self.assertEqual(grid.interval_of(boundary - 5e-10), n - 1)
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

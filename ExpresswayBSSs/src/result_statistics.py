@@ -841,11 +841,26 @@ def build_result_statistics(
         if charging_efficiency_value is not None
         else None
     )
-    energy_limits = parameter_snapshot.get("station_energy_limit_kwh") if parameter_snapshot else None
+    power_limits = parameter_snapshot.get("station_power_limit_kw") if parameter_snapshot else None
+    interval_hours_raw = parameter_snapshot.get("interval_hours") if parameter_snapshot else None
+    interval_hours = (
+        _finite_float(interval_hours_raw, "interval_hours")
+        if interval_hours_raw is not None
+        else 1.0
+    )
     valid_energy_limits = (
-        isinstance(energy_limits, Sequence)
-        and len(energy_limits) == num_stations
-        and all(isinstance(row, Sequence) and len(row) >= num_periods for row in energy_limits)
+        isinstance(power_limits, Sequence)
+        and len(power_limits) == num_stations
+        and all(isinstance(row, Sequence) and len(row) >= num_periods for row in power_limits)
+    )
+    # 站级上限为功率 (kW)；能量口径统计需换算为逐区间能量上限 (kWh)。
+    energy_limits = (
+        [
+            [float(limit) * interval_hours for limit in row]
+            for row in power_limits
+        ]
+        if valid_energy_limits
+        else None
     )
     initial_slot_soc = station_parameters.get("initial_slot_soc") if isinstance(station_parameters, Mapping) else None
     valid_initial_soc = (
@@ -1089,7 +1104,7 @@ def build_result_statistics(
         )
         if valid_energy_limits:
             limits = [
-                _finite_float(energy_limits[station][period], "station_energy_limit_kwh")
+                _finite_float(energy_limits[station][period], "station_power_limit_kw")
                 for period in range(num_periods)
             ]
             ratios = [
@@ -1171,7 +1186,7 @@ def build_result_statistics(
         period_row["max_wait_hours"] = wait_stats["max"]
         if valid_energy_limits:
             limit = sum(
-                _finite_float(energy_limits[station][period], "station_energy_limit_kwh")
+                _finite_float(energy_limits[station][period], "station_power_limit_kw")
                 for station in range(num_stations)
             )
             period_row["energy_limit_kwh"] = limit

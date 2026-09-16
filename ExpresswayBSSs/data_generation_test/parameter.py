@@ -2,10 +2,10 @@
 """
 业务参数模块：高速公路换电站运营 MPC-RL 分层优化的集中参数定义。
 
-本文件对应论文 paper/mian11_fixed.tex 第 2 节的符号定义与 plan.md 第 1 节
+本文件对应论文 paper/main.tex 第 2-3 节的符号定义与 docs/archive/plan_mpc.md 第 1 节
 “业务参数与模拟数据”的要求，集中保存后续候选网络生成
 (candidate_network.py)、模拟数据生成 (rl_data.py)、日前计划
-(dayahead_plan.py)、MPC 模型 (mpc_model.py) 与滚动执行 (run_mpc.py)
+(dayahead_plan.py)、MPC 模型 (src/paper_mpc.py) 与滚动执行 (run_mpc.py)
 所需的全部业务参数。
 
 内容概览
@@ -22,7 +22,7 @@
    - ``travel_time_hours`` / ``travel_periods``：行驶时间 tau_{p,i} 及
      仅为兼容旧代码保留的时段折算；
    - ``interval_hours``、``max_wait_hours`` 和逐站逐区间
-     ``station_energy_limit_kwh``：连续事件内核的时间与能量参数；
+     ``station_power_limit_kw``：连续事件内核的时间与功率参数；
    - ``soc_bin``：按入口 SOC 查询所属离线分档（对应论文候选网络分档）；
    - ``reservation_failure_penalty``：每次预约换电未能由站内满电库存履约
      时计入的违约成本，使随机需求预测或功率轨迹不再把模型推入不可行。
@@ -37,8 +37,8 @@
 - 2 个 O-D 对，入口均在 0 km，出口分别在 430 km 和 680 km：
   O-D 0 覆盖站 0--3，O-D 1 覆盖站 0--5；
 - SOC 分档 [0.30,0.50)、[0.50,0.75)、[0.75,1.00]，出口最低 SOC 0.10；
-- 充电效率 0.95，单槽功率上限 60 kW；每站每区间充电能量上限 240 kWh，
-  不施加新的站级瞬时功率上限；
+- 充电效率 0.95，单槽功率上限 60 kW；站级总功率上限 240 kW
+  （论文中为每站常数，代码保留逐区间取值作为超集）；
 - 分时电价为 12 个时段的 synthetic 表，换电服务价 1.2 元/kWh
   （各站各时段相同）；
 - 路径调整惩罚 kappa = 50，终端价值权重 beta = 1.0，
@@ -109,15 +109,6 @@ class StationParameters:
     slot_power_limit_kw: float = 60.0  # 单槽充电功率上限 \bar P_i (kW)
     charging_efficiency: float = 0.95  # 充电效率 eta_i
 
-    @property
-    def station_power_limit_kw(self) -> float:
-        """旧调用的只读兼容值（不再代表物理瞬时功率约束）。
-
-        新代码必须使用 ``BusinessParameters.station_energy_limit_kwh``。
-        此属性只在迁移期支撑尚未切换的旧模块；它不是可配置字段，也不
-        应被用于新增约束。
-        """
-        return 240.0
 
 
 @dataclass
@@ -175,8 +166,9 @@ class BusinessParameters:
     # ---- 价格（[站点][时段] 二维列表，单位：金额/电量） ----
     electricity_price: List[List[float]] = field(default_factory=list)  # e_{i,q}
     swap_service_price: List[List[float]] = field(default_factory=list)  # pi^sw_{i,q}
-    # 每站每外层区间充电电量上限 (kWh)，替代旧的站级瞬时功率上限。
-    station_energy_limit_kwh: List[List[float]] = field(default_factory=list)
+    # 站级总功率上限 \bar P_i (kW)：约束为 sum_b P_{i,b,q} <= \bar P_i。
+    # 论文中为每站常数；代码保留 [站点][时段] 逐区间取值作为超集。
+    station_power_limit_kw: List[List[float]] = field(default_factory=list)
 
     # ---- 目标函数系数 ----
     path_adjustment_penalty: float = 1.0  # 路径调整惩罚 kappa > 0
@@ -193,20 +185,6 @@ class BusinessParameters:
     data_source: str = "synthetic"
     generator_version: str = "six-station-synthetic-v2"
     solver: SolverParameters = field(default_factory=SolverParameters)
-
-    @property
-    def delta_hours(self) -> float:
-        """迁移兼容别名；新代码请使用 :attr:`interval_hours`。"""
-        return self.interval_hours
-
-    @delta_hours.setter
-    def delta_hours(self, value: float) -> None:
-        self.interval_hours = value
-
-    @property
-    def full_soc_tolerance(self) -> float:
-        """旧模型兼容常量；连续事件实现不得依赖它。"""
-        return 1e-6
 
     # ------------------------------------------------------------------
     # 校验
@@ -352,21 +330,21 @@ class BusinessParameters:
                 if any(p < 0 for p in row):
                     raise ValueError(f"{name}[{i}] 存在负数价格")
 
-        if len(self.station_energy_limit_kwh) != st.num_stations:
+        if len(self.station_power_limit_kw) != st.num_stations:
             raise ValueError(
-                "station_energy_limit_kwh 行数 "
-                f"{len(self.station_energy_limit_kwh)} 与 "
+                "station_power_limit_kw 行数 "
+                f"{len(self.station_power_limit_kw)} 与 "
                 f"num_stations={st.num_stations} 不一致"
             )
-        for i, row in enumerate(self.station_energy_limit_kwh):
+        for i, row in enumerate(self.station_power_limit_kw):
             if len(row) != self.num_periods:
                 raise ValueError(
-                    f"station_energy_limit_kwh[{i}] 长度 {len(row)} 与 "
+                    f"station_power_limit_kw[{i}] 长度 {len(row)} 与 "
                     f"num_periods={self.num_periods} 不一致"
                 )
             if any(limit <= 0.0 for limit in row):
                 raise ValueError(
-                    f"station_energy_limit_kwh[{i}] 必须全部为正数"
+                    f"station_power_limit_kw[{i}] 必须全部为正数"
                 )
 
         if self.path_adjustment_penalty <= 0:
@@ -519,22 +497,9 @@ class BusinessParameters:
             / (self.station.charging_efficiency * self.interval_hours)
         )
 
-    def full_power_tolerance_kw(self, station_index: int = 0) -> float:
-        """迁移兼容接口；连续事件实现不得调用该容差补足逻辑。
-
-        station_index 保留给未来逐站效率差异；当前各站效率相同。actor 的
-        请求动作需在单槽和站级上限内为该补足量预留裕量，MPC 才能在不
-        超过物理功率上限的前提下把容差内的缺口补至 SOC 1。
-        """
-        return (
-            self.battery_capacity_kwh
-            * self.full_soc_tolerance
-            / (self.station.charging_efficiency * self.interval_hours)
-        )
-
-    def station_energy_limit_at(self, station_index: int, period: int) -> float:
-        """返回站点在指定外层区间的充电能量上限（kWh）。"""
-        return self.station_energy_limit_kwh[station_index][period]
+    def station_power_limit_at(self, station_index: int, period: int) -> float:
+        """返回站点在指定外层区间的站级总功率上限（kW）。"""
+        return self.station_power_limit_kw[station_index][period]
 
     def electricity_price_at(self, station_index: int, period: int) -> float:
         """站点 station_index 在时段 period 的购电价格 e_{i,q}。"""
@@ -556,20 +521,24 @@ class BusinessParameters:
         """由 to_dict 生成的字典重建参数对象。"""
         payload = dict(data)
         station_data = dict(payload["station"])
-        # 旧 schema 的该字段曾被当作站级瞬时功率上限；新 schema 不再
-        # 读取它。这里仅保证已有 JSON 能被明确地迁移为能量上限。
-        legacy_station_power = station_data.pop("station_power_limit_kw", 240.0)
-        if "interval_hours" not in payload and "delta_hours" in payload:
-            payload["interval_hours"] = payload.pop("delta_hours")
-        payload.pop("full_soc_tolerance", None)
-        interval_hours = float(payload.get("interval_hours", 1.0))
-        if "station_energy_limit_kwh" not in payload:
-            count = int(station_data.get("num_stations", 0))
-            periods = int(payload.get("num_periods", 0))
-            payload["station_energy_limit_kwh"] = [
-                [float(legacy_station_power) * interval_hours for _ in range(periods)]
-                for _ in range(count)
-            ]
+        # 兼容旧 JSON：station_energy_limit_kwh（每区间能量上限 kWh）已改为
+        # station_power_limit_kw（站级功率上限 kW），旧值需除以 interval_hours。
+        legacy_limits = payload.pop("station_energy_limit_kwh", None)
+        if "station_power_limit_kw" not in payload:
+            interval_hours = float(payload.get("interval_hours", 1.0))
+            if legacy_limits is not None:
+                payload["station_power_limit_kw"] = [
+                    [float(value) / interval_hours for value in row]
+                    for row in legacy_limits
+                ]
+            else:
+                # 缺省时补默认站级功率上限（与 get_default_parameters 一致）。
+                count = int(station_data.get("num_stations", 0))
+                periods = int(payload.get("num_periods", 0))
+                payload["station_power_limit_kw"] = [
+                    [240.0 for _ in range(periods)]
+                    for _ in range(count)
+                ]
         station = StationParameters(**station_data)
         od_pairs = [ODPairParameters(**od) for od in payload["od_pairs"]]
         solver = SolverParameters(**payload["solver"])
@@ -627,8 +596,8 @@ def get_default_parameters() -> BusinessParameters:
         swap_service_price=[
             [1.2] * num_periods for _ in range(station.num_stations)
         ],
-        station_energy_limit_kwh=[
-            [240.0 * interval_hours] * num_periods
+        station_power_limit_kw=[
+            [240.0] * num_periods
             for _ in range(station.num_stations)
         ],
         max_wait_hours=0.25,
@@ -665,13 +634,10 @@ def _print_summary(params: BusinessParameters) -> None:
         f"车速 {params.vehicle_speed_kmh} km/h，续航 {params.range_km} km，"
         f"电池容量 {params.battery_capacity_kwh} kWh"
     )
-    print(
-        f"SOC 分档: {params.soc_bins}，出口最低 SOC = {params.min_exit_soc}，"
-        f"满电容差 = {params.full_soc_tolerance}"
-    )
+    print(f"SOC 分档: {params.soc_bins}，出口最低 SOC = {params.min_exit_soc}")
     print(
         f"充电效率 {st.charging_efficiency}，单槽功率上限 {st.slot_power_limit_kw} kW，"
-        f"站级功率上限 {st.station_power_limit_kw} kW"
+        f"站级总功率上限 {params.station_power_limit_kw[0][0]} kW"
     )
     print(f"分时电价 (站0): {params.electricity_price[0]}")
     print(f"换电服务价 (站0): {params.swap_service_price[0]} 元/kWh")

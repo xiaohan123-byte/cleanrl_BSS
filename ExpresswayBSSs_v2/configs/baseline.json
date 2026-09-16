@@ -1,0 +1,179 @@
+{
+  "num_periods": 144,
+  "interval_hours": 0.08333333333333333,
+  "horizon": 48,
+  "path_update_interval": 3,
+  "station": {
+    "num_stations": 6,
+    "station_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "positions_km": [
+      80,
+      180,
+      280,
+      380,
+      480,
+      580
+    ],
+    "num_slots": 5,
+    "initial_slot_soc": [
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ],
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ],
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ],
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ],
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ],
+      [
+        1,
+        0.9,
+        0.6,
+        0.4,
+        0.2
+      ]
+    ],
+    "charging_efficiency": 0.95,
+    "slot_power_limits_kw": [
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ],
+      [
+        60,
+        60,
+        60,
+        60,
+        60
+      ]
+    ],
+    "station_power_limits_kw": [
+      240,
+      240,
+      240,
+      240,
+      240,
+      240
+    ]
+  },
+  "od_pairs": [
+    {
+      "od_id": 0,
+      "entry_km": 0,
+      "exit_km": 430,
+      "station_indices": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "od_id": 1,
+      "entry_km": 0,
+      "exit_km": 680,
+      "station_indices": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "vehicle_speed_kmh": 75,
+  "range_km": 300,
+  "battery_capacity_kwh": 100,
+  "min_exit_soc": 0.1,
+  "min_swap_spacing_km": 100,
+  "max_wait_hours": 0.25,
+  "path_adjustment_penalty": 1,
+  "reservation_failure_penalty": 1000,
+  "num_reservations": 6,
+  "reservation_entry_window_hours": 2.0,
+  "reservation_entry_soc_range": [
+    0.3,
+    1.0
+  ],
+  "random_arrival_rate_per_hour": [
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2,
+    0.2
+  ],
+  "seed": 42,
+  "solver": {
+    "threads": 1,
+    "time_limit_sec": 30,
+    "output_flag": 0,
+    "mip_gap": 0,
+    "feasibility_tol": 1e-08
+  }
+}

@@ -1,0 +1,3 @@
+Restored objective and constraints (1)-(2) from optimization-revision/main_new.before.tex.
+Local adjustments: retain y,z optimization domain; zero-income convention for unserved requests; preserve acyclic network and fixed waiting arc; connect rho_r to rho_A; state binary d and positive adjustment cost; fix service-price superscript.
+Removed duplicate critic display from RL section; all other text outside the restored section is unchanged.

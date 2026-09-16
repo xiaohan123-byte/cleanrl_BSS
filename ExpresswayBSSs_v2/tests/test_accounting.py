@@ -1,114 +1,89 @@
-from __future__ import annotations
-
 import unittest
+from copy import deepcopy
 
 from src.accounting import (
-    DuplicateLedgerEventError,
-    RealizedLedger,
-    UnsupportedLedgerEventError,
+    DuplicateLedgerEventError, LedgerError, UnsupportedLedgerEventError,
+    append_events, event_components, summarize_ledger,
 )
-from src.domain import LedgerEntry, LedgerEventType
-from src.time_grid import TimeGrid
+from src.parameters import BusinessParameters
 
 
-class RealizedLedgerTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.ledger = RealizedLedger(
-            TimeGrid(1.0, num_intervals=3),
-            energy_price=[2.0, 3.0, 4.0],
-            reservation_service_price=[10.0, 11.0, 12.0],
-            random_service_price=[5.0, 6.0, 7.0],
-            reservation_failure_penalty=13.0,
-        )
+class AccountingTests(unittest.TestCase):
+    def setUp(self):
+        self.p = BusinessParameters(num_periods=4, horizon=2)
 
-    def test_carried_service_is_booked_at_service_interval(self) -> None:
-        entry = LedgerEntry(
-            event_id="service:carried",
-            event_type=LedgerEventType.RESERVATION_SERVICE,
-            occurred_at=1.2,
-            interval=1,
-            arrival_time=0.8,
-        )
-        posting = self.ledger.submit(entry)
-        self.assertEqual(posting.income_reservation, 11.0)
-        self.assertEqual(self.ledger.reward_for_interval(1), 11.0)
+    def service(self, request="R", period=0):
+        return dict(event_id=f"service:{request}", type="random_service", period=period,
+                    time=period * self.p.interval_hours, request_id=request, station=0, slot=0,
+                    return_soc=.25, energy_kwh=75., unit_price=self.p.swap_service_price[0][period],
+                    arrival_time=0., deadline=.25, realized=True)
 
-    def test_charge_cost_and_timeout_wait_are_realised_once(self) -> None:
-        charge = LedgerEntry(
-            event_id="charge:0",
-            event_type=LedgerEventType.CHARGING,
-            occurred_at=1.0,
-            interval=0,
-            energy_kwh=3.0,
-        )
-        timeout = LedgerEntry(
-            event_id="timeout:r",
-            event_type=LedgerEventType.RESERVATION_TIMEOUT,
-            occurred_at=0.25,
-            interval=0,
-            arrival_time=0.0,
-            deadline=0.25,
-            metadata={"wait_hours": 0.25},
-        )
-        self.ledger.submit(charge)
-        self.ledger.submit(timeout)
-        parts = self.ledger.components_for_interval(0)
-        self.assertEqual(parts["charging_cost"], 6.0)
-        self.assertEqual(parts["reservation_failure_cost"], 13.0)
-        self.assertEqual(parts["reward_delta"], -19.0)
-        with self.assertRaises(DuplicateLedgerEventError):
-            self.ledger.submit(timeout)
+    def test_revenue_and_grid_energy_cost_are_independent(self):
+        service = self.service()
+        charging = dict(event_id="charging:0:0:0", type="charging", period=0, time=0.,
+                        station=0, slot=0, power_kw=60., energy_kwh=5., unit_price=.35,
+                        start_soc=.25, end_soc=.2975, realized=True)
+        ledger = []
+        reward = append_events(self.p, ledger, [service, charging])
+        self.assertAlmostEqual(reward, 90. - 1.75)
+        self.assertAlmostEqual(summarize_ledger(ledger)["grid_energy_kwh"], 5.)
 
-    def test_prediction_only_quantities_are_rejected(self) -> None:
+    def test_actual_service_uses_service_period_price(self):
+        self.p.swap_service_price[0][1] = 2.
+        components = event_components(self.p, self.service(period=1))
+        self.assertEqual(components["income_random"], 150.)
+
+    def test_prediction_and_tampered_financials_are_rejected(self):
+        event = self.service()
+        event["realized"] = False
         with self.assertRaises(UnsupportedLedgerEventError):
-            self.ledger.submit(
-                {
-                    "event_id": "pending:x",
-                    "event_type": "pending_at_horizon",
-                    "occurred_at": 0.0,
-                    "interval": 0,
-                }
-            )
+            event_components(self.p, event)
+        for field, wrong in (("energy_kwh", 76.), ("unit_price", 9.), ("reward_delta", 500.)):
+            event = self.service()
+            event[field] = wrong
+            with self.assertRaises(LedgerError):
+                event_components(self.p, event)
 
-    def test_station_time_price_and_service_energy_factor(self) -> None:
-        ledger = RealizedLedger(
-            TimeGrid(1.0, num_intervals=3),
-            energy_price=[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]],
-            reservation_service_price=[[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]],
-            battery_capacity_kwh=100.0,
-        )
-        service = LedgerEntry(
-            event_id="service:station-1",
-            event_type=LedgerEventType.RESERVATION_SERVICE,
-            occurred_at=1.2,
-            interval=1,
-            station=1,
-            metadata={"return_soc": 0.2},
-        )
-        charge = LedgerEntry(
-            event_id="charge:station-1",
-            event_type=LedgerEventType.CHARGING,
-            occurred_at=2.0,
-            interval=1,
-            station=1,
-            energy_kwh=3.0,
-        )
-        self.assertEqual(ledger.submit(service).income_reservation, 40.0)
-        self.assertEqual(ledger.submit(charge).charging_cost, 15.0)
+    def test_duplicate_submission_is_atomic(self):
+        ledger = []
+        with self.assertRaises(DuplicateLedgerEventError):
+            append_events(self.p, ledger, [self.service(), self.service()])
+        self.assertEqual(ledger, [])
+        append_events(self.p, ledger, [self.service()])
+        copied = self.service()
+        copied["event_id"] = "different-id-same-service"
+        with self.assertRaises(DuplicateLedgerEventError):
+            append_events(self.p, ledger, [copied])
 
-    def test_path_publication_uses_configured_adjustment_cost(self) -> None:
-        ledger = RealizedLedger(
-            TimeGrid(1.0, num_intervals=1), path_adjustment_cost=17.5
-        )
-        publication = LedgerEntry(
-            event_id="publish:1:7:0",
-            event_type=LedgerEventType.PATH_PUBLISHED,
-            occurred_at=0.0,
-            interval=0,
-            metadata={"path_changed": True},
-        )
-        self.assertEqual(ledger.submit(publication).adjustment_cost, 17.5)
+    def test_failure_penalty_is_once_per_reservation(self):
+        first = dict(event_id="timeout:A:0:0:0", type="reservation_failure", period=0,
+                     time=.02, user_key="0:0", request_id="A:0:0:0", realized=True)
+        ledger = []
+        append_events(self.p, ledger, [first])
+        second = deepcopy(first)
+        second.update(event_id="timeout:A:0:0:1", request_id="A:0:0:1")
+        with self.assertRaises(DuplicateLedgerEventError):
+            append_events(self.p, ledger, [second])
+        self.assertEqual(summarize_ledger(ledger)["reservation_failure_cost"], self.p.reservation_failure_penalty)
+
+    def test_served_and_timed_out_outcomes_are_mutually_exclusive(self):
+        ledger = []
+        append_events(self.p, ledger, [self.service()])
+        timeout = dict(event_id="timeout:R", type="random_timeout", period=0,
+                       time=.02, request_id="R", station=0, realized=True)
+        with self.assertRaises(DuplicateLedgerEventError):
+            append_events(self.p, ledger, [timeout])
+        ledger = []
+        append_events(self.p, ledger, [timeout])
+        with self.assertRaises(DuplicateLedgerEventError):
+            append_events(self.p, ledger, [self.service()])
+
+    def test_returned_battery_soc_must_be_strictly_below_full(self):
+        event = self.service()
+        event["return_soc"] = 1.
+        with self.assertRaises(LedgerError):
+            event_components(self.p, event)
 
 
-if __name__ == "__main__":  # pragma: no cover
+if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
-"""Canonical continuous-time interval helpers.
+"""Time helpers for discrete decisions and continuously observed arrivals.
 
-The online executor, reference rollout, and optimisation model all need the
+The online executor, request builder, and optimisation model all need the
 same boundary convention: an interval is ``[start(q), end(q))``.  In
 particular, an event at the prediction end belongs to the next rolling round.
 This module intentionally keeps that rule small and explicit rather than
@@ -106,6 +106,12 @@ class TimeGrid:
         relative = (t - self.origin) / self.interval_hours
         # ``int`` truncates toward zero; the precondition above makes it floor.
         q = int(relative)
+        # Compare actual boundary values to correct division roundoff, without
+        # snapping a real event from just before a boundary into the next period.
+        while self.origin + (q + 1) * self.interval_hours <= t:
+            q += 1
+        while self.origin + q * self.interval_hours > t:
+            q -= 1
         if self.num_intervals is not None and q >= self.num_intervals:
             raise TimeGridError(f"time {t} is at or after the configured grid end")
         return q
@@ -156,7 +162,7 @@ class TimeGrid:
     def current_event_upper_bound(self, t_end: float) -> float:
         """Return the strict current-window supremum for model-side bounds.
 
-        Continuous execution uses a half-open set, so there is no finite
+        Continuous arrival time uses a half-open set, so there is no finite
         largest valid real number.  Returning the endpoint itself lets callers
         formulate ``t < t_end`` directly (or use a solver's strict-equivalent
         guard) without inventing a broad, behaviour-changing time margin.

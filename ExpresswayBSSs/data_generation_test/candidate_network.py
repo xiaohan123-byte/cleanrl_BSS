@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-离线候选网络模块：论文 2.2.2 节“基于 SOC 分档的离线候选网络”的实现。
+离线候选网络模块：论文 3.1 节“Offline Candidate networks by SOC Range”的实现。
 
-对应论文 paper/mian11_fixed.tex 第 189-213 行（2.2.2 节）与 plan.md
+对应论文 paper/main.tex 第 153-177 行（3.1 节）与 docs/archive/plan_mpc.md
 第 29-40 行的要求。本模块仅使用 Python 标准库。
 
 内容概览
@@ -14,7 +14,7 @@
 生成候选弧集 A^{h,p} 及其完整路径列表。在线使用时，再以用户的精确入口
 SOC 对所在分档的离线弧集（超集）做过滤，得到个体可行弧集 A^{p,k}。
 
-算法步骤（论文 Step 1-4 加 plan.md 一致性约束）
+算法步骤（论文 Step 1-4 加 docs/archive/plan_mpc.md 一致性约束）
 ---------------------------------------------
 对每个 O-D 对 p（节点集 V^p = {o^p} ∪ S^p ∪ {d^p}，入口 "entry"、出口
 "exit"、换电站为整数站点索引）和每个 SOC 分档 h = [lo, hi]：
@@ -23,7 +23,7 @@ SOC 对所在分档的离线弧集（超集）做过滤，得到个体可行弧�
   * 入口弧 o→j（j 为换电站）：若 hi - v(o,j) >= 0（能到达）；
   * 站间弧 i→j（i 在 j 上游）：若 v(i,j) <= 1（换电后满电 1 出发）；
   * 站→出口弧 i→d：若 v(i,d) + min_exit_soc <= 1；
-  * 入口直达出口弧 o→d（plan.md 一致性约束）：若 hi - v(o,d) >=
+  * 入口直达出口弧 o→d（docs/archive/plan_mpc.md 一致性约束）：若 hi - v(o,d) >=
     min_exit_soc。
 - Step 2 枚举完整路径：用标准库 DFS 枚举原始网络中全部 o→d 完整路径；
   邻接节点按（位置 km，节点字符串）升序，保证枚举顺序确定。
@@ -31,7 +31,7 @@ SOC 对所在分档的离线弧集（超集）做过滤，得到个体可行弧�
   的弧（入口--首站弧和站间弧；指向出口的末段弧不受约束），按距离升序
   （并列按弧端点位置、节点字符串固定排序）依次考察：试探删除该弧后，
   若剩余弧中仍存在至少一条对分档下界 lo 用户可行的完整 o→d 路径，
-  则删除之，否则保留。由此同时保证论文“存在不含该弧的方案”与 plan.md
+  则删除之，否则保留。由此同时保证论文“存在不含该弧的方案”与 docs/archive/plan_mpc.md
   “下界用户仍保有完整路径”两个条件（下界可行的路径对档内任意 SOC 均
   可行）。
 - Step 4 形成候选网络：在剪枝后的弧集上重新枚举全部完整路径，将这些
@@ -281,7 +281,7 @@ def generate_candidate_network(params: BusinessParameters) -> dict:
                 v = params.soc_consumption(od_index, ENTRY_NODE, j)
                 if soc_hi - v >= -_EPS:
                     raw_arcs.append((ENTRY_NODE, j))
-            # 入口 → 出口直达弧（plan.md 一致性约束）：
+            # 入口 → 出口直达弧（docs/archive/plan_mpc.md 一致性约束）：
             # soc_hi - v(o,d) >= min_exit_soc
             v_od = params.soc_consumption(od_index, ENTRY_NODE, EXIT_NODE)
             if soc_hi - v_od >= min_exit - _EPS:

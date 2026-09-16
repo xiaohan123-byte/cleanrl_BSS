@@ -1,0 +1,100 @@
+{
+  "unit_tests": {
+    "passed": 88,
+    "command": "python -m unittest discover -s tests -q"
+  },
+  "environment": {
+    "python": "3.10.19",
+    "numpy": "2.2.6",
+    "gurobi": [
+      13,
+      0,
+      2
+    ]
+  },
+  "full_run": {
+    "command": "python run_mpc.py --time-limit 2 --output outputs/validation_run.json",
+    "stations": 6,
+    "periods": 144,
+    "prediction_periods": 48,
+    "period_minutes": 5.0,
+    "statuses": {
+      "optimal": 99,
+      "time_limit": 45
+    },
+    "max_mip_gap": 0.12619095969275618,
+    "solver_time_limit_seconds": 2,
+    "default_solver_time_limit_seconds": 30
+  },
+  "checks": {
+    "ledger_unique": true,
+    "financial_components_reconciled": true,
+    "prices_and_energy_reconciled": true,
+    "inventory_reconciled": true,
+    "station_power_limits_satisfied": true
+  },
+  "actual_summary": {
+    "income_reservation": 1378.26898964868,
+    "income_random": 972.5727079958301,
+    "charging_cost": 530.9401021657025,
+    "adjustment_cost": 22.0,
+    "reservation_failure_cost": 0.0,
+    "reward_delta": 1797.9015954788076,
+    "total_reward": 1797.9015954788076,
+    "income": 2350.84169764451,
+    "reservation_services": 15,
+    "random_services": 11,
+    "reservation_failures": 0,
+    "random_timeouts": 2,
+    "path_adjustments": 22,
+    "grid_energy_kwh": 1206.263762737655,
+    "ledger_event_count": 4410,
+    "completed_reservations": 6,
+    "active_reservations": 0,
+    "pending_requests": 0,
+    "solve_seconds": 118.96500062942505
+  },
+  "archive": "../archives/ExpresswayBSSs_v2_pre_baseline_20260912_164355",
+  "paper_written_by_this_task": false,
+  "concurrent_paper_updates_preserved": true,
+  "default_run": {
+    "command": "python run_mpc.py",
+    "periods": 144,
+    "stations": 6,
+    "prediction_periods": 48,
+    "solver_time_limit_seconds": 30,
+    "statuses": {
+      "optimal": 131,
+      "time_limit": 13
+    },
+    "max_mip_gap": 0.02242668175355105,
+    "checks": {
+      "ledger_unique": true,
+      "financial_components_reconciled": true,
+      "prices_and_energy_reconciled": true,
+      "inventory_reconciled": true,
+      "station_power_limits_satisfied": true
+    },
+    "actual_summary": {
+      "income_reservation": 1378.2689896486797,
+      "income_random": 879.9523569935707,
+      "charging_cost": 521.5448503270118,
+      "adjustment_cost": 23.0,
+      "reservation_failure_cost": 0.0,
+      "reward_delta": 1713.6764963152389,
+      "total_reward": 1713.6764963152389,
+      "income": 2258.2213466422504,
+      "reservation_services": 15,
+      "random_services": 10,
+      "reservation_failures": 0,
+      "random_timeouts": 3,
+      "path_adjustments": 23,
+      "grid_energy_kwh": 1188.100520685313,
+      "ledger_event_count": 4411,
+      "completed_reservations": 6,
+      "active_reservations": 0,
+      "pending_requests": 0,
+      "solve_seconds": 685.5999999046326
+    }
+  }
+}

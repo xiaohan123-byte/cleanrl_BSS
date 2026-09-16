@@ -8,7 +8,7 @@ import unittest
 from data_generation_test.parameter import get_default_parameters
 from data_generation_test.rl_data import RLSignals
 from src.domain import CandidateRequest, RollingState, SlotState
-from src.mpc_model import EventMPCWindowInput, MPCController
+from src.paper_mpc import EventMPCWindowInput, MPCController
 
 
 def _params():
@@ -68,7 +68,7 @@ class EventMPCReplayTests(unittest.TestCase):
             deadline=1.0,
             return_soc=0.3,
         )
-        controller = MPCController(params, candidate_network={})
+        controller = MPCController(params)
         result = controller.solve_step(
             EventMPCWindowInput(
                 params=params,
@@ -111,7 +111,7 @@ class EventMPCReplayTests(unittest.TestCase):
             deadline=0.35,
             return_soc=0.4,
         )
-        controller = MPCController(params, candidate_network={})
+        controller = MPCController(params)
         result = controller.solve_step(
             EventMPCWindowInput(
                 params=params,

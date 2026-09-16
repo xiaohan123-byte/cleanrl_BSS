@@ -122,9 +122,9 @@ def _simulation_engine(params: BusinessParameters, grid: TimeGrid) -> Continuous
     # out-of-day intervals retain their physical service/deadline semantics but
     # have no fabricated charging allowance or price signal.
     total_intervals = grid.num_intervals or params.num_periods
-    energy_limits = [
+    power_limits = [
         [
-            params.station_energy_limit_kwh[station][period]
+            params.station_power_limit_kw[station][period]
             if period < params.num_periods
             else 0.0
             for period in range(total_intervals)
@@ -137,7 +137,7 @@ def _simulation_engine(params: BusinessParameters, grid: TimeGrid) -> Continuous
         charging_efficiency=params.station.charging_efficiency,
         max_wait_hours=params.max_wait_hours,
         slot_power_limit_kw=params.station.slot_power_limit_kw,
-        station_energy_limit_kwh=energy_limits,
+        station_power_limit_kw=power_limits,
     )
 
 
@@ -283,10 +283,10 @@ def simulate_dayahead_inventory(
             ready_count = sum(
                 1 for cell in row if cell.ready and cell.soc >= 1.0 - _EPS
             )
-            # These legacy-named diagnostics now mean the state at the
-            # interval's right limit.  Continuous service may recharge again
-            # after a reservation, so an old single interior snapshot would be
-            # misleading; the full event log above is authoritative.
+            # These diagnostics record the state at the interval's right
+            # limit.  Continuous service may recharge again after a
+            # reservation, so a single interior snapshot would be misleading;
+            # the full event log above is authoritative.
             full_after_reservation[station][period] = ready_count
             full_after_random[station][period] = ready_count
             slot_soc_end[station][period] = [cell.soc for cell in row]

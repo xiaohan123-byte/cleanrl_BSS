@@ -1,0 +1,3 @@
+现在工作的主要目标是修改ExpresswayBSSs_v2\paper_v2\sections\03_model.tex和ExpresswayBSSs_v2\paper_v2\sections\04_terminal_value_learning.tex。
+
+论文的其余部分和代码部分暂时不查看也不改动。以后再统一修改

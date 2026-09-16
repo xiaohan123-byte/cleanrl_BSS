@@ -1,63 +1,40 @@
-from __future__ import annotations
-
+import json
 import unittest
-
-from src.domain import (
-    CandidateRequest,
-    PhysicalRequestStatus,
-    RequestKind,
-    RollingState,
-    SlotState,
-    WaitingRequest,
-)
-
+from src.domain import DomainError, Reservation, RollingState, WaitingRequest
 
 class DomainStateTest(unittest.TestCase):
-    def test_json_round_trip_preserves_deadline_and_queue_order(self) -> None:
-        state = RollingState(
-            now=1.0,
-            slots=[[SlotState(0, 0, 0.4, last_update_time=1.0)]],
-        )
-        later = WaitingRequest(
-            request_id="later",
-            kind=RequestKind.RANDOM,
-            station=0,
-            arrival_time=0.8,
-            deadline=1.3,
-            return_soc=0.2,
-        )
-        earlier = WaitingRequest(
-            request_id="earlier",
-            kind=RequestKind.RANDOM,
-            station=0,
-            arrival_time=0.7,
-            deadline=1.2,
-            return_soc=0.3,
-        )
-        state.add_waiting(later)
-        state.add_waiting(earlier)
-        state.request_status[earlier.event_id] = PhysicalRequestStatus.WAITING
+    def test_round_trip_preserves_request_id_deadline_and_distinct_plans(self):
+        r = WaitingRequest('A:0:3:0', 0, 'reservation', .03, .28, .2, (0, 3))
+        user = Reservation((0,3), 0, .6, 20, .2, True,
+                           day_ahead=[0,1], retained_plan=[1],
+                           published_plan=[0,1], waiting_request_id=r.request_id)
+        state = RollingState(2, [[1,.4]], {'0:3':user}, {r.request_id:r})
+        restored = RollingState.from_dict(json.loads(json.dumps(state.to_dict())))
+        self.assertEqual(restored.waiting[r.request_id].deadline, .28)
+        self.assertEqual(restored.users['0:3'].day_ahead, [0,1])
+        self.assertEqual(restored.users['0:3'].retained_plan, [1])
+        self.assertEqual(restored.users['0:3'].published_plan, [0,1])
+        restored.users['0:3'].retained_plan.clear()
+        self.assertEqual(state.users['0:3'].retained_plan,[1])
 
-        restored = RollingState.from_dict(state.to_dict())
-        queue = restored.queue_for(0, RequestKind.RANDOM)
-        self.assertEqual([item.request_id for item in queue], ["earlier", "later"])
-        self.assertEqual([item.deadline for item in queue], [1.2, 1.3])
-        self.assertEqual(restored.to_dict(), state.to_dict())
+    def test_return_soc_must_be_strictly_below_one(self):
+        with self.assertRaises(DomainError):
+            WaitingRequest('bad',0,'random',0,.25,1)
 
-    def test_reservation_candidate_uses_stable_path_event_id(self) -> None:
-        candidate = CandidateRequest(
-            request_id="r-7",
-            kind=RequestKind.RESERVATION,
-            station=3,
-            arrival_time=2.0,
-            deadline=2.25,
-            return_soc=0.4,
-            user_key=(1, 7),
-            path_order=2,
-        )
-        self.assertEqual(candidate.event_id, "reservation:1:7:2:3")
-        self.assertEqual(candidate.to_waiting_request().event_id, candidate.event_id)
+    def test_waiting_request_cannot_be_orphaned(self):
+        state = RollingState(0,[[1]],waiting={'a':WaitingRequest('a',0,'reservation',0,.25,.2,(0,0))})
+        with self.assertRaises(DomainError):
+            state.validate()
 
-
-if __name__ == "__main__":  # pragma: no cover
-    unittest.main()
+    def test_mutated_physical_records_are_revalidated(self):
+        user = Reservation((0,0),0,.8,0,.8)
+        state = RollingState(0,[[1]],{'0:0':user})
+        user.soc = 1.2
+        with self.assertRaises(DomainError):
+            state.validate()
+        user.soc = .8
+        request = WaitingRequest('random',0,'random',0,.25,.2)
+        state.waiting['random'] = request
+        request.deadline = -.1
+        with self.assertRaises(DomainError):
+            state.validate()

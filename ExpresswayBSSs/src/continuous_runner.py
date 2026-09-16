@@ -31,8 +31,10 @@ from src.domain import (
 )
 from src.event_engine import ContinuousEventEngine
 from src.event_path_search import EventPathSearchError, build_path_options
-from src.mpc_model import EventMPCResult, EventMPCWindowInput, MPCController
 from src.paper_mpc import (
+    EventMPCResult,
+    EventMPCWindowInput,
+    MPCController,
     PaperMPCError,
     PaperMPCNoSolution,
     PaperMPCSolverUnavailable,
@@ -97,7 +99,7 @@ def _engine(params: BusinessParameters, grid: TimeGrid) -> ContinuousEventEngine
         charging_efficiency=params.station.charging_efficiency,
         max_wait_hours=params.max_wait_hours,
         slot_power_limit_kw=params.station.slot_power_limit_kw,
-        station_energy_limit_kwh=params.station_energy_limit_kwh,
+        station_power_limit_kw=params.station_power_limit_kw,
     )
 
 
@@ -760,7 +762,7 @@ def run_continuous_rolling_mpc(
     grid = TimeGrid(params.interval_hours, num_intervals=params.num_periods)
     engine = _engine(params, grid)
     state = _initial_state(params)
-    controller = MPCController(params, dict(network), rl_provider=provider, dayahead_plan=dict(plan))
+    controller = MPCController(params, rl_provider=provider)
     ledger = RealizedLedger(
         grid,
         energy_price=params.electricity_price,
@@ -1047,7 +1049,7 @@ def run_continuous_rolling_mpc(
             "path_source": "gurobi_joint_path_flow",
             "path_search_optimality": "global_when_solver_status_optimal",
             "event_formulation": "complete_station_pattern_extended_milp",
-            "station_energy_limit": "per_station_per_interval_kwh",
+            "station_power_limit": "per_station_per_interval_kw",
         },
         "rounds": rounds,
         "summary": {

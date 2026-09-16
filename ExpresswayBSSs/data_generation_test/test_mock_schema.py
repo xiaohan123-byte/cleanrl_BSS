@@ -34,7 +34,7 @@ class SixStationMockSchemaTest(unittest.TestCase):
         for table_name in (
             "electricity_price",
             "swap_service_price",
-            "station_energy_limit_kwh",
+            "station_power_limit_kw",
         ):
             table = data["parameter_snapshot"][table_name]
             self.assertEqual(len(table), 6)
@@ -81,12 +81,12 @@ class SixStationMockSchemaTest(unittest.TestCase):
         ]
         projected = project_requested_power(self.params, raw, start_period=0)
         for station in range(self.params.station.num_stations):
-            energy = self.params.interval_hours * sum(
+            power = sum(
                 projected[station][slot][0]
                 for slot in range(self.params.station.num_slots)
             )
             self.assertAlmostEqual(
-                energy, self.params.station_energy_limit_at(station, 0)
+                power, self.params.station_power_limit_at(station, 0)
             )
             self.assertTrue(
                 all(

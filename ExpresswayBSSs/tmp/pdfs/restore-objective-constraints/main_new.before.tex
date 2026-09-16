@@ -1,0 +1,634 @@
+% !LW recipe = latexmk (xelatex)
+\documentclass[12pt,a4paper,UTF8]{ctexart}
+\usepackage{SJTUReport}
+\usepackage{booktabs} % 三线表
+\usepackage{amsmath}
+\usepackage{amssymb}
+
+%%-------------------------------正文开始---------------------------%%
+\begin{document}
+
+% %-----------------------封面--------------------%%
+\cover
+
+%------------------摘要-------------%%
+\newpage
+\begin{abstract}
+
+本文研究高速公路换电站网络的实时运营优化，同时考虑预约用户和随机到达用户。长途电动汽车在一次行程中可能多次换电；每次换电取走一块满电电池并退回一块低电量电池，因此，用户选择哪些站点换电会影响沿线各站的电池库存。本文将模型预测控制（MPC）与强化学习（RL）相结合：MPC 决定预约用户依次前往哪些站点换电，并为每次服务选择提供电池的槽位；RL 策略网络给定各槽位的充电功率，价值网络评估预测期末的电池库存和未完成请求对后续净收益的影响。充电功率在每轮 MPC 求解时保持固定，价值网络采用分段线性结构。模型按连续时间描述车辆到站、排队、超时、充电和换电过程。到预测期末仍未超时的等待请求在下一轮继续处理；换电收入、预约失败成本和路径调整成本均在相应事件实际发生时计入一次。
+
+\end{abstract}
+\newpage
+
+\thispagestyle{empty} % 首页不显示页码
+
+%%--------------------------目录页------------------------%%
+\newpage
+\tableofcontents
+
+%%------------------------正文页从这里开始-------------------%
+\newpage
+
+%可选择这里也放一个标题
+\begin{center}
+   \title{ \Huge \textbf{{考虑异质用户的高速公路换电站运营 MPC-RL 分层协同优化}}}
+\end{center}
+
+
+\section{Introduction}
+随着电动汽车在高速公路长途出行中的普及，沿线补能设施的运营能力日益影响用户的出行和道路系统的运行效率。换电可以缩短车辆补能时间，但长途车辆可能需要在一次行程中多次换电。由于车辆沿高速公路单向行驶且不能折返，前一次换电的站点选择会影响后续能够到达的站点，因此，各次换电需要统筹安排。本文将用户依次前往的换电站所构成的路径称为换电路径。
+
+车辆的电池荷电状态（SOC）决定其还能行驶多远，因而影响第一个换电站的选择。每次换电后，车辆获得满电电池；退回的低电量电池则留在站内，充满后才能再次提供给其他用户。由此，一位用户的换电路径既影响自身行程，也会改变沿线各站未来的电池库存，进而影响其他用户能否获得服务。运营者需要根据车辆和站内电池的状态，持续调整换电与充电安排。
+
+实际运营中存在预约用户和随机到达用户。预约用户提前提交预计进入高速公路的时刻、行程起终点和进入时的 SOC，运营者据此决定是否接受预约，并在运营日前发布换电路径。随机到达用户直接到站提出请求，其到达时刻和 SOC 事先只能预测。预约用户的实际到达情况也可能偏离预约信息；车辆进入高速公路后，运营者需要根据其实时位置、SOC 和预计到站时刻调整尚未完成的换电安排。用户到站后若没有满电电池，则在站内等待，超过最长等待时间后离开。此外，分时电价使充电成本随时间变化。因此，运营者既要服务已接受预约的用户和随机到达用户，也要合理安排站内充电。
+
+本文采用模型预测控制（Model Predictive Control, MPC）与强化学习（Reinforcement Learning, RL）相结合的方法，分别处理换电路径和充电功率两类决策。换电路径需要从多个站点组合中选择，并满足车辆续航、道路连接和站内库存等约束；用户状态和需求预测又在不断变化。MPC 在每个决策时刻根据最新信息规划未来一段时间的换电安排，仅执行当前时段的安排，随后重新优化，适合处理这类动态调整问题。
+
+充电功率不仅影响当前购电成本，也决定各站电池何时充满，从而影响未来的服务能力。本文用 RL 学习充电策略，使其根据需求、电价和电池状态选择各槽位的充电功率。如\autoref{fig:MPC-RL}所示，策略网络先给出预测期内的充电功率；MPC 将其作为已知参数，优化用户的换电路径，并决定每次服务使用哪个槽位的电池；价值网络则估计预测期结束后的运营净收益。
+
+\begin{figure}[!htbp]
+  \centering
+  % FIGURE_PROMPT_BEGIN: fig:MPC-RL
+  % 绘制一张适用于运筹优化与智能交通学术论文的 MPC–RL 协同框架图。白色背景，扁平化矢量风格，横向 16:9，配色仅使用深蓝、青绿色、橙色和中性灰，无渐变、阴影、3D 或装饰图标。
+  % 图中从左到右展示：当前各槽位电池 SOC、等待请求的到站和截止时刻、预约用户的位置及预计到站时刻、电价和需求预测；根据已知信息确定用于预测的路径；RL 策略网络逐时段给出充电功率，价值网络评估预测期末状态；MPC 选择用户的换电路径和每次服务使用的电池；当前时段内按实际到站、充满、换电和超时情况执行；计算实际奖励，更新电池状态、等待队列和已告知用户的路径，进入下一轮。
+  % 显示系统每隔固定时间重新决策，而充电与换电按连续时间推进。顺序为先确定用于预测的路径，再用策略网络预测功率，最后求解 MPC。图中文字应直接描述各步骤，不使用正文未定义的简写。模块不超过六个，适合 A4 论文单栏阅读。
+  % FIGURE_PROMPT_END: fig:MPC-RL
+  \fbox{\parbox[c][0.52\textwidth][c]{0.92\textwidth}{%
+    \centering\small Figure placeholder}}
+  \caption{MPC 与 RL 的决策过程及状态更新}
+  \label{fig:MPC-RL}
+\end{figure}
+
+MPC 只直接计算有限预测期内的收益，可能在期末过度消耗满电电池，影响此后的服务。设置期末库存下限可以限制这种行为，但难以同时反映各电池的 SOC 和未来请求到站时刻的差异。本文用预测期结束后的运营净收益训练价值网络，评估期末电池状态和未完成请求的长期影响。尚未完成的请求保留各自的到站时刻和等待截止时刻，只有在实际换电时才消耗满电电池。为便于纳入 MPC，价值网络采用分段线性结构。其参数在每轮求解时固定，输入的期末状态则由本轮的路径选择和电池分配决定。
+
+因此，MPC 负责在运营约束下安排换电，RL 负责确定充电功率并估计预测期后的收益。两者通过站内电池状态和期末价值相互联系，使当前的路径与电池分配决策能够兼顾后续运营。
+
+% CONTRIBUTIONS_PLACEHOLDER_BEGIN
+% 待作者补充本文贡献
+% CONTRIBUTIONS_PLACEHOLDER_END
+
+本文其余部分安排如下：第 2 节描述问题；第 3 节建立 MPC 模型，包括按 SOC 范围预先构建路径网络、生成日前换电路径和实时优化；第 4 节将充电控制描述为马尔可夫决策过程并介绍 RL 算法；第 5 节给出数值实验；第 6 节总结全文。
+
+全文将站点规定的满电 SOC 归一化为 $1$。“满电”表示达到这一运营要求，并不要求达到电芯的电化学上限。
+
+
+
+
+
+
+\section{Problem Statement}
+
+考虑包含多个入口--出口（O-D）对及沿线换电站的单向高速公路网络。对于 O-D 对 $p$，车辆从入口 $o^p$ 进入，沿下游方向行驶且不能折返，最终从出口 $d^p$ 离开，途中可能需要在沿线换电站集合 $\mathcal S^p$ 中的多个站点换电。全系统的站点集合为 $\mathcal S=\bigcup_{p\in\mathcal P}\mathcal S^p$，不同 O-D 对可以经过同一站点。
+
+站点 $i$ 的电池槽位构成集合 $\mathcal B_i$，各槽位中电池的电量以归一化 SOC 表示。每次换电时，用户取走一块 SOC 为 $1$ 的满电电池，并将带有剩余电量的电池放入原槽位。退回的电池充满后可再次提供给其他用户。因此，用户的换电路径会同时影响其后续行程和沿线各站的电池库存。
+
+系统服务预约用户和随机到达用户。预约用户在运营日前提交 O-D 对、预计进入高速公路的时刻和进入时的 SOC。运营者据此决定是否接受预约，并为接受的预约制定和发布日前换电路径。随机到达用户在到站时提出请求，运营者事先只掌握其到达预测。
+
+在时刻 $t_\ell$，对每个 $p\in\mathcal P$，已接受预约的用户分为尚未进入高速公路的用户 $\mathcal K_\ell^{\mathrm{fut},p}$ 和已进入高速公路的在途用户 $\mathcal K_\ell^{\mathrm{enr},p}$，即 $\mathcal K_\ell^p=\mathcal K_\ell^{\mathrm{fut},p}\mathbin{\dot\cup}\mathcal K_\ell^{\mathrm{enr},p}$，其中 $\dot\cup$ 表示不交并。迟于预约时刻但尚未进入高速公路的用户仍留在前一集合中；已完成行程或因预约失败而退出的用户不再纳入。对尚未进入高速公路的用户，以 $\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$ 表示当前预计的入口 SOC，初始采用预约值，并根据进入高速公路前获得的新观测更新。用户进入后，系统使用其实时位置、SOC 和到达下游节点的预计时刻。
+
+用户到站后若没有满电电池，则在站内等待。请求 $r$ 的到站时刻为 $t_r^{\mathrm{arr}}$，最长等待时间为 $\Delta t$，因此等待截止时刻为 $t_r^{\mathrm{ddl}}=t_r^{\mathrm{arr}}+\Delta t$。服务时刻 $t_r^{\mathrm{sw}}$ 必须满足 $t_r^{\mathrm{arr}}\le t_r^{\mathrm{sw}}\le t_r^{\mathrm{ddl}}$。截止时刻仍未得到服务的预约请求记为一次预约失败，随机请求则流失。本文将换电视为瞬时完成。
+
+系统每隔 $\sigma$ 重新决策一次。以运营日的起始时刻为时间原点，记
+\[
+t_q=q\sigma,
+\qquad
+\mathcal I_q=[t_q,t_{q+1}),
+\qquad
+\mathcal T_\ell=\{\ell,\ldots,\ell+H-1\}.
+\]
+在时刻 $t_\ell$，系统预测未来 $H$ 个时段，即连续时间范围 $[t_\ell,t_{\ell+H})$。每轮求解中，预计到站时刻保持固定，不将本站的预测等待时间加到下游的预计到站时刻；下一轮再根据实际观测更新。车辆到站和换电仍按连续时间描述，时段索引只用于将请求分组，以及表示电价等分时段给定的数据。
+
+服务时，预约请求优先于随机请求，同类请求按原到站时刻先后处理；同时到达的同类请求采用预先给定的顺序。系统不为尚未到站的用户预留当前可用电池。到下一轮开始时仍在等待且尚未超时的请求继续排队，原到站时刻和截止时刻不变。
+
+运营者需要统筹预约用户的换电路径和站内充电，在运营约束下兼顾预约服务，并权衡换电收入、购电成本、路径调整成本与后续收益。本文由 RL 根据需求、电价和电池状态给出预测期内各槽位的充电功率，并用分段线性价值网络评估期末状态。MPC 在这些功率给定的条件下，优化预约用户接下来前往哪些站点换电，以及每次服务使用哪个槽位的电池。每轮求解后，系统向路径发生变化的在途用户发布新的换电安排，并只执行当前时段的充电和服务安排。随后，系统根据实际到站、充满、换电和超时情况更新状态，开始下一轮优化。
+
+\autoref{tab:notation}列出正文主要符号，其余符号在首次出现时说明。RL 的状态、动作和算法符号在第 4 节定义。
+
+\begin{table}[!ht]
+  \centering
+  \caption{正文主要符号}
+  \label{tab:notation}
+  \small
+  \setlength{\tabcolsep}{3pt}
+  \renewcommand{\arraystretch}{0.98}
+  \begin{tabular}{@{}lp{11cm}@{}}
+    \toprule
+    \textbf{符号} & \textbf{含义} \\
+    \midrule
+    \multicolumn{2}{l}{\textit{集合与索引}} \\
+    $\sigma,t_q,\mathcal I_q,\mathcal T_\ell,\Delta t$ & 决策间隔、时段起点、各时段及预测期的时段索引，以及最长等待时间 \\
+    $\mathcal P,p;\ \mathcal S^p,\mathcal S;\ \mathcal B_i,b$ & 入口--出口对、沿线及全系统站点、槽位的集合和索引；槽位编号不代表同一块电池 \\
+    $\mathcal K_\ell^{\mathrm{fut},p},\mathcal K_\ell^{\mathrm{enr},p},\mathcal K_\ell^p$ & 尚未进入高速公路的预约用户、在途预约用户及两者的并集 \\
+    $o^p,d^p,o_\ell^{\mathrm{cur},p,k},\widetilde{\mathrm{soc}}_{A,\ell}^{p,k},\mathrm{soc}_{A,\ell}^{p,k}$ & 入口、出口、车辆当前位置对应的虚拟起点、预计入口 SOC 与当前 SOC \\
+    $\mathcal A^{p,k},t_{A,i}^{p,k},t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}},t_r^{\mathrm{sw}}$ & 用户可以选择的弧；预计到站时刻，以及请求的到站、截止和服务时刻 \\
+    \midrule
+    \multicolumn{2}{l}{\textit{参数与状态}} \\
+    $D_{i,j}^{p},v_{i,j}^{p},\underline D,\underline s_d^p$ & 节点间距离与 SOC 消耗、最小换电间距和出口最低 SOC \\
+    $c^{ch}_{i,q},\pi_{i,q}^{\mathrm{sw}},\overline p_i,\overline P_i$ & 购电价、服务价格、单槽功率上限和站级总功率上限 \\
+    $E_B,\eta_i,\widehat P_{i,b,q},T_{i,b,q}^{\mathrm{ch}},S_{i,b}(t)$ & 电池额定能量、充电效率、RL 给定的充电功率、实际充电时长和电池 SOC \\
+    $\bar{\mathbf y}_{A}^{p,k},\mathbf y_{A}^{\mathrm{pub},p,k}$ & 日前告知用户的路径，以及最近告知的路径中尚未走过的部分 \\
+    $c^{adj},c^{\mathrm{fail}},\beta$ & 单次路径调整成本、单次预约失败成本与 RL 终端价值权重 \\
+    \midrule
+    \multicolumn{2}{l}{\textit{决策变量与主要辅助量}} \\
+    $y_{i,j}^{p,k},x_{A,i}^{p,k},d_{p,k}$ & 是否选择某条弧、是否在某站换电，以及路径是否改变 \\
+    $s_r,s_{r,q},f_r,\omega_r,a_r$ & 是否获得服务及服务所属时段、是否超时、期末是否等待，以及请求是否发生 \\
+    $z_{r,b};\ \mathcal C_i^A,\mathcal E_i,\mathcal E_i^A$ & 是否使用槽位 $b$ 的电池；可能提出的预约请求、本轮考虑的请求及其中预约请求的集合 \\
+    $s_{\ell+H},\Phi^{\mathrm{RL}},w_h^{\mathrm{pend}}$ & 预测期末状态、此后的运营价值，以及期末是否还有未完成的预约换电 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+
+\section{MPC Formulation}
+
+在时段 $\mathcal I_\ell$ 开始的时刻 $t_\ell$，系统获取各槽位电池的 SOC、此时仍在站内等待、尚未超时的请求、在途用户的位置和 SOC、他们到达各站的预计时刻，以及未来 $H$ 个时段的随机需求预测和电价。已经发布给用户、但尚未走完的换电路径也作为本轮优化的输入。
+
+系统先确定用于预测的换电路径：在途用户采用最近发布的路径，尚未进入高速公路的用户优先沿用上一轮的计划。随后，系统按这些路径逐时段预测运行状态，并由策略网络给出各槽位的充电功率 $\widehat P_{i,b,q}$。
+
+获得功率后，MPC 在各用户可行的行驶路线中选择换电站，并决定每次换电使用哪个槽位的电池。
+
+求解后，若在途用户需要前往的换电站发生变化，系统立即通知用户，并计入一次路径调整费用。新的路径作为下一轮的比较基准。尚未进入高速公路的用户暂不收到新的路径。系统只执行当前时段 $\mathcal I_\ell$ 内的充电和换电安排，并根据实际到站、充满、换电和超时情况更新电池状态与等待队列。时段结束后重新求解，如\autoref{fig:rolling_horizon}所示。
+
+\begin{figure}[!htbp]
+  \centering
+  % FIGURE_PROMPT_BEGIN: fig:rolling_horizon
+  % 绘制横向时间轴示意图，展示每轮优化未来多个时段、只执行当前时段的过程。白色背景，宽高比约 2:1。深蓝表示预测期，橙色表示当前时段，绿色表示继续等待的请求，灰色表示已经发生的事件。
+  % 顶部时间轴标出 $t_{\ell-1}$、$t_\ell$、$t_{\ell+1}$ 和 $t_{\ell+H}$。预测期为 $[t_\ell,t_{\ell+H})$，只执行第一个时段。下方分别展示：尚未进入高速公路的用户，以日前路径为比较基准；在途用户，从当前位置选择之后的换电站，变化后通知用户；站内等待用户，到站和截止时刻在各轮之间保持不变。
+  % 当前时段内标出用户到站、电池充满、立即换电和超时离开；预测期结束时仍未超时的用户继续等待。已发布路径仍可在下一轮调整；同一时段可以多次换电；随机用户也可能跨时段等待。文字简洁，图形适合 A4 论文单栏阅读。
+  % FIGURE_PROMPT_END: fig:rolling_horizon
+  \fbox{\parbox[c][0.46\textwidth][c]{0.92\textwidth}{%
+    \centering\small Figure placeholder}}
+  \caption{逐时段优化换电路径，并根据实际服务情况更新状态}
+  \label{fig:rolling_horizon}
+\end{figure}
+
+
+\subsection{Offline Network Construction by SOC Range}
+
+为了表示用户在哪些站点换电，本文借鉴加油站选址研究中的扩展网络方法，用一条从入口到出口的路径表示换电站的先后顺序。例如，对 O-D 对 $p$，路径
+$o^p\rightarrow i_1\rightarrow\cdots\rightarrow i_r\rightarrow d^p$ 表示用户依次在 $i_1,\ldots,i_r$ 换电；一条弧直接连接的两个站点之间即使还有其他站点，用户也不在那里换电。出发时的 SOC 决定了车辆能够到达哪些站点。为减少在线计算量，先将出发 SOC 划分为若干区间，再为每个区间预先建立网络。
+
+对每个 O-D 对 $p$，节点集合为
+$\mathcal V^p=\{o^p\}\cup\mathcal S^p\cup\{d^p\}$，所有节点均按高速公路下游方向排列。参数 $D_{i,j}^p$ 和 $v_{i,j}^p>0$ 分别表示从 $i$ 到下游节点 $j$ 的行驶距离和 SOC 消耗。
+
+为避免用户在相距很近的站点连续换电，同时控制网络规模，设置最小换电间距 $\underline D>0$。只要仍能保留至少一条可行路径，就尽量删除从起点到首个换电站、或相邻两次换电之间距离小于 $\underline D$ 的弧。从最后一个换电站到出口不受该距离限制，但到达出口时的 SOC 不得低于 $\underline s_d^p$。
+
+对每个 SOC 区间 $h$ 和 O-D 对 $p$，按以下步骤建立网络。
+
+\begin{enumerate}
+  \item[\textbf{Step 1.}] \textbf{连接可以到达的节点。}若车辆按该 SOC 区间的上限电量出发能够从入口 $o^p$ 到达下游站点 $j$，则连接二者。对于沿行驶方向排列的两个站点 $i$ 和 $j$，若 $v_{i,j}^p\le1$，则连接二者；若 $v_{i,d^p}^p+\underline s_d^p\le1$，则连接站点 $i$ 与出口 $d^p$。
+
+  \item[\textbf{Step 2.}] \textbf{列出路径。}在上述网络中枚举所有从 $o^p$ 到 $d^p$ 的完整路径。
+
+  \item[\textbf{Step 3.}] \textbf{检查换电间距。}逐一检查这些路径中从起点到首站、以及两个换电站之间的弧。若距离小于 $\underline D$，且删除该弧后仍有至少一条完整路径，则删除该弧；否则保留。
+
+  \item[\textbf{Step 4.}] \textbf{得到网络。}将保留路径中的所有弧合并为 $\mathcal A^{h,p}$，与节点集 $\mathcal V^p$ 一同构成网络。
+\end{enumerate}
+
+在线求解时，尚未进入高速公路的用户按最新的预计入口 SOC $\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$ 选取网络；在途用户则以当前位置作为虚拟起点，使用当前 SOC。随后按用户的 SOC 删除无法到达首站的弧，并检查到达出口时的最低 SOC 要求。在途用户已经走过的路段不再参与优化；若用户已在站内等待，则保留这次换电，具体处理见 Optimization Model 小节。用户可以选择的弧构成集合 $\mathcal A^{p,k}$。
+
+
+\subsection{Day-Ahead Baseline Path Generation}
+
+用户提交预约信息
+$\left(p,\bar t_A^{p,k},\overline{\mathrm{soc}}_A^{p,k}\right)$
+后，运营者根据其行程、预计进入高速公路的时刻和入口 SOC 判断能否接受预约，并为接受的用户安排换电路径。
+
+预约按提交顺序处理。每处理一位用户，先根据已经接受的预约和随机需求预测，逐时段估计各站的电池库存。充电功率由 RL 根据预测状态给出。未满电池按所在时段的功率充电，SOC 达到 $1$ 后停止；换入用户退回的电池后立即恢复充电。
+
+对 O-D 对 $p$ 的预约用户 $k$，按以下规则安排路径：
+\begin{enumerate}
+  \item 车辆从入口出发时的 SOC 为 $\overline{\mathrm{soc}}_A^{p,k}$，每次换电后恢复为 $1$。下一站必须与当前节点在网络中相连，以保证车辆能够到达。
+  \item 若车辆能够从当前位置直接到达出口，且到达 SOC 不低于 $\underline s_d^p$，则驶向出口；否则，在可以到达的站点中，只考虑预计到站时有满电电池可用的站点。
+  \item 优先选择预计可用满电电池最多的站点，数量相同时选择更靠近出口的站点。确定站点后，为该用户在相应时段预留一块满电电池，并更新后续时段的库存预测，再继续选择下一站。
+\end{enumerate}
+
+若在某一步找不到既有满电电池、又能继续驶向出口的站点，则拒绝该预约；只有能够安排完整行程的用户才被接受。若确定的路径经过弧 $(i,j)$，则令 $\bar y_{i,j}^{p,k}=1$，否则为 $0$。该路径随预约结果告知用户，并作为用户进入高速公路前比较路径变化的基准。
+
+
+\subsection{Optimization Model}
+
+\paragraph{集合与变量。}
+在时刻 $t_\ell$，用户从本轮起点 $o_\ell^{p,k}$ 到出口的可行路线由网络 $(\mathcal V^{p,k},\mathcal A^{p,k})$ 表示，其中 $p\in\mathcal P$、$k\in\mathcal K_\ell^p$。尚未进入高速公路的用户从入口出发，在途用户从当前位置出发。网络中的弧已经过 SOC 检查：车辆能够到达首站，换得满电电池后能够到达下一站，并在驶离高速公路时满足最低 SOC 要求。
+
+若用户已在站内等待，本轮仍需处理这次换电。为此，用一条行驶距离为零的固定弧连接虚拟起点与当前站点，用户在该站换电成功后再继续行程。这条弧直接对应原来的等待请求，不重复生成请求。
+
+在求解前，为所有可选的入弧 $(j,i)\in\mathcal A^{p,k}$ 列出用户可能在站点 $i$ 提出的换电请求，组成集合 $\mathcal C_i^A$。其中 $r=(p,k,j,i)$ 表示用户 $(p,k)$ 沿弧 $(j,i)$ 到达站点 $i$ 时提出的换电请求。集合包含从本轮起点到出口途中可能提出的请求，但不重复包含已经在站内等待的请求。其中预计在本轮预测期内到站的部分为
+\[
+\mathcal C_{i,\ell}^A
+=\{r\in\mathcal C_i^A:t_\ell\le t_r^{\mathrm{arr}}<t_{\ell+H}\}.
+\]
+令 $\mathcal E_{i,\ell}^{R,\mathrm{new}}$ 为预计在本轮预测期内新到站的随机请求集，$\mathcal W_{i,\ell}$ 为时刻 $t_\ell$ 仍在站内等待的请求集，$\mathcal W_{i,\ell}^A\subseteq\mathcal W_{i,\ell}$ 为其中的预约请求。于是
+\begin{equation}
+\mathcal E_i=\mathcal C_{i,\ell}^A\mathbin{\dot\cup}\mathcal E_{i,\ell}^{R,\mathrm{new}}\mathbin{\dot\cup}\mathcal W_{i,\ell},
+\qquad
+\mathcal E_i^A=\mathcal C_{i,\ell}^A\mathbin{\dot\cup}\mathcal W_{i,\ell}^A
+\subseteq\mathcal E_i,
+\label{eq:request_sets}
+\end{equation}
+其中 $\dot\cup$ 表示不交并。这些集合在求解前确定，所选路径及此前的服务结果决定哪些预约请求会产生。尚未到站的预约用户采用本轮更新的预计到站时刻，且该时刻不早于 $t_\ell$。各请求的到站时刻 $t_r^{\mathrm{arr}}$、截止时刻 $t_r^{\mathrm{ddl}}=t_r^{\mathrm{arr}}+\Delta t$ 和退回电池的 SOC $\rho_r\in[0,1)$ 均为已知参数；已经在等待的请求保留原来的到站时刻和截止时刻。
+
+本轮有两类决策变量：
+\begin{equation}
+\begin{aligned}
+y_{i,j}^{p,k}&\in\{0,1\},
+&&p\in\mathcal P,\ k\in\mathcal K_\ell^p,\ (i,j)\in\mathcal A^{p,k},\\
+z_{r,b}&\in\{0,1\},
+&&i\in\mathcal S,\ r\in\mathcal E_i,\ b\in\mathcal B_i.
+\end{aligned}
+\label{eq:decision_variables}
+\end{equation}
+$y_{i,j}^{p,k}=1$ 表示用户的路径经过弧 $(i,j)$，是本模型的核心决策。$z_{r,b}=1$ 表示请求 $r$ 使用槽位 $b$ 中的满电电池，并将退回电池放入同一槽位。对用户而言，使用哪个槽位的满电电池没有区别；但各槽位的充电功率可能不同，退回电池放入哪个槽位会影响后续服务。若相关槽位的状态和参数相同，则可以有多个效果相同的分配方案。
+
+辅助变量 $a_r$ 表示请求是否发生，$s_r$ 表示是否获得服务，$f_r$ 表示是否超时失败或流失，$\omega_r$ 表示预测期末是否仍在等待，$s_{r,q}$ 表示是否在时段 $q$ 获得服务，取值均为 $0$ 或 $1$。服务时刻 $t_r^{\mathrm{sw}}$、电池 SOC $S_{i,b}(t)$、充电时长 $T_{i,b,q}^{\mathrm{ch}}$、路径是否调整的指示变量 $d_{p,k}$，以及预测期末状态 $s_{\ell+H}$，由下述关系确定。RL 给出的充电功率 $\widehat P_{i,b,q}$ 和价值函数参数 $\theta$ 在本轮求解中保持不变，MPC 不对它们进行优化。
+
+\paragraph{目标函数。}
+每次换电交付的净电量为 $E_B(1-\rho_r)$，按服务发生时的价格收费。预测期内的换电收入、充电成本、路径调整成本和预约失败成本分别为
+\begin{align}
+I&=E_B\sum_{i\in\mathcal S}\sum_{r\in\mathcal E_i}
+\sum_{q\in\mathcal T_\ell}\pi_{i,q}^{\mathrm{sw}}(1-\rho_r)s_{r,q},
+\label{eq:income}\\
+C_{\mathrm{ch}}&=\sum_{i\in\mathcal S}\sum_{b\in\mathcal B_i}
+\sum_{q\in\mathcal T_\ell}c^{ch}_{i,q}\widehat P_{i,b,q}T_{i,b,q}^{\mathrm{ch}},
+\label{eq:chargingcost}\\
+C_{\mathrm{adj}}&=c^{adj}\sum_{p\in\mathcal P}\sum_{k\in\mathcal K_\ell^p}d_{p,k},
+\label{eq:adjustment_cost}\\
+C_{\mathrm{fail}}&=c^{\mathrm{fail}}\sum_{i\in\mathcal S}\sum_{r\in\mathcal E_i^A}f_r.
+\label{eq:reservation_failure_cost}
+\end{align}
+尚未进入高速公路的用户以日前告知的路径为比较基准，在途用户则以最近告知的路径中尚未走过的部分为基准。目标函数计入预计的调整成本，实际费用只在通知用户改变路径时计入一次。
+
+将预测期末的状态输入第 4 节训练的价值网络，得到
+\begin{equation}
+\Phi^{\mathrm{RL}}=V_\theta(s_{\ell+H}).
+\label{eq:rl_terminal_value}
+\end{equation}
+该值估计预测期结束后的运营净回报，已经计入本轮收入和成本的项目不再重复计算。给定权重 $\beta\ge0$，优化目标为
+\begin{equation}
+\max_{\mathbf y,\mathbf z}\quad
+I-C_{\mathrm{ch}}-C_{\mathrm{adj}}-C_{\mathrm{fail}}+\beta\Phi^{\mathrm{RL}},
+\label{eq:objective}
+\end{equation}
+其中，收入、成本和期末状态都由路径选择、电池分配及以下约束确定。
+
+\paragraph{约束条件。}
+（1）\textbf{路径与退回电池的电量。}每位用户在网络中选择一条从本轮起点到出口的路径：
+\begin{equation}
+\sum_{j:(n,j)\in\mathcal A^{p,k}}y_{n,j}^{p,k}
+-\sum_{j:(j,n)\in\mathcal A^{p,k}}y_{j,n}^{p,k}
+=\begin{cases}
+1,&n=o_\ell^{p,k},\\
+-1,&n=d^p,\\
+0,&\text{其余节点},
+\end{cases}
+\label{eq:flow}
+\end{equation}
+对所有 $p\in\mathcal P$、$k\in\mathcal K_\ell^p$、$n\in\mathcal V^{p,k}$ 成立。网络不含回路，因此满足流平衡的一组 $y$ 就确定了用户依次前往的换电站。对于已在站内等待的用户，连接起点与当前站的固定弧取 $y=1$。
+
+记 $s_{0,\ell}^{p,k}$ 为用户在本轮起点的 SOC：尚未进入高速公路时取预计入口值 $\widetilde{\mathrm{soc}}_{A,\ell}^{p,k}$，已经进入后取当前观测值 $\mathrm{soc}_{A,\ell}^{p,k}$。对请求 $r=(p,k,j,i)\in\mathcal C_i^A$，用户带来的电池 SOC 为
+\begin{equation}
+\rho_r=\rho_{A,j,i}^{p,k}
+=\begin{cases}
+s_{0,\ell}^{p,k}-v_{o_\ell^{p,k},i}^{p,k},&j=o_\ell^{p,k},\\
+1-v_{j,i}^{p},&j\in\mathcal S^p,
+\end{cases}
+\label{eq:return_soc}
+\end{equation}
+首段耗电按本轮起点到站点 $i$ 的路程计算，此后每段行程都从满电开始。随机请求的退回 SOC 取预测值，已经在等待的请求取观测值。
+
+（2）\textbf{路径调整。}对所有 $p\in\mathcal P$、$k\in\mathcal K_\ell^p$ 和 $i\in\mathcal S^p$，用 $x_{A,i}^{p,k}$ 表示用户是否在站点 $i$ 换电，用 $d_{p,k}$ 表示路径是否改变：
+\begin{equation}
+x_{A,i}^{p,k}=\sum_{j:(j,i)\in\mathcal A^{p,k}}y_{j,i}^{p,k},
+\qquad
+d_{p,k}=\max_{i\in\mathcal S^p}
+\left|x_{A,i}^{p,k}-x_{A,i\mid\ell}^{\mathrm{ref},p,k}\right|,
+\label{eq:path_adjustment_indicator}
+\end{equation}
+基准 $x_{A,i\mid\ell}^{\mathrm{ref},p,k}$ 记录此前告知用户的换电站：尚未进入高速公路时采用日前路径，在途时采用最近发布路径中尚未走过的部分。若没有指向站点 $i$ 的弧，则 $x_{A,i}^{p,k}=0$；若沿线没有换电站，则 $d_{p,k}=0$。由于车辆只能向下游行驶，站点确定后，前往各站的顺序也随之确定。因此，只要增加或删除一个换电站，就记为一次路径调整。
+
+（3）\textbf{预约请求的产生条件。}预测随机请求和已经在等待的请求取 $a_r=1$。对预约请求 $r=(p,k,j,i)\in\mathcal C_{i,\ell}^A$，先检查用户是否能在上一站 $j$ 完成换电。令 $\mathcal U_r$ 包含该用户可能在站点 $j$ 提出的换电请求，以及他在该站已有的等待请求；若 $i$ 是从起点直接到达的首站，则无需检查上一站。以 $s_h^{\mathrm{in}}$ 表示请求 $h$ 是否在预测期内获得服务：$h\in\bigcup_i\mathcal E_i$ 时取 $s_h$，其余取 $0$。于是
+\begin{equation}
+a_r=y_{j,i}^{p,k}g_r,
+\qquad
+g_r=\begin{cases}
+1,&j=o_\ell^{p,k},\\
+\displaystyle\sum_{h\in\mathcal U_r}s_h^{\mathrm{in}},&j\ne o_\ell^{p,k}.
+\end{cases}
+\label{eq:reservation_alive_chain}
+\end{equation}
+其中 $\mathcal U_r=\{h\in\mathcal C_j^A\mathbin{\dot\cup}\mathcal W_{j,\ell}^A:h\text{ 属于用户 }(p,k)\}$ 对两个换电站之间的行程成立，首段取 $\mathcal U_r=\varnothing$。一条路径至多选择其中一个请求。用户是否向首站提出请求由路径决定；只有在上一站获得服务后，才会向下一站提出请求。某站换电失败后，用户不再向后续站点提出请求。记
+\[
+\mathcal E_{p,k}^A=\{r\in\textstyle\bigcup_i\mathcal E_i^A:r\text{ 属于用户 }(p,k)\},
+\qquad
+F_{p,k}=\sum_{r\in\mathcal E_{p,k}^A}f_r\in\{0,1\}.
+\]
+其中 $F_{p,k}$ 表示用户是否在预测期内发生换电失败，每位用户只计一次。为保证到站与服务的先后顺序，对每个 $r=(p,k,j,i)\in\mathcal C_{i,\ell}^A$ 还要求
+\begin{equation}
+\begin{aligned}
+y_{j,i}^{p,k}(1-F_{p,k})&\le g_r,\\
+a_r=s_h^{\mathrm{in}}=1&\ \Longrightarrow\
+t_h^{\mathrm{sw}}\le t_r^{\mathrm{arr}},\qquad h\in\mathcal U_r.
+\end{aligned}
+\label{eq:arrival_causality}
+\end{equation}
+只要用户没有因换电失败退出行程，路径中预计在本轮到站的换电就必须纳入计算，不能因上一站尚未服务而直接略去；上一站的服务时刻也不能晚于下一站的到站时刻。本轮将预计到站时刻视为常数，不随等待时间调整，因此可能排除实际运行中可以延后到站的方案。下一轮再根据最新观测更新预计到站时刻。
+
+（4）\textbf{服务顺序与电池分配。}对每个 $i\in\mathcal S$、$r\in\mathcal E_i$，有
+\begin{equation}
+\begin{aligned}
+\sum_{b\in\mathcal B_i}z_{r,b}&=s_r,
+&s_r+f_r+\omega_r&=a_r,\\
+s_r=1&\ \Longrightarrow\
+t_r^{\mathrm{sw}}\in[t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}}]
+\cap[t_\ell,t_{\ell+H}),\\
+s_{r,q}&=\mathbf1\{s_r=1\text{ 且 }t_r^{\mathrm{sw}}\in\mathcal I_q\},
+&s_r&=\sum_{q\in\mathcal T_\ell}s_{r,q}.
+\end{aligned}
+\label{eq:service_window}
+\end{equation}
+未获得服务的请求不定义服务时刻，各 $s_{r,q}$ 均取 $0$。计算从预测期起点开始，在用户到站、电池充满、换电、等待截止或时段切换时更新状态，直到预测期结束。充满时刻由电池的 SOC 和充电功率计算。
+
+队列只包含 $a_r=1$ 且已经到站、还未获得服务、也未超过截止时刻的请求。只要队列非空且有满电电池，就立即服务。预约用户优先于随机用户，同类用户按到站先后排序；同刻到达时采用预先给定的顺序。模型用 $z$ 决定排在最前面的用户使用哪个槽位的满电电池。每完成一次换电就更新队列和电池状态，直到没有用户等待或没有满电电池。不为尚未到站的用户保留可用电池，也不为等待更高价格而推迟服务。
+
+若充满、到站和等待截止发生在同一时刻，先更新充电和到站情况，再完成能够提供的服务，最后将仍未服务且已经截止的请求记为失败或流失。发生在预测期终点 $t_{\ell+H}$ 的事件由下一轮处理。因此
+\begin{equation}
+f_r=(a_r-s_r)\mathbf1\{t_r^{\mathrm{ddl}}<t_{\ell+H}\},
+\qquad
+\omega_r=(a_r-s_r)\mathbf1\{t_r^{\mathrm{ddl}}\ge t_{\ell+H}\}.
+\label{eq:outcome_boundary}
+\end{equation}
+服务时刻和结果由上述规则与等式确定，MPC 不能另行选择拒绝谁或何时服务。
+
+（5）\textbf{电池 SOC 与充电时长。}初始 SOC 取观测值 $S_{i,b}(t_\ell^-)=S_{i,b}^{\mathrm{obs}}$。在同一时段 $q$ 内，若两个时刻 $t_1<t_2$ 之间没有换电，则
+\begin{equation}
+S_{i,b}(t_2^-)=\min\left\{1,\,
+S_{i,b}(t_1^+)+\frac{\eta_i\widehat P_{i,b,q}}{E_B}(t_2-t_1)\right\}.
+\label{eq:event_charging_transition}
+\end{equation}
+时间、功率和电池能量分别以小时、kW 和 kWh 计。只有满电电池能够交付给用户；换电后，原槽位放入用户退回的电池：
+\begin{equation}
+\begin{aligned}
+z_{r,b}=1&\ \Longrightarrow\
+S_{i,b}((t_r^{\mathrm{sw}})^-)=1,\quad
+S_{i,b}((t_r^{\mathrm{sw}})^+)=\rho_r,\\
+\sum_{r\in\mathcal E_i:\,s_r=1,\ t_r^{\mathrm{sw}}=t}z_{r,b}&\le1,
+\qquad t\in[t_\ell,t_{\ell+H}).
+\end{aligned}
+\label{eq:slot_matching}
+\end{equation}
+上述关系适用于所有 $i\in\mathcal S$、$b\in\mathcal B_i$ 及相应请求。没有发生换电的槽位，其 SOC 在该时刻不变。同一槽位可以多次提供电池，但每次换电后都必须重新充满。电池未满且功率大于零的累计时间就是实际充电时长：
+\begin{equation}
+T_{i,b,q}^{\mathrm{ch}}=\int_{t_q}^{t_{q+1}}
+\mathbf1\{S_{i,b}(t)<1,\ \widehat P_{i,b,q}>0\}\,\mathrm dt,
+\qquad i\in\mathcal S,\ b\in\mathcal B_i,\ q\in\mathcal T_\ell.
+\label{eq:charging_duration}
+\end{equation}
+RL 给出的功率须满足
+\begin{equation}
+0\le\widehat P_{i,b,q}\le\overline p_i,
+\qquad\sum_{b\in\mathcal B_i}\widehat P_{i,b,q}\le\overline P_i,
+\label{eq:power_projection}
+\end{equation}
+其中 $i\in\mathcal S$、$b\in\mathcal B_i$、$q\in\mathcal T_\ell$。这些上限在 RL 生成功率时就已满足。MPC 使用给定功率计算电池何时充满、何时停止或恢复充电，由此得到实际用电量。
+
+（6）\textbf{预测期末的状态。}令
+\[
+\overline{\mathcal D}_\ell^A
+=\bigcup_{i\in\mathcal S}(\mathcal C_i^A\mathbin{\dot\cup}\mathcal W_{i,\ell}^A)
+\]
+包含从当前时刻到用户离开高速公路前可能提出的所有预约换电请求。对 $h\in\overline{\mathcal D}_\ell^A$，$\delta_h$ 表示所选路径是否包含这次换电：$\mathcal C_i^A$ 中的请求取对应入弧的 $y$，时刻 $t_\ell$ 已在等待的请求取 $1$。是否到预测期末仍未完成，由下式确定：
+\begin{equation}
+w_h^{\mathrm{pend}}=\delta_h(1-F_{p(h),k(h)})(1-s_h^{\mathrm{in}}),
+\qquad h\in\overline{\mathcal D}_\ell^A,
+\label{eq:pending_delivery_alive}
+\end{equation}
+其中 $(p(h),k(h))$ 表示请求所属用户。当用户没有因换电失败退出行程、所选路径包含这次换电且它尚未在预测期内完成时，$w_h^{\mathrm{pend}}=1$。
+
+预测期末状态 $s_{\ell+H}$ 包括各电池的 SOC $\{S_{i,b}(t_{\ell+H}^-)\}_{i,b}$、$\omega_r=1$ 的等待请求、$w_h^{\mathrm{pend}}=1$ 的未完成预约换电，以及已知的时间、电价和需求预测等信息，并采用与 RL 训练相同的编码。期末仍在等待的预约请求同时满足 $w_h^{\mathrm{pend}}=\omega_r=1$，只记录一次。尚未到站的换电保留预计到站时刻、截止时刻、退回 SOC，以及需要先在哪一站完成换电，不能当作已到站的用户加入等待队列。路径和电池分配由此改变期末库存与未完成请求，进而影响式\eqref{eq:rl_terminal_value}的价值。
+
+
+\section{RL Formulation}
+
+RL 层学习各槽位的充电功率策略，并通过分段线性价值网络估计 MPC 预测期末之后的运营净收益。本节将充电控制建模为马尔可夫决策过程，并介绍所用的 RL 算法。
+
+\subsection{Markov decision process}
+
+\paragraph{状态。}
+在决策时刻 $t_\ell$，RL 观测系统状态 $s_\ell$，包括各槽位电池的 SOC、电价、时间，以及以下用户和需求信息：尚未进入高速公路的预约用户，在途预约用户的位置、SOC 和已发布路径，站内等待用户的到站时刻和等待期限，上一时段实际到站的随机用户，以及未来随机用户的到站预测。
+令 $\mathcal K_\ell^{\mathrm{fut},p}$ 表示时刻 $t_\ell$ 已接纳但尚未进入高速公路的预约用户集合，其中也包括预计在当前预测期之后进入的用户。$\bar{\mathbf y}_A^{p,k}$ 和 $\mathbf y_A^{\mathrm{pub},p,k}$ 分别表示日前首次发布路径和最近告知的路径中尚未走过部分的弧指示量。预约用户的信息表示为
+\begin{equation}
+\begin{aligned}
+\mathcal Z_{A}
+={}&
+\left\{
+\left(p,k,\bar t_A^{p,k},
+\overline{\mathrm{soc}}_A^{p,k},
+\bar{\mathbf y}_A^{p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{fut},p}
+\right\}\\
+&\cup
+\left\{
+\left(p,k,o_\ell^{\mathrm{cur},p,k},\mathrm{soc}_{A,\ell}^{p,k},
+\mathbf y_A^{\mathrm{pub},p,k}\right):
+k\in\mathcal K_\ell^{\mathrm{enr},p}
+\right\}.
+\end{aligned}
+\label{eq:rl_reservation_information}
+\end{equation}
+站内等待队列记为
+$\mathcal W_\ell=\{(r,i,t_r^{\mathrm{arr}},t_r^{\mathrm{ddl}})\}$，
+包括尚未服务且未超过等待期限的预约和随机请求。
+$\mathcal Z_{A}$ 与 $\mathcal W_\ell$ 中的元素数量随时间变化，因此分别通过 $f_A$ 和 $f_W$ 转换为固定维度的特征。$f_B$、$f_R^{\mathrm{act}}$ 和 $f_R^{\mathrm{pred}}$ 分别提取电池 SOC、实际随机到站记录和随机请求预测的特征。状态表示为
+\begin{equation}
+\begin{aligned}
+s_\ell=\Big(&
+f_B\!\left(\{S_{i,b}^{\mathrm{obs}}(t_\ell)\}_{i\in\mathcal S,b\in\mathcal B_i}\right),
+f_A(\mathcal Z_{A}),
+f_W(\mathcal W_\ell),\\
+&
+f_R^{\mathrm{act}}\!\left(
+\{(i,r,t_R^{i,r},\mathrm{soc}_R^{i,r},z_{R,r,i}^{\mathrm{act}}):
+r\in\mathcal R_{i,\ell-1}^{\mathrm{act}}\}_{i\in\mathcal S}
+\right),\\
+&
+f_R^{\mathrm{pred}}\!\left(
+\{(i,\nu,t_{R}^{i,\nu},\mathrm{soc}_{R}^{i,\nu}):
+\nu\in\mathcal R_{i,q}\}_{i\in\mathcal S,q\in\mathcal T_\ell}
+\right),
+\{c^{ch}_{i,q}\}_{i\in\mathcal S,q\in\mathcal T_\ell},
+\xi_\ell
+\Big).
+\end{aligned}
+\label{eq:rl_state}
+\end{equation}
+其中 $\xi_\ell$ 表示时段、节假日或交通高峰等外生特征；$\mathcal R_{i,\ell-1}^{\mathrm{act}}$ 记录上一时段实际到站的随机请求，$z_{R,r,i}^{\mathrm{act}}$ 表示其实际服务结果。$f_R^{\mathrm{act}}$ 使用实际到站时刻、SOC 和服务结果，$f_R^{\mathrm{pred}}$ 仅使用时刻 $t_\ell$ 已知的预测，两类信息分别处理。
+
+同一站点的槽位编号本身不影响电池价值。因此，$f_B$ 对各槽位 SOC 使用相同的分段线性函数，再在站内求和，以描述电池 SOC 的分布。策略网络仍为每个槽位输出功率；交换两个槽位的输入信息时，其输出也相应交换。预测充电过程时，系统按预先给定的规则从满电槽位中选择电池；MPC 则通过 $z_{r,b}$ 决定各请求使用哪个槽位的电池。特征提取仅使用仿射变换、整流线性单元（ReLU）和求和，使从原始状态到价值网络输出的映射保持分段线性。
+
+请求特征保留相对于当前时刻的到站时间和截止时间、退回电池 SOC、用户类别，以及同一用户多次换电的先后关系。同一次换电只计入一次，已在等待队列中的请求不再通过预约信息重复计入。在 MPC 中，可先计算各请求已知属性的特征，再由 $w_h^{\mathrm{pend}}$、$\omega_r$ 和路径变量决定是否将其计入状态；电池 SOC 和预测服务结果则随决策更新。训练和终端价值计算使用相同的特征定义与时间基准，需求预测还需覆盖预测期末之后的时段。未完成请求的到站时间和截止时间必须保留，不能只用请求总量代替。
+
+\paragraph{动作。}
+RL 的动作是各站各槽位在当前时段的充电功率设定值：
+\begin{equation}
+a_\ell=
+\{\widehat P_{i,b,\ell}\}_{i\in\mathcal S,b\in\mathcal B_i}.
+\label{eq:rl_action}
+\end{equation}
+策略网络先为每个槽位输出功率，再将输出欧氏投影到式\eqref{eq:power_projection}定义的闭凸集上，得到动作 $\widehat P$。该投影唯一，并同时满足槽位功率上限和站级总功率上限。PPO 的策略概率密度和重要性采样比率均按投影后的动作分布计算。
+
+\paragraph{预测期内的充电功率。}
+为向 MPC 提供未来 $H$ 个时段的充电功率，系统以当前状态
+$s_{\ell}^{\mathrm{ref}}=s_\ell$ 为起点，用同一策略网络的平均动作逐时段预测充电和服务过程：
+\begin{equation}
+\{\widehat P_{i,b,q}\}_{i,b}
+=
+\mu_\phi(s_{q}^{\mathrm{ref}}),
+\quad q\in\mathcal T_\ell,
+\label{eq:rl_power_rollout}
+\end{equation}
+其中 $\mu_\phi$ 表示策略分布的均值。系统先按第 3 节的方法确定用于预测的路径，再用策略网络逐时段计算功率，最后将整段功率序列和参数已固定的价值网络交给 MPC。用于预测的路径只依据求解前已知的位置、SOC、预计到站时刻和网络中的可达关系确定。预测过程采用与实际执行相同的预约优先、等待、超时、充电和电池更换规则，也允许预约请求因超时而失败。因此，$s_q^{\mathrm{ref}}$ 的计算不依赖本轮 MPC 尚未求得的路径与服务决策，MPC 获得的功率序列也已确定。
+
+预测下一时段状态时，将时段 $q$ 的预测请求及其服务结果通过 $f_R^{\mathrm{nom}}$ 转换为特征。$f_R^{\mathrm{nom}}$ 与 $f_R^{\mathrm{act}}$ 输出维度相同，但前者处理预测结果，后者处理实际记录；前者只用于预测过程和预测期末状态，不更新实际记录。$f_R^{\mathrm{pred}}$ 所需的后续需求由同一预测模型的条件均值补齐，超出当前 $H$ 步预测范围的部分采用预先给定的期末需求预测。整段功率序列在本轮 MPC 求解中固定，实际只执行第一时段的设定值 $\widehat P_{i,b,\ell}$，下一决策时刻再重新计算。
+
+\paragraph{状态转移。}
+给定 $s_\ell$ 和充电功率序列后，系统求解 MPC，得到各用户的最优路径
+$\{y_{i,j}^{p,k*}\}$ 和槽位分配 $\mathbf z^*=\{z_{r,b}^*\}$。对于在途用户，若之后的路径发生变化，则立即发布新路径，并计入一次调整成本；新路径也作为下一轮预测和评价调整的依据。尚未进入高速公路的用户，其优化路径仅用于本轮预测，不向用户发布。
+
+在当前时段执行时，在途用户采用刚发布的路径，尚未进入高速公路的用户仍采用日前发布路径 $\bar{\mathbf y}_{A}^{p,k}$。后者若在 $\mathcal I_\ell$ 内实际进入高速公路，先按日前路径行驶，到下一决策时刻再作为在途用户更新。预约和随机用户在 $\mathcal I_\ell$ 内的实际到站记录分别记为 $\mathcal H_{A,\ell}^{\mathrm{act}}$ 和 $\mathcal H_{R,\ell}^{\mathrm{act}}$，每条记录包含请求标识、站点、实际到站时刻和退回电池的实际 SOC。
+
+系统只执行当前时段 $\mathcal I_\ell$ 的方案。用 $\operatorname{Exec}_\ell$ 表示该时段的实际运行过程，其输入为实际到站记录、当前等待队列、已发布路径、当前充电功率设定值、观测 SOC 和槽位分配方案 $\mathbf z^*$。给定这些输入后，运行过程确定；同一时刻依次处理充电完成、用户到站、队列服务和超时判定：
+\begin{equation}
+\begin{aligned}
+(\mathbf S^{\mathrm{obs}}(t_{\ell+1}),\mathcal W_{\ell+1},
+\mathbf s_{A,\ell}^{\mathrm{act}},\mathbf z_{R,\ell}^{\mathrm{act}},
+\mathbf f_{A,\ell}^{\mathrm{act}})
+=\operatorname{Exec}_\ell\!\Big(&
+\mathbf S^{\mathrm{obs}}(t_\ell),\mathcal W_\ell,
+\{\widehat P_{i,b,\ell}\}_{i,b},\\
+&\{\mathbf y_{A,\ell}^{\mathrm{exec},p,k}\}_{p,k},\ \mathbf z^*,
+\mathcal H_{A,\ell}^{\mathrm{act}},\mathcal H_{R,\ell}^{\mathrm{act}}
+\Big).
+\end{aligned}
+\label{eq:actual_execution_operator}
+\end{equation}
+其中，对在途用户取 $\mathbf y_{A,\ell}^{\mathrm{exec},p,k}=\mathbf y_A^{p,k*}$，对尚未进入高速公路的用户取日前路径 $\bar{\mathbf y}_{A}^{p,k}$。如果 MPC 已通过 $\mathbf z^*$ 为当前应服务的请求安排电池，且该电池仍为满电，则按方案交付；否则按预先给定的规则从当前满电槽位中选择电池。只要存在满电电池，就立即服务当前优先级最高的等待请求。
+
+实际服务只处理已到站和此前仍在等待的用户。预测请求本身不会触发实际服务，预测与实际出现偏差时系统仍按上述规则运行，实际期末状态也无需与预测相同。状态转移表示为
+\begin{equation}
+s_{\ell+1}
+\sim
+\mathbb P\!\left(
+\cdot\mid
+s_\ell,a_\ell,
+\mathrm{MPC}(s_\ell,\widehat{\mathbf P})
+\right),
+\label{eq:rl_transition}
+\end{equation}
+其中 $\mathbb P$ 表示随机到站情况和下一轮预测更新共同决定的状态转移概率，$\widehat{\mathbf P}=\{\widehat P_{i,b,q}:i\in\mathcal S,b\in\mathcal B_i,q\in\mathcal T_\ell\}$。每轮 MPC 优化整个预测期的方案，但系统只执行当前时段。
+
+\paragraph{奖励。}
+RL 奖励取当前执行时段实际产生的运营净收益，并计入本轮发布新路径产生的调整成本：
+\begin{equation}
+r_\ell
+=
+I_\ell^{\mathrm{act}}
+-C_{\mathrm{ch},\ell}
+-C_{\mathrm{adj},\ell}
+-C_{\mathrm{fail},\ell}.
+\label{eq:rl_reward}
+\end{equation}
+其中 $I_\ell^{\mathrm{act}}$、$C_{\mathrm{ch},\ell}$、$C_{\mathrm{adj},\ell}$ 和 $C_{\mathrm{fail},\ell}$ 分别为时段 $\mathcal I_\ell$ 内实际发生的服务收入、充电成本、路径调整成本和预约超时成本。收入按实际服务时刻的价格计算，充电成本按实际充电量计算，调整成本在向在途用户发布新路径时计入，预约超时成本在截止时刻所在时段计入。各项跨时段只结算一次：上一时段到站、本时段服务的请求，其收入计入本时段；预测期末仍在等待的请求，之后再按实际结果结算。
+
+MPC 中预测的随机用户收入、未来预约超时损失和未来充电成本不计入当前奖励，尚未进入高速公路用户的预计路径调整成本也不计入。通过这一奖励，策略网络学习充电功率对运营成本、预约服务可靠性、路径稳定性和后续电池价值的共同影响。
+
+
+\subsection{RL algorithm}
+
+各槽位的充电功率为连续动作，需求也具有不确定性，因此本文采用近端策略优化（Proximal Policy Optimization, PPO）训练 RL。PPO 采用策略网络和价值网络：策略网络 $\pi_{\phi}(a_t\mid s_t)$ 给出充电功率动作的概率分布，价值网络 $V_{\theta}(s_t)$ 估计当前状态下的长期运营净收益。价值网络采用式\eqref{eq:pwl_critic}的分段线性结构，学习系统状态价值，并通过式\eqref{eq:rl_terminal_value}统一评价预测期末电池库存和未完成请求的后续影响。该价值是继续由策略网络和 MPC 共同控制时的期望折扣运营净收益，因此不再为各槽位或未完成请求另设价值项。
+
+$V_\theta$ 采用含 $M$ 个 ReLU 单元的分段线性结构：
+\begin{equation}
+V_\theta(s)
+=\boldsymbol a^\top s+b
++\sum_{m=1}^{M}c_m
+\max\{0,\boldsymbol w_m^\top s+d_m\}.
+\label{eq:pwl_critic}
+\end{equation}
+价值网络和状态特征提取的参数在每轮 MPC 求解中保持固定，输入的预测期末状态则随本轮决策变化。
+
+价值网络通过最小化以下预测误差进行训练：
+\begin{equation}
+L_V(\theta)=
+\mathbb{E}_t\left[
+\left(V_{\theta}(s_t)-\hat{G}_t\right)^2
+\right],
+\label{eq:value_loss}
+\end{equation}
+其中 $\hat{G}_t$ 是由采样轨迹中之后实际获得的奖励计算的折扣回报，服务收入、充电费用和超时损失均按实际发生时刻计入。每个采样批次内，供 MPC 使用的网络参数保持固定，批次结束后再更新。训练样本需覆盖不同的电池 SOC 分布、请求到站时间和排队情况。策略网络采用截断代理目标更新，重要性采样比率定义为
+\begin{equation}
+w_t^{\mathrm{IS}}(\phi)=
+\frac{\pi_{\phi}(a_t\mid s_t)}{\pi_{\phi_{old}}(a_t\mid s_t)},
+\label{eq:ppo_ratio}
+\end{equation}
+则策略优化目标为
+\begin{equation}
+L_{\mathrm{CLIP}}(\phi)=
+\mathbb{E}_t\left[
+\min\left(
+w_t^{\mathrm{IS}}(\phi)\hat{A}_t,
+\mathrm{clip}(w_t^{\mathrm{IS}}(\phi),1-\epsilon,1+\epsilon)\hat{A}_t
+\right)
+\right],
+\label{eq:ppo_clip}
+\end{equation}
+其中 $\hat{A}_t$ 为优势函数估计，$\epsilon$ 控制概率比率的截断范围。优势函数采用广义优势估计（Generalized Advantage Estimation, GAE）计算：
+\begin{equation}
+\hat{A}_t=\sum_{n=0}^{\infty}
+(\gamma_{\mathrm{RL}}\lambda_{\mathrm{GAE}})^n
+e_{t+n}^{\mathrm{TD}},
+\quad
+e_t^{\mathrm{TD}}=r_t
++\gamma_{\mathrm{RL}}V_{\theta}(s_{t+1})-V_{\theta}(s_t),
+\label{eq:gae}
+\end{equation}
+其中 $\gamma_{\mathrm{RL}}$ 为折扣因子，
+$\lambda_{\mathrm{GAE}}$ 为 GAE 参数。RL 每隔 $\sigma$ 作出一次决策，两个决策时刻之间的充电和服务过程仍按连续时间计算。
+
+\paragraph{终端价值的计算。}每轮 MPC 求解时，价值网络和特征提取的参数均已固定，因此可逐个线性化式\eqref{eq:pwl_critic}中的 ReLU 单元。令 $\zeta_m=\boldsymbol w_m^\top s_{\ell+H}+d_m$，$u_m$ 为该单元的输出。给定有效上下界 $L_m\le\zeta_m\le U_m$，当 $L_m<0<U_m$ 时，引入 $\delta_m^V\in\{0,1\}$，并施加
+\begin{subequations}
+\label{eq:pwl_critic_embedding}
+\begin{align}
+u_m&\ge0,& u_m&\ge\zeta_m,\\
+u_m&\le U_m\delta_m^V,&
+u_m&\le\zeta_m-L_m(1-\delta_m^V),
+\qquad m=1,\ldots,M.
+\end{align}
+\end{subequations}
+其中 $L_m,U_m$ 根据本轮可行状态的上下界确定。若 $U_m\le0$，直接取 $u_m=0$；若 $L_m\ge0$，直接取 $u_m=\zeta_m$。以 $u_m$ 替换式\eqref{eq:pwl_critic}中的最大值，并同样处理状态特征提取中的 ReLU，即可用混合整数线性约束表示终端价值的计算。需要判断是否激活的 ReLU 单元越多，新增整数变量和约束也越多。
+
+训练完成后，策略网络在每个决策时刻给出当前各槽位的充电功率，并通过式\eqref{eq:rl_power_rollout}逐时段计算整个预测期的功率序列，实际只执行第一时段。价值网络参数在本轮 MPC 求解中保持固定；MPC 优化用户之后的路径和各请求使用的电池，据此构造 $s_{\ell+H}$，并通过式\eqref{eq:pwl_critic_embedding}计算终端价值。由此，RL 提供充电功率和长期价值函数，MPC 决定路径与电池分配。求解前的预测用于确定功率等输入，MPC 中的终端价值仍由本轮决策对应的期末状态决定。
+
+
+\section{Numerical experiments}
+
+% NUMERICAL_EXPERIMENTS_PLACEHOLDER_BEGIN
+% 待作者提供实验设置、数据与结果
+% NUMERICAL_EXPERIMENTS_PLACEHOLDER_END
+
+
+\section{Conclusion}
+
+本文研究高速公路换电站网络中预约用户和随机用户的协同服务，提出 MPC--RL 分层优化框架。MPC 定期更新预约用户的路径，并安排每个请求使用哪个槽位的电池。尚未进入高速公路的用户从入口规划路径，调整情况相对于日前发布路径评价；在途用户从实际位置规划之后的路径，与最近告知的路径中尚未走过的部分比较。新路径向在途用户发布时，计入一次调整成本。网络按 SOC 区间预先建立，再根据实时状态删除不能使用的弧。站内等待请求保留原到站时刻和截止时刻，继续参与下一轮决策。请求最多等待 $\Delta t$，预约用户优先，同类用户按到站顺序服务；电池达到 SOC $1$ 后才能交付，充满后停止充电，换入用户退回的电池后恢复充电。
+
+RL 的策略网络为每个槽位提供充电功率，MPC 将其作为已知参数；分段线性价值网络统一评价预测期末电池库存和未完成请求对后续运营净收益的影响。每轮先根据已知信息确定用于预测的路径，再逐时段计算充电功率，最后由 MPC 在固定功率和网络参数下优化路径与电池分配，并计算服务结果和终端价值。这一顺序使功率的计算不依赖本轮尚未求得的路径。
+
+本文将下游节点的预计到站时刻作为外生参数，忽略本轮等待对之后到站时间的影响，也未建立随机交通模型；换电按瞬时事件处理，未计入作业时长。终端价值由固定维度的状态特征和分段线性价值网络近似，可能无法完整反映电池 SOC 分布及同一用户多次换电之间的依赖。因此，仍需通过实验评估价值近似误差，以及新增整数变量对求解效率的影响。后续可进一步考虑交通变化和换电作业时长，改进终端价值估计，并在不同需求强度、电价和库存配置下检验框架的表现。
+
+
+%%----------- 参考文献 -------------------%%
+%在reference.bib文件中填写参考文献，此处自动生成
+
+% 当前正文尚无 \cite 命令，添加正式引用后再启用下行参考文献列表。
+% \reference
+
+\end{document}

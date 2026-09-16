@@ -149,7 +149,7 @@ class ContinuousSixStationIntegrationTests(unittest.TestCase):
         # Give every slot 60 kW (no station-level scaling): from SOC 0.3 it
         # becomes full at about 1.228 h, after the first-station arrival at
         # 1.067 h but before its online deadline at 1.317 h.
-        params.station_energy_limit_kwh = [
+        params.station_power_limit_kw = [
             [300.0] * params.num_periods
             for _ in range(params.station.num_stations)
         ]

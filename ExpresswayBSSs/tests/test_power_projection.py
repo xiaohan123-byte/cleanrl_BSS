@@ -10,7 +10,7 @@ class PowerProjectionTest(unittest.TestCase):
         projection = project_requested_power(
             [[80.0, -3.0], [40.0, 50.0]],
             slot_power_limit_kw=[[50.0, 50.0], [50.0, 30.0]],
-            station_energy_limit_kwh=[20.0, 24.0],
+            station_power_limit_kw=[20.0, 24.0],
             interval_hours=1.0,
             shape=[2, 2],
         )
@@ -27,7 +27,7 @@ class PowerProjectionTest(unittest.TestCase):
         kwargs = dict(
             requested_power=[[9.0, 7.0]],
             slot_power_limit_kw=8.0,
-            station_energy_limit_kwh=6.0,
+            station_power_limit_kw=6.0,
             interval_hours=0.5,
             shape=[2],
         )

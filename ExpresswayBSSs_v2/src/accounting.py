@@ -1,396 +1,169 @@
-"""Realised-event accounting for the continuous execution kernel.
+"""Accounting of realised events in the discrete rolling baseline.
 
-Forecast terminal values and MPC pending labels have no occurrence time, so
-they are intentionally absent from this module.  ``RealizedLedger`` accepts
-only idempotent, physically realised events emitted by ``ContinuousEventEngine``
-or a path-publication adapter.
+Financial entries are recomputed from physical quantities and parameters.
+Prediction objectives and request outcomes are never accepted as ledger events.
 """
-
 from __future__ import annotations
 
-from dataclasses import dataclass
-from math import isfinite
-from typing import Any, Callable, Dict, Iterable, List, Mapping, Sequence, Union
-
-from src.domain import LedgerEntry, LedgerEventType
-from src.time_grid import TimeGrid, TimeGridError
+from math import isclose, isfinite
+from typing import Any, Iterable, Mapping
 
 
-class LedgerError(RuntimeError):
-    """Base class for realised-ledger validation failures."""
+class LedgerError(ValueError):
+    """A realised event is inconsistent with the accounting contract."""
 
 
 class DuplicateLedgerEventError(LedgerError):
-    """Raised when a physically unique event is submitted twice."""
+    """A unique physical event was submitted more than once."""
 
 
-class UnsupportedLedgerEventError(TypeError, LedgerError):
-    """Raised for a prediction-only or otherwise non-realised quantity."""
+class UnsupportedLedgerEventError(LedgerError):
+    """An unsupported or prediction-only quantity was submitted."""
 
 
-PriceSource = Union[
-    float,
-    Sequence[float],
-    Sequence[Sequence[float]],
-    Mapping[Any, Any],
-    Callable[..., float],
-]
+COMPONENTS = (
+    "income_reservation", "income_random", "charging_cost", "adjustment_cost",
+    "reservation_failure_cost", "reward_delta",
+)
+EVENT_TYPES = {
+    "reservation_service", "random_service", "charging", "path_adjustment",
+    "reservation_failure", "random_timeout", "reservation_arrival",
+    "random_arrival", "reservation_entry", "reservation_exit", "path_publication",
+}
 
 
-@dataclass(frozen=True)
-class LedgerPosting:
-    """The deterministic financial effect of one accepted realised event."""
-
-    entry: LedgerEntry
-    income_reservation: float = 0.0
-    income_random: float = 0.0
-    charging_cost: float = 0.0
-    adjustment_cost: float = 0.0
-    reservation_failure_cost: float = 0.0
-    reward_delta: float = 0.0
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "entry": self.entry.to_dict(),
-            "income_reservation": self.income_reservation,
-            "income_random": self.income_random,
-            "charging_cost": self.charging_cost,
-            "adjustment_cost": self.adjustment_cost,
-            "reservation_failure_cost": self.reservation_failure_cost,
-            "reward_delta": self.reward_delta,
-        }
+def _number(value: Any, name: str) -> float:
+    try:
+        result = float(value)
+    except (TypeError, ValueError) as exc:
+        raise LedgerError(f"{name} must be numeric") from exc
+    if not isfinite(result):
+        raise LedgerError(f"{name} must be finite")
+    return result
 
 
-def _price_at(
-    source: PriceSource, interval: int, name: str, station: int | None = None
-) -> float:
-    """Read an interval price or a station-by-interval price.
+def _check_value(event: Mapping[str, Any], key: str, expected: float) -> None:
+    if key in event and not isclose(_number(event[key], key), expected, abs_tol=1e-7, rel_tol=1e-8):
+        raise LedgerError(f"{event['event_id']}: {key} does not match physical accounting")
 
-    Supported forms include a scalar, ``[period]``, ``[station][period]``, a
-    mapping with tuple ``(station, period)`` keys, and callables accepting
-    either ``(period)`` or ``(station, period)``.
-    """
 
-    if callable(source):
-        if station is None:
-            value = source(interval)
+def event_components(params: Any, event: Mapping[str, Any]) -> dict[str, float]:
+    """Validate one actual event and derive its signed financial contribution."""
+    if not event.get("event_id"):
+        raise LedgerError("event_id is required")
+    kind = event.get("type")
+    if kind not in EVENT_TYPES or event.get("realized", True) is not True:
+        raise UnsupportedLedgerEventError(f"not a realised baseline event: {kind}")
+    n = event.get("period")
+    if not isinstance(n, int) or not 0 <= n < params.num_periods:
+        raise LedgerError("event period is outside the operating horizon")
+    time = _number(event.get("time"), "time")
+    start, end = n * params.interval_hours, (n + 1) * params.interval_hours
+    if time < start - 1e-8 or time > end + 1e-8:
+        raise LedgerError("event occurrence is outside its execution interval")
+    if kind in {"reservation_service", "random_service", "path_adjustment"} and not isclose(time, start, abs_tol=1e-8):
+        raise LedgerError("service and path adjustment must occur at a decision boundary")
+    out = dict.fromkeys(COMPONENTS, 0.0)
+    if kind in {"reservation_service", "random_service", "charging"}:
+        i, b = event.get("station"), event.get("slot")
+        if not isinstance(i, int) or not 0 <= i < params.station.num_stations:
+            raise LedgerError("invalid station")
+        if not isinstance(b, int) or not 0 <= b < params.station.num_slots:
+            raise LedgerError("invalid slot")
+        if kind == "charging":
+            power = _number(event.get("power_kw"), "power_kw")
+            if power < -1e-8 or power > params.slot_power_limit(i, b) + 1e-7:
+                raise LedgerError("charging power exceeds slot limit")
+            energy = params.interval_hours * power
+            price = params.electricity_price[i][n]
+            before = _number(event.get("start_soc"), "start_soc")
+            after = _number(event.get("end_soc"), "end_soc")
+            if not -1e-7 <= before <= 1 + 1e-7 or not -1e-7 <= after <= 1 + 1e-7:
+                raise LedgerError("charging SOC is outside [0, 1]")
+            expected_after = before + energy * params.station.charging_efficiency / params.battery_capacity_kwh
+            if not isclose(after, expected_after, abs_tol=1e-7, rel_tol=1e-8):
+                raise LedgerError("charging SOC does not reconcile with grid energy")
+            out["charging_cost"] = energy * price
         else:
-            try:
-                value = source(station, interval)
-            except TypeError:
-                value = source(interval)
-    elif isinstance(source, Mapping):
-        if station is not None and (station, interval) in source:
-            value = source[(station, interval)]
-        elif station is not None and f"{station}:{interval}" in source:
-            value = source[f"{station}:{interval}"]
-        else:
-            station_row = None
-            if station is not None:
-                station_row = source.get(station, source.get(str(station)))
-            if isinstance(station_row, Mapping) or (
-                isinstance(station_row, Sequence)
-                and not isinstance(station_row, (str, bytes))
-            ):
-                return _price_at(station_row, interval, name)
-            if interval in source:
-                value = source[interval]
-            elif str(interval) in source:
-                value = source[str(interval)]
-            else:
-                raise LedgerError(f"{name} does not define interval {interval}")
-    elif isinstance(source, Sequence) and not isinstance(source, (str, bytes)):
-        if (
-            station is not None
-            and len(source) > 0
-            and isinstance(source[0], Sequence)
-            and not isinstance(source[0], (str, bytes))
-        ):
-            if station < 0 or station >= len(source):
-                raise LedgerError(f"{name} does not define station {station}")
-            return _price_at(source[station], interval, name)
-        if interval < 0 or interval >= len(source):
-            raise LedgerError(f"{name} does not define interval {interval}")
-        value = source[interval]
-    else:
-        value = source
-    numeric = float(value)
-    if not isfinite(numeric):
-        raise LedgerError(f"{name} value must be finite")
-    return numeric
+            if not event.get("request_id"):
+                raise LedgerError("service requires an actual request_id")
+            rho = _number(event.get("return_soc"), "return_soc")
+            if not 0 <= rho < 1:
+                raise LedgerError("return SOC is outside [0, 1)")
+            energy = params.battery_capacity_kwh * (1 - rho)
+            price = params.swap_service_price[i][n]
+            out["income_reservation" if kind == "reservation_service" else "income_random"] = energy * price
+        _check_value(event, "energy_kwh", energy)
+        _check_value(event, "unit_price", price)
+    elif kind == "path_adjustment":
+        if not event.get("user_key"):
+            raise LedgerError("path adjustment requires a user_key")
+        out["adjustment_cost"] = params.path_adjustment_penalty
+    elif kind == "reservation_failure":
+        if not event.get("user_key") or not event.get("request_id"):
+            raise LedgerError("reservation failure requires a user and request")
+        if time >= end:
+            raise LedgerError("deadline at the next boundary must remain pending")
+        out["reservation_failure_cost"] = params.reservation_failure_penalty
+    out["reward_delta"] = (
+        out["income_reservation"] + out["income_random"] - out["charging_cost"]
+        - out["adjustment_cost"] - out["reservation_failure_cost"]
+    )
+    for key, expected in out.items():
+        _check_value(event, key, expected)
+    return out
 
 
-class RealizedLedger:
-    """Idempotent accounting of actual services, charging, and failures.
-
-    All components use the sign convention used by the reward equation:
-
-    ``income_reservation + income_random - charging_cost - adjustment_cost
-    - reservation_failure_cost``.
-    """
-
-    _PREDICTION_ONLY_TYPES = {
-        "pending_at_horizon",
-        "served_in_horizon",
-        "failed_in_horizon",
-        "terminal_soc_value",
-        "outside_delivery_value",
-        "outside_swap_value",
-    }
-
-    def __init__(
-        self,
-        time_grid: TimeGrid,
-        *,
-        energy_price: PriceSource = 0.0,
-        reservation_service_price: PriceSource = 0.0,
-        random_service_price: PriceSource = 0.0,
-        reservation_failure_penalty: PriceSource = 0.0,
-        path_adjustment_cost: PriceSource = 0.0,
-        battery_capacity_kwh: float | None = None,
-    ) -> None:
-        self.time_grid = time_grid
-        self.energy_price = energy_price
-        self.reservation_service_price = reservation_service_price
-        self.random_service_price = random_service_price
-        self.reservation_failure_penalty = reservation_failure_penalty
-        self.path_adjustment_cost = path_adjustment_cost
-        if battery_capacity_kwh is not None and (
-            not isfinite(battery_capacity_kwh) or battery_capacity_kwh <= 0
-        ):
-            raise LedgerError("battery_capacity_kwh must be positive when specified")
-        self.battery_capacity_kwh = (
-            None if battery_capacity_kwh is None else float(battery_capacity_kwh)
-        )
-        self._postings: List[LedgerPosting] = []
-        self._event_ids: set[str] = set()
-
-    @property
-    def event_ids(self) -> set[str]:
-        return set(self._event_ids)
-
-    @property
-    def postings(self) -> List[LedgerPosting]:
-        return list(self._postings)
-
-    @property
-    def entries(self) -> List[LedgerEntry]:
-        return [posting.entry for posting in self._postings]
-
-    def submit(self, entry: LedgerEntry | Mapping[str, Any]) -> LedgerPosting:
-        """Validate, account, and retain one realised entry exactly once."""
-
-        normalized = self._coerce_entry(entry)
-        if not normalized.realized:
-            raise UnsupportedLedgerEventError("prediction-only entry cannot be realised")
-        if normalized.event_id in self._event_ids:
-            raise DuplicateLedgerEventError(
-                f"ledger event was already submitted: {normalized.event_id}"
-            )
-        posting = self._make_posting(normalized)
-        self._event_ids.add(normalized.event_id)
-        self._postings.append(posting)
-        return posting
-
-    # Alias for streaming callers.
-    record = submit
-
-    def submit_many(
-        self, entries: Iterable[LedgerEntry | Mapping[str, Any]]
-    ) -> List[LedgerPosting]:
-        return [self.submit(entry) for entry in entries]
-
-    def reward_for_interval(self, interval: int) -> float:
-        """Return only realised reward components for one interval."""
-
-        return sum(
-            posting.reward_delta
-            for posting in self._postings
-            if posting.entry.interval == interval
-        )
-
-    def components_for_interval(self, interval: int) -> Dict[str, float]:
-        fields = (
-            "income_reservation",
-            "income_random",
-            "charging_cost",
-            "adjustment_cost",
-            "reservation_failure_cost",
-            "reward_delta",
-        )
-        result = {field: 0.0 for field in fields}
-        for posting in self._postings:
-            if posting.entry.interval != interval:
-                continue
-            for field in fields:
-                result[field] += getattr(posting, field)
-        return result
-
-    def summary(self) -> Dict[str, float]:
-        fields = (
-            "income_reservation",
-            "income_random",
-            "charging_cost",
-            "adjustment_cost",
-            "reservation_failure_cost",
-            "reward_delta",
-        )
-        result = {field: 0.0 for field in fields}
-        for posting in self._postings:
-            for field in fields:
-                result[field] += getattr(posting, field)
-        return result
-
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "event_ids": sorted(self._event_ids),
-            "postings": [posting.to_dict() for posting in self._postings],
-            "summary": self.summary(),
-        }
-
-    def _coerce_entry(self, entry: LedgerEntry | Mapping[str, Any]) -> LedgerEntry:
-        if isinstance(entry, LedgerEntry):
-            return entry
-        if not isinstance(entry, Mapping):
-            raise LedgerError(f"unsupported ledger entry type: {type(entry)!r}")
-        event_type = str(entry.get("event_type", ""))
-        if event_type in self._PREDICTION_ONLY_TYPES:
-            raise UnsupportedLedgerEventError(
-                f"{event_type} has no realised occurrence time and cannot enter ledger"
-            )
-        try:
-            return LedgerEntry.from_dict(entry)
-        except ValueError as exc:
-            if event_type in self._PREDICTION_ONLY_TYPES:
-                raise UnsupportedLedgerEventError(event_type) from exc
-            raise LedgerError(str(exc)) from exc
-
-    def _make_posting(self, entry: LedgerEntry) -> LedgerPosting:
-        event_type = entry.event_type
-        income_reservation = 0.0
-        income_random = 0.0
-        charging_cost = 0.0
-        adjustment_cost = 0.0
-        reservation_failure_cost = 0.0
-
-        if event_type is LedgerEventType.CHARGING:
-            charging_cost = entry.energy_kwh * _price_at(
-                self.energy_price, entry.interval, "energy_price", entry.station
-            )
-        elif event_type is LedgerEventType.RESERVATION_SERVICE:
-            self._assert_service_interval(entry)
-            income_reservation = self._service_income(
-                entry, self.reservation_service_price, "reservation_service_price"
-            )
-        elif event_type is LedgerEventType.RANDOM_SERVICE:
-            self._assert_service_interval(entry)
-            income_random = self._service_income(
-                entry, self.random_service_price, "random_service_price"
-            )
-        elif event_type is LedgerEventType.PATH_PUBLISHED:
-            adjustment_cost = self._explicit_or_price(
-                entry, self.path_adjustment_cost, "path_adjustment_cost"
-            )
-        elif event_type is LedgerEventType.RESERVATION_TIMEOUT:
-            self._assert_service_interval(entry)
-            reservation_failure_cost = self._explicit_or_price(
-                entry,
-                self.reservation_failure_penalty,
-                "reservation_failure_penalty",
-            )
-        elif event_type is LedgerEventType.RANDOM_TIMEOUT:
-            self._assert_service_interval(entry)
-            # Record the realised timeout but intentionally assign no random
-            # loss cost; no hidden lost-demand or waiting penalty is added.
-        elif event_type is LedgerEventType.REQUEST_CANCELLED:
-            # Cancellation makes downstream events inactive; it is not another
-            # failure charge and therefore leaves all components at zero.
-            pass
-        else:  # pragma: no cover - Enum construction guards this branch.
-            raise UnsupportedLedgerEventError(str(event_type))
-
-        reward = (
-            income_reservation
-            + income_random
-            - charging_cost
-            - adjustment_cost
-            - reservation_failure_cost
-        )
-        return LedgerPosting(
-            entry=entry,
-            income_reservation=income_reservation,
-            income_random=income_random,
-            charging_cost=charging_cost,
-            adjustment_cost=adjustment_cost,
-            reservation_failure_cost=reservation_failure_cost,
-            reward_delta=reward,
-        )
-
-    def _assert_service_interval(self, entry: LedgerEntry) -> None:
-        try:
-            actual_interval = self.time_grid.interval_of(entry.occurred_at)
-        except TimeGridError as exc:
-            raise LedgerError(
-                f"realised service/timeout time {entry.occurred_at} is outside time grid"
-            ) from exc
-        if actual_interval != entry.interval:
-            raise LedgerError(
-                f"entry {entry.event_id} declares interval {entry.interval}, "
-                f"but its occurrence belongs to {actual_interval}"
-            )
-
-    @staticmethod
-    def _explicit_or_price(entry: LedgerEntry, source: PriceSource, name: str) -> float:
-        if "amount" in entry.metadata:
-            value = entry.metadata["amount"]
-        elif entry.amount != 0.0:
-            value = entry.amount
-        else:
-            value = _price_at(source, entry.interval, name, entry.station)
-        numeric = float(value)
-        if not isfinite(numeric):
-            raise LedgerError(f"{name} must be finite")
-        return numeric
-
-    def _service_income(self, entry: LedgerEntry, source: PriceSource, name: str) -> float:
-        """Compute swap income from actually supplied energy when available.
-
-        Executor entries carry ``return_soc`` and ``battery_capacity_kwh`` so
-        the normal path is ``price[station, interval] * E_B * (1-return_soc)``.
-        An explicit ``amount`` remains an already-calculated total;
-        entries without return-SOC metadata retain flat pricing.
-        """
-
-        if "amount" in entry.metadata:
-            value = entry.metadata["amount"]
-        elif entry.amount != 0.0:
-            value = entry.amount
-        else:
-            price = _price_at(source, entry.interval, name, entry.station)
-            energy = entry.metadata.get("service_energy_kwh")
-            if energy is None and "return_soc" in entry.metadata:
-                return_soc = float(entry.metadata["return_soc"])
-                if not 0.0 <= return_soc <= 1.0:
-                    raise LedgerError("service return_soc must lie in [0, 1]")
-                capacity = entry.metadata.get(
-                    "battery_capacity_kwh", self.battery_capacity_kwh
-                )
-                if capacity is not None:
-                    capacity = float(capacity)
-                    if not isfinite(capacity) or capacity <= 0:
-                        raise LedgerError("service battery_capacity_kwh must be positive")
-                    energy = capacity * (1.0 - return_soc)
-            value = price if energy is None else price * float(energy)
-        numeric = float(value)
-        if not isfinite(numeric):
-            raise LedgerError(f"{name} must be finite")
-        return numeric
+def append_events(params: Any, ledger: list[dict[str, Any]], events: Iterable[Mapping[str, Any]]) -> float:
+    """Append validated events atomically; duplicate actual effects are errors."""
+    event_ids = {entry["event_id"] for entry in ledger}
+    serviced = {entry["request_id"] for entry in ledger if entry["type"] in {"reservation_service", "random_service"}}
+    failed = {str(entry["user_key"]) for entry in ledger if entry["type"] == "reservation_failure"}
+    terminal_types = {"reservation_service", "random_service", "reservation_failure", "random_timeout"}
+    outcomes = {entry["request_id"] for entry in ledger if entry["type"] in terminal_types}
+    additions = []
+    for item in events:
+        event = dict(item)
+        event_id = event.get("event_id")
+        if event_id in event_ids:
+            raise DuplicateLedgerEventError(f"duplicate event: {event_id}")
+        event_ids.add(event_id)
+        if event.get("type") in terminal_types:
+            request_id = event.get("request_id")
+            if request_id in outcomes:
+                raise DuplicateLedgerEventError(f"request already has a terminal outcome: {request_id}")
+            outcomes.add(request_id)
+        if event.get("type") == "reservation_service" and str(event.get("user_key")) in failed:
+            raise LedgerError("a failed reservation cannot receive a later service")
+        if event.get("type") in {"reservation_service", "random_service"}:
+            request_id = event.get("request_id")
+            if request_id in serviced:
+                raise DuplicateLedgerEventError(f"request already served: {request_id}")
+            serviced.add(request_id)
+        if event.get("type") == "reservation_failure":
+            key = str(event.get("user_key"))
+            if key in failed:
+                raise DuplicateLedgerEventError(f"reservation already failed: {key}")
+            failed.add(key)
+        event.update(event_components(params, event))
+        event["realized"] = True
+        additions.append(event)
+    ledger.extend(additions)
+    return sum(item["reward_delta"] for item in additions)
 
 
-__all__ = [
-    "DuplicateLedgerEventError",
-    "LedgerError",
-    "LedgerPosting",
-    "RealizedLedger",
-    "UnsupportedLedgerEventError",
-]
+def summarize_ledger(ledger: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+    entries = list(ledger)
+    summary: dict[str, Any] = {key: sum(float(item.get(key, 0)) for item in entries) for key in COMPONENTS}
+    summary.update(
+        total_reward=summary["reward_delta"],
+        income=summary["income_reservation"] + summary["income_random"],
+        reservation_services=sum(item["type"] == "reservation_service" for item in entries),
+        random_services=sum(item["type"] == "random_service" for item in entries),
+        reservation_failures=sum(item["type"] == "reservation_failure" for item in entries),
+        random_timeouts=sum(item["type"] == "random_timeout" for item in entries),
+        path_adjustments=sum(item["type"] == "path_adjustment" for item in entries),
+        grid_energy_kwh=sum(float(item.get("energy_kwh", 0)) for item in entries if item["type"] == "charging"),
+        ledger_event_count=len(entries),
+    )
+    return summary
