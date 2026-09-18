@@ -112,12 +112,18 @@ def main(argv=None):
                 manifest = json.loads((dataset_dir / "manifest.json").read_text(encoding="utf-8"))
                 if fingerprint(manifest) != saved_plan["dataset_manifest_hash"]:
                     raise ValueError("frozen dataset manifest changed")
+                prior_controller = json.loads((output / "status.json").read_text(encoding="utf-8"))
+                immutable_json(output / "controller_history" / f"attempt_{prior_controller['created']}.json", prior_controller)
+                # Keep the bounded JSON-write retry wrapper on workers in this mode too.
+                recovery = recovery_snapshot(output)
+            else:
+                recovery = None
             manifest = prepare_dataset(args.data_dir, dataset_dir)
-            recovery = None
         if args.prepare_only:
             print(json.dumps({"state": "prepared", "dataset": str(dataset_dir),
                 "test_days": manifest["test_day_ids_by_weekday"], "jobs": 35}, ensure_ascii=False))
             return 0
+        status_recovering = {}
         if args.resume_reviewed_model_fix:
             snapshot, hashes = source_snapshot(output)
             status_recovering = {"reviewed_model_fix": "execution power tolerance aligned to configured solver FeasTol"}
@@ -126,7 +132,6 @@ def main(argv=None):
                     "earlier_completed_groups": "unchanged; h8 and later use the reviewed fix"}
         elif not args.resume_frozen:
             snapshot, hashes = source_snapshot(output)
-            status_recovering = {}
         days = manifest["test_day_ids_by_weekday"]
         if not args.resume_reviewed_model_fix:
             plan = {"dataset_manifest_hash": fingerprint(manifest), "source_hashes": hashes,
@@ -137,7 +142,7 @@ def main(argv=None):
                 "jobs": [{"job_id": f"h{h}_day{d:02d}", "horizon": h, "day_id": d,
                           "weekday": (d-1)%7+1} for h in HORIZONS for d in days]}
         if args.resume_reviewed_model_fix:
-            (output / "plan_reviewed_fix.json").write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+            atomic_json(output / "plan_reviewed_fix.json", plan)
         else:
             immutable_json(output / "plan.json", plan)
         environment = {"python": sys.version, "executable": sys.executable,
@@ -176,16 +181,22 @@ def main(argv=None):
                 if fingerprint(value) != expected:
                     raise ValueError("frozen scenario changed")
                 identity = {**job, "source_hash": fingerprint(hashes), "scenario_hash": expected}
-                immutable_json(directory / "job.json", identity)
                 marker = directory / "worker_status.json"
-                if marker.exists():
-                    previous = json.loads(marker.read_text(encoding="utf-8"))
-                    if previous["state"] == "complete":
-                        if not all((directory / f).exists() for f in ("result.json.gz", "metrics.json", "statistics.json")):
-                            raise ValueError("completed job missing artifacts")
+                previous = json.loads(marker.read_text(encoding="utf-8")) if marker.exists() else None
+                if previous and previous["state"] == "complete":
+                    if not all((directory / f).exists() for f in ("result.json.gz", "metrics.json", "statistics.json")):
+                        raise ValueError("completed job missing artifacts")
+                    if job["job_id"] not in status["completed_jobs"]:
                         status["completed_jobs"].append(job["job_id"])
                         atomic_json(output / "status.json", status)
-                        continue
+                    continue
+                if args.resume_reviewed_model_fix:
+                    # The original immutable job identity keeps its frozen source
+                    # hash; the reviewed fix is recorded in a separate artifact.
+                    atomic_json(directory / "job_reviewed_fix.json", identity)
+                else:
+                    immutable_json(directory / "job.json", identity)
+                if previous:
                     # Failed attempts require explicit diagnosis; never silently repeat them.
                     if previous["state"] == "failed" and not (args.retry_io_failure and reviewed_io_failure(previous)) \
                             and not (args.resume_reviewed_model_fix and previous.get("error") == "invalid slot charging power"):
@@ -197,7 +208,10 @@ def main(argv=None):
                 if recovery:
                     command = [sys.executable, "-u", str(recovery / "io_retry_worker.py"),
                                "--frozen-source", str(snapshot), *command[3:]]
-                    atomic_json(directory / "io_recovery.json", {
+                    io_record = directory / "io_recovery.json"
+                    if io_record.exists():
+                        io_record = directory / f"io_recovery_{fingerprint(hashes)[:12]}.json"
+                    atomic_json(io_record, {
                         "recovery_code": str(recovery), "original_source": str(snapshot),
                         "original_source_hash": fingerprint(hashes), "scenario_hash": expected,
                         "change": "bounded retries of atomic JSON writes; solver/model/data unchanged",

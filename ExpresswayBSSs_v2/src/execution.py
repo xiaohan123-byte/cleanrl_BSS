@@ -249,11 +249,15 @@ def _validate_power(params, state, solution):
             power = float(solution.power[i][b][0])
             tolerance = _solver_feasibility_tolerance(params)
             if not isfinite(power) or power < -tolerance or power > params.slot_power_limit(i, b) + tolerance:
-                raise ExecutionError("invalid slot charging power")
+                raise ExecutionError(
+                    f"invalid slot charging power: station={i} slot={b} power={power!r} "
+                    f"limit={params.slot_power_limit(i, b)} tolerance={tolerance}")
             power = min(params.slot_power_limit(i, b), max(0., power))
             row.append(power)
         if sum(row) > params.station_power_limit(i) + tolerance:
-            raise ExecutionError("station power limit exceeded")
+            raise ExecutionError(
+                f"station power limit exceeded: station={i} total={sum(row)!r} "
+                f"limit={params.station_power_limit(i)} tolerance={tolerance}")
         powers.append(row)
     return powers
 
