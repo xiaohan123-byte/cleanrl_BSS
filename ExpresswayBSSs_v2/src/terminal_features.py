@@ -6,6 +6,7 @@ predecessor service time. Thus all non-inventory candidate fields are constants
 selected by binary decisions; no continuously variable time is rounded to a bin.
 """
 from __future__ import annotations
+from .parameters import slots_at, price_at
 
 import math
 from collections import defaultdict
@@ -72,6 +73,7 @@ class FeatureSpec:
         self.inventory_indices = []
         self.nstations = params.station.num_stations
         self.nslots = params.station.num_slots
+        self.slot_counts = [slots_at(params, i) for i in range(self.nstations)]
         endpoints = list(getattr(params.station, "positions_km", [0.0, 1.0]))
         for od in getattr(params, "od_pairs", []):
             endpoints.extend((od.entry_km, od.exit_km))
@@ -148,7 +150,7 @@ class FeatureSpec:
                 "dimension": self.dimension, "chain_templates": [[d, list(s)] for d, s in self.groups],
                 "soc_thresholds": list(SOC_THRESHOLDS), "time_limits_hours": list(TIME_LIMITS),
                 "count_scale": 100.0, "time_scale_hours": 24.0,
-                "inventory_count_scale": self.nslots, "network_length_km": self.network_length,
+                "inventory_count_scale": self.slot_counts, "network_length_km": self.network_length,
                 "random_forecast_feature_extent": "state_time_to_operating_end"}
 
     def _external(self, period):
@@ -158,8 +160,8 @@ class FeatureSpec:
         values = [tau / 24.0, max(0.0, end - tau) / 24.0]
         values.extend(float(period % p.path_update_interval == phase) for phase in range(3))
         for station in range(self.nstations):
-            values.extend((p.electricity_price[station][period], p.swap_service_price[station][period])
-                          if period < p.num_periods else (0.0, 0.0))
+            values.extend((price_at(p, "electricity_price", station, period), price_at(p, "swap_service_price", station, period))
+                          if period < p.num_periods or getattr(p, "finish_pending_after_demand", False) else (0.0, 0.0))
         for k in range(24):
             left, right = tau + k, min(tau + k + 1, end)
             length = max(0.0, right - left)
@@ -249,9 +251,9 @@ class FeatureSpec:
             return output
         for station, indices in enumerate(self.inventory_indices):
             row = np.asarray(state.slot_soc[station])
-            output[indices[0]] = row.sum() / self.nslots
+            output[indices[0]] = row.sum() / self.slot_counts[station]
             for index, threshold in zip(indices[1:], SOC_THRESHOLDS):
-                output[index] = np.maximum(row - threshold, 0).sum() / (self.nslots * (1 - threshold))
+                output[index] = np.maximum(row - threshold, 0).sum() / (self.slot_counts[station] * (1 - threshold))
         output[self.external_start:] = self._external(state.period)
         if self.variant != "full":
             return output
@@ -306,17 +308,17 @@ class FeatureSpec:
         selectors = []
         if self.variant == "simple_inventory":
             expressions[0] = p.battery_capacity_kwh * cp.quicksum(soc[i, b, end_period]
-                                for i in range(self.nstations) for b in range(self.nslots))
-            bounds[0] = [0.0, p.battery_capacity_kwh * self.nstations * self.nslots]
+                                for i in range(self.nstations) for b in range(self.slot_counts[i]))
+            bounds[0] = [0.0, p.battery_capacity_kwh * sum(self.slot_counts)]
             return expressions, bounds, {"cases": [], "selectors": []}
         for station, indices in enumerate(self.inventory_indices):
-            expressions[indices[0]] = cp.quicksum(soc[station, b, end_period] for b in range(self.nslots)) / self.nslots
+            expressions[indices[0]] = cp.quicksum(soc[station, b, end_period] for b in range(self.slot_counts[station])) / self.slot_counts[station]
             bounds[indices[0]] = [0.0, 1.0]
             for index, threshold in zip(indices[1:], SOC_THRESHOLDS):
                 pieces = [bounded_relu(model, cp, COPT, soc[station, b, end_period] - threshold,
                                        -threshold, 1 - threshold, f"soc_hinge[{station},{b},{threshold}]")
-                          for b in range(self.nslots)]
-                expressions[index] = cp.quicksum(pieces) / (self.nslots * (1 - threshold))
+                          for b in range(self.slot_counts[station])]
+                expressions[index] = cp.quicksum(pieces) / (self.slot_counts[station] * (1 - threshold))
                 bounds[index] = [0.0, 1.0]
         external = self._external(end_period)
         for offset, value in enumerate(external):

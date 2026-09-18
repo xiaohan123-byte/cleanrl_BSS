@@ -5,6 +5,12 @@ validates those actions, swaps first, and applies the specified constant power.
 Arrivals between boundaries only enter the next round's waiting set.
 """
 from __future__ import annotations
+from .parameters import slots_at, price_at, execution_period_limit
+
+
+def _solver_feasibility_tolerance(params):
+    """Execution may accept a solution only within the solver's stated bound."""
+    return float(getattr(getattr(params, "solver", None), "feasibility_tol", 1e-7))
 
 from math import isclose, isfinite, ulp
 from typing import Any
@@ -210,7 +216,7 @@ def _validate_services(params, state, services, now):
             raise ExecutionError(f"only an observed waiting request can be served: {rid}")
         if rid in chosen_ids or (i, b) in chosen_slots:
             raise ExecutionError("a request or battery is assigned twice at one boundary")
-        if not 0 <= i < params.station.num_stations or not 0 <= b < params.station.num_slots:
+        if not 0 <= i < params.station.num_stations or not 0 <= b < slots_at(params, i):
             raise ExecutionError("invalid service station or slot")
         if eligible[rid].station != i:
             raise ExecutionError("request cannot be served at another station")
@@ -234,17 +240,19 @@ def _validate_power(params, state, solution):
         raise ExecutionError("power must define every station")
     powers = []
     for i in range(params.station.num_stations):
-        if len(solution.power[i]) != params.station.num_slots:
+        if len(solution.power[i]) != slots_at(params, i):
             raise ExecutionError("power must define every charging slot")
         row = []
-        for b in range(params.station.num_slots):
+        for b in range(slots_at(params, i)):
             if not solution.power[i][b]:
                 raise ExecutionError("first-period power is missing")
             power = float(solution.power[i][b][0])
-            if not isfinite(power) or power < 0 or power > params.slot_power_limit(i, b) + 1e-7:
+            tolerance = _solver_feasibility_tolerance(params)
+            if not isfinite(power) or power < -tolerance or power > params.slot_power_limit(i, b) + tolerance:
                 raise ExecutionError("invalid slot charging power")
+            power = min(params.slot_power_limit(i, b), max(0., power))
             row.append(power)
-        if sum(row) > params.station_power_limit(i) + 1e-7:
+        if sum(row) > params.station_power_limit(i) + tolerance:
             raise ExecutionError("station power limit exceeded")
         powers.append(row)
     return powers
@@ -253,7 +261,7 @@ def _validate_power(params, state, solution):
 def execute_step(params: Any, state: RollingState, solution: MPCSolution,
                  random_arrivals: list[dict] | None = None, scenario=None) -> ExecutionResult:
     """Apply the first control interval on a clone and return actual events."""
-    if not 0 <= state.period < params.num_periods:
+    if not 0 <= state.period < execution_period_limit(params):
         raise ExecutionError("cannot execute outside the operating horizon")
     state.validate()
     result = state.clone()
@@ -273,7 +281,7 @@ def execute_step(params: Any, state: RollingState, solution: MPCSolution,
                        arrival_time=request.arrival_time, deadline=request.deadline,
                        waiting_hours=max(0., now - request.arrival_time),
                        energy_kwh=params.battery_capacity_kwh * (1. - request.return_soc),
-                       unit_price=params.swap_service_price[action.station][n])
+                       unit_price=price_at(params, "swap_service_price", action.station, n))
         if request.kind == "reservation":
             key = user_key_text(request.user_key)
             user = result.users[key]
@@ -308,7 +316,7 @@ def execute_step(params: Any, state: RollingState, solution: MPCSolution,
             events.append(_event("charging", f"charging:{n}:{i}:{b}", n, now,
                                  station=i, slot=b, power_kw=power,
                                  energy_kwh=power * params.interval_hours,
-                                 unit_price=params.electricity_price[i][n],
+                                 unit_price=price_at(params, "electricity_price", i, n),
                                  start_soc=before, end_soc=after))
     _record_random(params, result, random_arrivals or [], events, n, now, end)
     truth = _scenario_records(scenario)

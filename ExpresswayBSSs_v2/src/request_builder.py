@@ -1,5 +1,6 @@
 """Assemble arc-dependent requests without fixing downstream arrival times."""
 from __future__ import annotations
+from .parameters import prediction_horizon
 from math import ulp
 from src.domain import CandidateRequest, DomainError, MPCWindow, user_key_text
 from src.path_state import build_remaining_network
@@ -17,7 +18,7 @@ def _arc_id(key, source, station):
 def build_window(params, state, network, forecast, horizon=None):
     state.validate()
     ell = state.period
-    horizon = min(params.horizon if horizon is None else horizon, params.num_periods - ell)
+    horizon = prediction_horizon(params, ell, params.horizon if horizon is None else horizon)
     if horizon <= 0:
         raise DomainError('empty prediction window')
     requests = []

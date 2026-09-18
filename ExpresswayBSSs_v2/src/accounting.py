@@ -4,6 +4,7 @@ Financial entries are recomputed from physical quantities and parameters.
 Prediction objectives and request outcomes are never accepted as ledger events.
 """
 from __future__ import annotations
+from .parameters import slots_at, price_at, execution_period_limit
 
 from math import isclose, isfinite
 from typing import Any, Iterable, Mapping
@@ -55,7 +56,7 @@ def event_components(params: Any, event: Mapping[str, Any]) -> dict[str, float]:
     if kind not in EVENT_TYPES or event.get("realized", True) is not True:
         raise UnsupportedLedgerEventError(f"not a realised baseline event: {kind}")
     n = event.get("period")
-    if not isinstance(n, int) or not 0 <= n < params.num_periods:
+    if not isinstance(n, int) or not 0 <= n < execution_period_limit(params):
         raise LedgerError("event period is outside the operating horizon")
     time = _number(event.get("time"), "time")
     start, end = n * params.interval_hours, (n + 1) * params.interval_hours
@@ -68,14 +69,14 @@ def event_components(params: Any, event: Mapping[str, Any]) -> dict[str, float]:
         i, b = event.get("station"), event.get("slot")
         if not isinstance(i, int) or not 0 <= i < params.station.num_stations:
             raise LedgerError("invalid station")
-        if not isinstance(b, int) or not 0 <= b < params.station.num_slots:
+        if not isinstance(b, int) or not 0 <= b < slots_at(params, i):
             raise LedgerError("invalid slot")
         if kind == "charging":
             power = _number(event.get("power_kw"), "power_kw")
             if power < -1e-8 or power > params.slot_power_limit(i, b) + 1e-7:
                 raise LedgerError("charging power exceeds slot limit")
             energy = params.interval_hours * power
-            price = params.electricity_price[i][n]
+            price = price_at(params, "electricity_price", i, n)
             before = _number(event.get("start_soc"), "start_soc")
             after = _number(event.get("end_soc"), "end_soc")
             if not -1e-7 <= before <= 1 + 1e-7 or not -1e-7 <= after <= 1 + 1e-7:
@@ -91,7 +92,7 @@ def event_components(params: Any, event: Mapping[str, Any]) -> dict[str, float]:
             if not 0 <= rho < 1:
                 raise LedgerError("return SOC is outside [0, 1)")
             energy = params.battery_capacity_kwh * (1 - rho)
-            price = params.swap_service_price[i][n]
+            price = price_at(params, "swap_service_price", i, n)
             out["income_reservation" if kind == "reservation_service" else "income_random"] = energy * price
         _check_value(event, "energy_kwh", energy)
         _check_value(event, "unit_price", price)

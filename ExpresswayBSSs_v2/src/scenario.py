@@ -165,7 +165,7 @@ def generate_synthetic_scenario(params: BusinessParameters, seed: int | None = N
     return SyntheticScenario(params, reservations, random_requests, scenario_seed)
 
 
-def _generate_terminal_scenario(params: BusinessParameters, scenario_seed: int) -> SyntheticScenario:
+def _generate_terminal_scenario(params: BusinessParameters, scenario_seed: int, *, day_id: int | None = None, include_random: bool = True) -> SyntheticScenario:
     """Generate the confirmed independent processes without feasibility filtering.
 
     Sampling a report uniformly from its intersected support is exactly the
@@ -173,7 +173,8 @@ def _generate_terminal_scenario(params: BusinessParameters, scenario_seed: int) 
     Actual OD and SOC draws are never rejected to make a route feasible.
     """
     def rng(stream: int):
-        return np.random.default_rng(np.random.SeedSequence([scenario_seed, stream]))
+        return np.random.default_rng(np.random.SeedSequence(
+            [scenario_seed, stream] if day_id is None else [scenario_seed, stream, day_id]))
 
     od_rng, hour_rng, offset_rng, soc_rng = [rng(k) for k in (110, 111, 112, 113)]
     report_time_rng, report_soc_rng, travel_rng = [rng(k) for k in (120, 121, 122)]
@@ -214,7 +215,7 @@ def _generate_terminal_scenario(params: BusinessParameters, scenario_seed: int) 
     reservations.sort(key=lambda record: (record["entry_time"], record["user_key"]))
     random_requests = []
     soc_low, soc_high = params.random_return_soc_range
-    for station in params.station.station_ids:
+    for station in (params.station.station_ids if include_random else []):
         index = 0
         for period in range(params.num_periods):
             start = period * params.interval_hours

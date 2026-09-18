@@ -7,6 +7,7 @@ big-M bound in physical time and no positive time epsilon.
 """
 
 from __future__ import annotations
+from .parameters import slots_at, price_at, execution_period_limit
 
 import math
 import sys
@@ -54,14 +55,15 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
         raise MPCSolveError("COPT (coptpy) is required to solve the baseline MILP") from exc
 
     ell, horizon = window.ell, window.horizon
-    if horizon < 1 or ell < 0 or ell + horizon > params.num_periods:
+    if horizon < 1 or ell < 0 or ell >= execution_period_limit(params) or (not getattr(params, "finish_pending_after_demand", False) and ell + horizon > params.num_periods):
         raise ValueError("MPC window must lie within the configured operating periods")
     if window.state.period != ell:
         raise ValueError("MPC initial state and window period differ")
     delta = params.interval_hours
     periods = range(ell, ell + horizon)
     end = (ell + horizon) * delta
-    nstations, nslots = params.station.num_stations, params.station.num_slots
+    nstations = params.station.num_stations
+    slot_counts = [slots_at(params, i) for i in range(nstations)]
     requests = {r.request_id: r for r in window.requests}
     if len(requests) != len(window.requests):
         raise ValueError("Candidate request IDs must be unique")
@@ -200,9 +202,9 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
             else:
                 activation[rid] = y[user_key_text(req.user_key), tuple(req.arc)]
             for n in possible_periods[rid]:
-                for slot in range(nslots):
+                for slot in range(slot_counts[req.station]):
                     alpha[rid, slot, n] = model.addVar(vtype=COPT.BINARY, name=f"a[{rid},{slot},{n}]")
-                service[rid, n] = cp.quicksum(alpha[rid, slot, n] for slot in range(nslots))
+                service[rid, n] = cp.quicksum(alpha[rid, slot, n] for slot in range(slot_counts[requests[rid].station]))
             total[rid] = cp.quicksum(service[rid, n] for n in possible_periods[rid])
             model.addConstr(total[rid] <= activation[rid], name=f"once[{rid}]")
             cases = [(t, 1 if q is None else service[q, m]) for t, q, m in possible_cases[rid]]
@@ -287,7 +289,7 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
         eta = params.station.charging_efficiency
         charging_cost = cp.LinExpr()
         for station in range(nstations):
-            for slot in range(nslots):
+            for slot in range(slot_counts[station]):
                 for n in range(ell, ell + horizon + 1):
                     soc[station, slot, n] = model.addVar(lb=0, ub=1, name=f"S[{station},{slot},{n}]")
                 model.addConstr(soc[station, slot, ell] == window.state.slot_soc[station][slot])
@@ -306,7 +308,7 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
                     if charging_mode == "baseline":
                         from .terminal_value import bounded_relu
                         limit = min(params.slot_power_limit(station, slot),
-                                    params.station_power_limit(station) / nslots)
+                                    params.station_power_limit(station) / slot_counts[station])
                         full_step = params.battery_capacity_kwh / (eta * delta)
                         required = full_step * (1 - soc[station, slot, n] + reduction)
                         excess = bounded_relu(model, cp, COPT, required - limit,
@@ -314,13 +316,13 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
                                               f"base_power_excess[{station},{slot},{n}]")
                         model.addConstr(pvar == required - excess,
                                         name=f"baseline_power[{station},{slot},{n}]")
-                    charging_cost += delta * params.electricity_price[station][n] * pvar
+                    charging_cost += delta * price_at(params, "electricity_price", station, n) * pvar
             for n in periods:
-                model.addConstr(cp.quicksum(power[station, slot, n] for slot in range(nslots))
+                model.addConstr(cp.quicksum(power[station, slot, n] for slot in range(slot_counts[station]))
                                 <= params.station_power_limit(station))
 
         income = cp.quicksum(params.battery_capacity_kwh * (1 - requests[rid].return_soc)
-                             * params.swap_service_price[requests[rid].station][n] * avar
+                             * price_at(params, "swap_service_price", requests[rid].station, n) * avar
                              for (rid, _, n), avar in alpha.items())
         adjustment_cost = params.path_adjustment_penalty * cp.quicksum(changed.values())
         failure_cost = params.reservation_failure_penalty * cp.quicksum(failures.values())
@@ -331,7 +333,7 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
             from .terminal_value import embed_value
             if terminal_model.kind == "simple_inventory":
                 terminal_expression = terminal_model.inventory_coefficient * params.battery_capacity_kwh * \
-                    cp.quicksum(soc[i, b, ell + horizon] for i in range(nstations) for b in range(nslots))
+                    cp.quicksum(soc[i, b, ell + horizon] for i in range(nstations) for b in range(slot_counts[i]))
             else:
                 feature_spec = feature_spec or FeatureSpec(params, terminal_model.variant)
                 terminal_expressions, terminal_bounds, terminal_records = feature_spec.build_mip(
@@ -438,9 +440,9 @@ def solve_mpc(params: Any, window: MPCWindow, *, terminal_model=None, feature_sp
             status=status, objective=float(model.objval),
             objective_terms=terms,
             paths=paths, services=services,
-            power=[[[max(0.0, power[i, b, n].x) for n in periods] for b in range(nslots)] for i in range(nstations)],
+            power=[[[max(0.0, power[i, b, n].x) for n in periods] for b in range(slot_counts[i])] for i in range(nstations)],
             soc=[[[min(1.0, max(0.0, soc[i, b, n].x)) for n in range(ell, ell + horizon + 1)]
-                  for b in range(nslots)] for i in range(nstations)],
+                  for b in range(slot_counts[i])] for i in range(nstations)],
             request_outcomes=outcomes, mip_gap=float(model.bestgap) if is_mip else 0.0,
             solve_seconds=float(model.solvingtime),
         )

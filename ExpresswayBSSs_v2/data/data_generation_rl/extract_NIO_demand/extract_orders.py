@@ -3,24 +3,43 @@
 """
 批量提取柱状图订单量数据工具
 
-从24小时柱状图提取订单量数值，输出24个逗号分隔的整数（索引0-23对应0:00-23:00）
+从24小时柱状图提取订单量数值，输出24个逗号分隔的整数（索引0-23对应0:00-23:59）
 
 用法:
-    python extract_orders.py <历史时刻索引> <图片路径/目录/通配符> [图片路径2 ...]
+    python extract_orders.py [历史时刻索引] <图片路径/目录/通配符> [图片路径2 ...]
+
+省略历史时刻索引时，从 images_<node_idx>_<direction>_<history_index> 目录自动读取。
 
 示例:
+    python extract_orders.py ./0917
     python extract_orders.py 21 ./images/*.jpg
     python extract_orders.py 15 img1.jpg img2.jpg img3.jpg
     python extract_orders.py 21 ./images/
 """
 
+import argparse
 import os
+import re
 import sys
 import numpy as np
 from PIL import Image
 from glob import glob
 from itertools import groupby
 from numpy.polynomial import polynomial as P
+from pathlib import Path
+
+
+def parse_image_metadata(image_path):
+    """从 images_<node_idx>_<direction>_<history_index> 目录读取元数据。"""
+    for parent in Path(image_path).resolve().parents:
+        match = re.fullmatch(r"images_([^_]+)_(bj|sh)_(\d+)", parent.name)
+        if match:
+            node_idx, direction, index = match.groups()
+            history_index = int(index)
+            if not 0 <= history_index <= 23:
+                raise ValueError(f"{parent.name}: history_index 必须在 0-23 之间")
+            return node_idx, direction, history_index
+    raise ValueError(f"{image_path}: 未找到 images_<node_idx>_<bj|sh>_<0-23> 目录")
 
 
 def measure_bar_height(x_pos, mask_img, base_y, search_w=8):
@@ -119,9 +138,13 @@ def find_px_per_unit(heights):
     return float(min_h)
 
 
-def extract_chart_data(image_path, history_index):
-    img = Image.open(image_path)
-    img_np = np.array(img)
+def extract_chart_data(image_path, history_index=None):
+    if history_index is None:
+        _, _, history_index = parse_image_metadata(image_path)
+    if not isinstance(history_index, int) or not 0 <= history_index <= 23:
+        raise ValueError("history_index 必须是 0-23 的整数")
+    with Image.open(image_path) as img:
+        img_np = np.array(img.convert("RGB"))
     h, w = img_np.shape[:2]
 
     # 1. 定位图表区域
@@ -139,7 +162,8 @@ def extract_chart_data(image_path, history_index):
         col_proj = np.sum(window > 0, axis=0)
         peaks = col_proj > 50
         peak_count = sum(1 for k, _g in groupby(peaks) if k)
-        if 8 <= peak_count <= 20:
+        # 允许稀疏图表；保留最低数量限制，避免误选青色按钮。
+        if 5 <= peak_count <= 23:
             score = np.sum(window) + peak_count * 1000
             if score > best_score:
                 best_score = score
@@ -213,7 +237,11 @@ def extract_chart_data(image_path, history_index):
     ]
     if not spacings:
         return None, "无法计算柱子间距"
-    median_spacing = float(np.median(spacings))
+    # 稀疏图表的非零柱子之间可能隔着零订单小时，不能用中位间距。
+    if len(cyan_bars) < 8:
+        median_spacing = float(min(spacings))
+    else:
+        median_spacing = float(np.median(spacings))
     derived_indices = [
         round((cx - anchor_x) / median_spacing + history_index)
         for cx in cyan_bars
@@ -282,69 +310,61 @@ def extract_chart_data(image_path, history_index):
     return values, None
 
 
-def collect_images(paths):
+def collect_images(paths, recursive=False):
     image_extensions = {'.jpg', '.jpeg', '.png', '.bmp', '.webp'}
     all_files = []
     for p in paths:
+        p = os.fspath(p)
         if os.path.isdir(p):
-            for ext in image_extensions:
-                all_files.extend(glob(os.path.join(p, f'*{ext}')))
-                all_files.extend(glob(os.path.join(p, f'*{ext.upper()}')))
-        elif '*' in p or '?' in p:
-            all_files.extend(glob(p))
-        elif os.path.exists(p):
+            pattern = '**/*' if recursive else '*'
+            all_files.extend(glob(os.path.join(p, pattern), recursive=recursive))
+        elif any(char in p for char in '*?['):
+            for match in glob(p, recursive=recursive):
+                if os.path.isdir(match):
+                    all_files.extend(collect_images([match], recursive=recursive))
+                else:
+                    all_files.append(match)
+        elif os.path.isfile(p):
             all_files.append(p)
-    result = []
-    for f in sorted(set(all_files)):
-        ext = os.path.splitext(f)[1].lower()
-        if ext in image_extensions:
-            result.append(f)
-    return sorted(result)
+    return sorted({
+        os.path.abspath(f) for f in all_files
+        if os.path.isfile(f) and os.path.splitext(f)[1].lower() in image_extensions
+    })
 
 
 def main():
-    if len(sys.argv) < 3:
-        print("批量提取柱状图订单量数据")
-        print()
-        print("用法: python extract_orders.py <历史时刻索引> <图片...>")
-        print()
-        print("参数:")
-        print("  历史时刻索引: 深色柱子或虚线（历史此刻）对应的0-23索引")
-        print("  图片: 支持文件路径、目录、通配符，可多个")
-        print()
-        print("示例:")
-        print("  python extract_orders.py 21 ./images/*.jpg")
-        print("  python extract_orders.py 15 img1.jpg img2.jpg")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="提取24小时订单量；默认从图片目录名读取历史时刻索引。",
+        usage="%(prog)s [history_index] <图片路径/目录/通配符> [...]",
+    )
+    parser.add_argument("paths", nargs="+", help="图片路径；目录会递归扫描")
+    args = parser.parse_args()
+    history_index = None
+    if args.paths[0].lstrip("-+").isdigit():
+        history_index = int(args.paths.pop(0))
+        if not 0 <= history_index <= 23:
+            parser.error("历史时刻索引必须是0-23的整数")
+        if not args.paths:
+            parser.error("请提供图片路径或目录")
 
-    try:
-        history_index = int(sys.argv[1])
-        if not (0 <= history_index <= 23):
-            raise ValueError
-    except ValueError:
-        print("错误: 历史时刻索引必须是0-23的整数")
-        sys.exit(1)
-
-    image_files = collect_images(sys.argv[2:])
+    image_files = collect_images(args.paths, recursive=True)
     if not image_files:
-        print("错误: 未找到图片文件")
-        sys.exit(1)
-
-    print(f"历史时刻索引: {history_index}")
-    print(f"图片数量: {len(image_files)}\n")
-    print("=" * 60)
-
+        parser.error("未找到图片文件")
+    print(f"图片数量: {len(image_files)}")
+    failed = False
     for img_file in image_files:
-        values, error = extract_chart_data(img_file, history_index)
-        filename = os.path.basename(img_file)
-        if error:
-            print(f"【{filename}】 错误: {error}")
-        else:
-            result_str = ','.join(map(str, values))
-            print(f"【{filename}】")
-            print(f"{result_str}")
-        print()
+        try:
+            values, error = extract_chart_data(img_file, history_index)
+            if error:
+                raise ValueError(error)
+        except (OSError, ValueError) as exc:
+            print(f"【{img_file}】错误: {exc}", file=sys.stderr)
+            failed = True
+            continue
+        print(f"【{img_file}】")
+        print(','.join(map(str, values)))
+    return int(failed)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

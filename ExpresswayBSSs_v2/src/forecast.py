@@ -1,5 +1,6 @@
 """Forecasts use reports and observed motion, never future scenario truth."""
 from __future__ import annotations
+from .parameters import execution_period_limit, prediction_horizon
 
 from bisect import bisect_left, bisect_right
 from dataclasses import dataclass
@@ -150,14 +151,19 @@ def deterministic_random_requests(params, start_time, end_time):
 
 
 def build_forecast(params: BusinessParameters, observation: ObservationView, ell: int, horizon: int) -> Forecast:
-    if ell < 0 or horizon <= 0 or ell >= params.num_periods:
+    if ell < 0 or horizon <= 0 or ell >= execution_period_limit(params):
         raise ValueError("forecast indices must lie within the operating grid")
     start = ell * params.interval_hours
-    end = min(ell + horizon, params.num_periods) * params.interval_hours
+    end = (ell + prediction_horizon(params, ell, horizon)) * params.interval_hours
     if abs(observation.now - start) > params.time_epsilon:
         raise ValueError("forecast observation time does not match the current round")
     if getattr(params, "terminal_experiment", False):
         return Forecast(deterministic_random_requests(params, start, end), start, end)
+    if getattr(params, "finish_pending_after_demand", False):
+        # Legacy stochastic forecasts also stop admitting new demand at day end.
+        end = min(end, params.num_periods * params.interval_hours)
+        if start >= end:
+            return Forecast([], start, (ell + horizon) * params.interval_hours)
     # Keep the original baseline's independent per-round forecast stream.
     rng = np.random.default_rng(np.random.SeedSequence([params.seed, 303, ell]))
     requests = []

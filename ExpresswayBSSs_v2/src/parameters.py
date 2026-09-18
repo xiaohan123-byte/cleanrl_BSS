@@ -28,6 +28,7 @@ class StationParameters:
     charging_efficiency: float = .95
     slot_power_limits_kw: list[list[float]] = field(default_factory=lambda: [[60.] * 5 for _ in range(6)])
     station_power_limits_kw: list[float] = field(default_factory=lambda: [240.] * 6)
+    num_slots_by_station: list[int] = field(default_factory=list)
 
 
 @dataclass
@@ -88,6 +89,7 @@ class BusinessParameters:
     random_return_soc_range: list[float] = field(default_factory=lambda: [.05, .4])
     random_soc_prediction: float = .225
     source_metadata: dict = field(default_factory=dict)
+    finish_pending_after_demand: bool = False
 
     def __post_init__(self) -> None:
         hourly = [.35, .35, .65, 1.10, 1.10, .65, .40, .35, .35, .65, 1.10, .65]
@@ -119,6 +121,11 @@ class BusinessParameters:
         st = self.station
         if st.num_stations <= 0 or st.num_slots <= 0:
             raise ValueError("station and slot counts must be positive")
+        if st.num_slots_by_station and (len(st.num_slots_by_station) != st.num_stations or
+                any(not isinstance(n, int) or isinstance(n, bool) or n <= 0 for n in st.num_slots_by_station)):
+            raise ValueError("num_slots_by_station needs one positive integer per station")
+        if not isinstance(self.finish_pending_after_demand, bool):
+            raise ValueError("finish_pending_after_demand must be boolean")
         if st.station_ids != list(range(st.num_stations)):
             raise ValueError("station_ids must be contiguous indices starting at zero")
         if len(st.positions_km) != st.num_stations or any(not math.isfinite(x) for x in st.positions_km):
@@ -129,7 +136,7 @@ class BusinessParameters:
             raise ValueError("charging_efficiency must be in (0, 1]")
         for name, lower, upper in (("initial_slot_soc", 0., 1.), ("slot_power_limits_kw", 0., math.inf)):
             matrix = getattr(st, name)
-            if len(matrix) != st.num_stations or any(len(row) != st.num_slots for row in matrix):
+            if len(matrix) != st.num_stations or any(len(row) != slots_at(self, i) for i, row in enumerate(matrix)):
                 raise ValueError(f"{name} must have shape [station][slot]")
             if any(not math.isfinite(x) or not lower <= x <= upper for row in matrix for x in row):
                 raise ValueError(f"invalid values in {name}")
@@ -229,6 +236,8 @@ class BusinessParameters:
         return sorted(set(self.station.positions_km) | {x for od in self.od_pairs for x in (od.entry_km, od.exit_km)})
 
     def random_rate_at(self, station: int, time_hours: float) -> float:
+        if self.finish_pending_after_demand and not 0 <= time_hours < self.num_periods * self.interval_hours:
+            return 0.
         if self.random_hourly_means:
             if not 0 <= time_hours < self.num_periods * self.interval_hours:
                 return 0.
@@ -257,13 +266,20 @@ class BusinessParameters:
         return self.station.station_power_limits_kw[station]
 
     def electricity_price_at(self, station: int, period: int) -> float:
-        return self.electricity_price[station][period]
+        return price_at(self, "electricity_price", station, period)
 
     def swap_service_price_at(self, station: int, period: int) -> float:
-        return self.swap_service_price[station][period]
+        return price_at(self, "swap_service_price", station, period)
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        payload = asdict(self)
+        # Preserve historical serialized inputs and their fingerprints when the
+        # new options are disabled; old scenario archives remain reproducible.
+        if not self.finish_pending_after_demand:
+            payload.pop("finish_pending_after_demand")
+        if not self.station.num_slots_by_station:
+            payload["station"].pop("num_slots_by_station")
+        return payload
 
     @classmethod
     def from_dict(cls, data: dict) -> "BusinessParameters":
@@ -286,6 +302,49 @@ class BusinessParameters:
     @classmethod
     def load_json(cls, path: str | Path) -> "BusinessParameters":
         return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
+
+def slots_at(params, station: int) -> int:
+    """Number of real slots; also supports legacy lightweight test parameters."""
+    counts = getattr(params.station, "num_slots_by_station", [])
+    return counts[station] if counts else params.station.num_slots
+
+
+def price_at(params, name: str, station: int, period: int) -> float:
+    if period < 0:
+        raise ValueError("negative price period")
+    if getattr(params, "finish_pending_after_demand", False):
+        period %= params.num_periods
+    return getattr(params, name)[station][period]
+
+
+def execution_period_limit(params) -> int:
+    """Conservative safety bound, not a truncated optimization horizon."""
+    if not getattr(params, "finish_pending_after_demand", False):
+        return params.num_periods
+    travel = max(abs(od.exit_km - od.entry_km) for od in params.od_pairs) / params.vehicle_speed_kmh
+    travel *= 1 + params.travel_time_relative_error
+    waiting = max(len(od.station_indices) for od in params.od_pairs) * params.max_wait_hours
+    return params.num_periods + math.ceil((travel + waiting) / params.interval_hours) + 1
+
+
+def prediction_horizon(params, period: int, requested: int) -> int:
+    return requested if getattr(params, "finish_pending_after_demand", False) else min(requested, params.num_periods - period)
+
+
+def validate_complete_result(result: dict) -> None:
+    """A completed demand day must include every pending service when enabled."""
+    params = BusinessParameters.from_dict(result["parameter_snapshot"])
+    count = len(result["rounds"])
+    if not params.finish_pending_after_demand:
+        if count != params.num_periods:
+            raise ValueError("partial trajectory cannot be reported as a full-day experiment")
+        return
+    state = result["final_state"]
+    if (not result.get("completed") or not params.num_periods <= count <= execution_period_limit(params)
+            or state["period"] != count or state["waiting"]
+            or any(u["status"] == "active" for u in state["users"].values())):
+        raise ValueError("demand day has an incomplete cleanup trajectory")
 
 
 def get_default_parameters() -> BusinessParameters:

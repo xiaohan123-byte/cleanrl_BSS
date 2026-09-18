@@ -50,6 +50,8 @@ def main(argv=None):
     parser.add_argument("--scenario",type=Path,required=True)
     parser.add_argument("--output-dir",type=Path,required=True)
     parser.add_argument("--deadline",default=DEFAULT_DEADLINE)
+    parser.add_argument("--no-deadline",dest="deadline",action="store_const",const=None,
+                        help="Run without the legacy global experiment deadline")
     parser.add_argument("--horizon",type=int)
     parser.add_argument("--time-limit",type=float)
     parser.add_argument("--model",type=Path)

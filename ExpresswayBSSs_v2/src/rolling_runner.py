@@ -14,6 +14,7 @@ from src.execution import advance_to_boundary, execute_step
 from src.forecast import build_forecast
 from src.mpc_model import solve_mpc
 from src.request_builder import build_window
+from src.parameters import BusinessParameters, execution_period_limit, prediction_horizon
 from src.experiment_control import (RunJournal, ExperimentPaused, check_deadline,
                                     fingerprint, atomic_json)
 
@@ -39,7 +40,7 @@ def run_rolling_mpc(params: Any, scenario: Any, network: dict | None = None,
     scenario.validate()
     physical_snapshot = lambda values: {key: value for key, value in values.items()
                                         if key not in {"horizon", "solver"}}
-    if physical_snapshot(scenario.params) != physical_snapshot(params.to_dict()):
+    if physical_snapshot(BusinessParameters.from_dict(scenario.params).to_dict()) != physical_snapshot(params.to_dict()):
         raise ValueError("scenario parameter snapshot differs from run physical parameters")
     check_deadline(deadline)
     if network is None:
@@ -74,7 +75,11 @@ def run_rolling_mpc(params: Any, scenario: Any, network: dict | None = None,
             state = RollingState.from_dict(restored)
         journal.status("running", completed_periods=len(rounds))
     experimental = bool(getattr(params, "terminal_experiment", False))
-    for ell in range(len(rounds), params.num_periods):
+    drain = getattr(params, "finish_pending_after_demand", False)
+    pending = lambda: bool(state.waiting) or any(u.status == "active" for u in state.users.values())
+    for ell in range(len(rounds), execution_period_limit(params)):
+        if ell >= params.num_periods and not pending():
+            break
         try:
             # Leave the full allowed solver interval before the hard supervisor
             # deadline. The external supervisor also covers model construction.
@@ -90,7 +95,7 @@ def run_rolling_mpc(params: Any, scenario: Any, network: dict | None = None,
             admission = advance_to_boundary(params, state, boundary_arrivals, **execution_options)
             state = admission.state
             before = _snapshot(state)
-            horizon = min(params.horizon, params.num_periods - ell)
+            horizon = prediction_horizon(params, ell, params.horizon)
             forecast = build_forecast(params, observation, ell, horizon)
             window = build_window(params, state, network, forecast, horizon=horizon)
             state_features = None
@@ -140,6 +145,10 @@ def run_rolling_mpc(params: Any, scenario: Any, network: dict | None = None,
                                completed_periods=len(rounds), failing_period=ell,
                                error_type=type(exc).__name__, error=str(exc))
             raise
+    if drain and pending():
+        if journal is not None:
+            journal.status("failed", completed_periods=len(rounds), error="cleanup safety bound exceeded")
+        raise RuntimeError("cleanup safety bound exceeded with pending users or requests")
     summary = summarize_ledger(state.ledger)
     summary["completed_reservations"] = sum(user.status == "completed" for user in state.users.values())
     summary["active_reservations"] = sum(user.status == "active" for user in state.users.values())
@@ -150,6 +159,8 @@ def run_rolling_mpc(params: Any, scenario: Any, network: dict | None = None,
         "schema_version": 4,
         "run_mode": "discrete_mpc_terminal" if terminal_model is not None else "discrete_mpc_no_terminal",
         "completed": True, "solver_backend": "copt",
+        "demand_periods": params.num_periods, "executed_periods": len(rounds),
+        "cleanup_periods": max(0, len(rounds) - params.num_periods),
         "method": {"route_mode": route_mode, "charging_mode": charging_mode,
                    "terminal_kind": terminal_model.kind if terminal_model is not None else "zero",
                    "feature_variant": feature_spec.variant if feature_spec is not None else None},

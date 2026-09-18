@@ -8,7 +8,7 @@ from math import isclose
 from pathlib import Path
 
 from src.accounting import COMPONENTS, LedgerError, append_events, summarize_ledger
-from src.parameters import BusinessParameters
+from src.parameters import BusinessParameters, slots_at, validate_complete_result
 
 
 class StatisticsError(ValueError):
@@ -26,6 +26,7 @@ def build_result_statistics(result: dict) -> dict:
         raise StatisticsError("expected complete discrete MPC result schema version 4")
     try:
         params = BusinessParameters.from_dict(result["parameter_snapshot"])
+        validate_complete_result(result)
         ledger: list[dict] = []
         append_events(params, ledger, result["ledger"])
     except (KeyError, TypeError, ValueError, LedgerError) as exc:
@@ -34,7 +35,7 @@ def build_result_statistics(result: dict) -> dict:
     for key, expected in summary.items():
         if key in result.get("summary", {}):
             _close(result["summary"][key], expected, f"summary.{key}")
-    by_period = [[] for _ in range(params.num_periods)]
+    by_period = [[] for _ in result["rounds"]]
     by_station = [[] for _ in range(params.station.num_stations)]
     for entry in ledger:
         by_period[entry["period"]].append(entry)
@@ -44,8 +45,6 @@ def build_result_statistics(result: dict) -> dict:
                 raise StatisticsError("ledger contains an invalid station")
             by_station[station].append(entry)
     inventory = [list(row) for row in result["initial_state"]["slot_soc"]]
-    if len(result["rounds"]) != params.num_periods:
-        raise StatisticsError("result does not contain all operating periods")
     round_ids = [event["event_id"] for row in result["rounds"] for event in row["events"]]
     if round_ids != [entry["event_id"] for entry in ledger]:
         raise StatisticsError("round events do not cover the realised ledger exactly once")
@@ -87,7 +86,7 @@ def build_result_statistics(result: dict) -> dict:
             _close(event["start_soc"], inventory[i][b], "post-swap charging SOC")
             inventory[i][b] = event["end_soc"]
             station_power[i] += event["power_kw"]
-        if len(charged_slots) != params.station.num_stations * params.station.num_slots:
+        if len(charged_slots) != sum(slots_at(params, i) for i in params.station.station_ids):
             raise StatisticsError("each slot needs one charging record per interval, including zero power")
         if any(power > params.station_power_limit(i) + 1e-7 for i, power in enumerate(station_power)):
             raise StatisticsError("aggregate station charging power exceeds its limit")
