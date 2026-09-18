@@ -1,4 +1,7 @@
 __pycache__/
 *.py[cod]
-outputs/*
-!outputs/.gitkeep
+# Track all output files, including those ignored by parent rules.
+!outputs/
+!outputs/**
+# Exclude runtime lock files (e.g. controller/worker locks with restricted ACLs).
+*.lock

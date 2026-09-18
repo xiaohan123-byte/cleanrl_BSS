@@ -1,0 +1,3 @@
+{"state": "started", "day_id": 4, "horizon": 8, "job_id": "h8_day04", "weekday": 4, "worker_pid": 27460}
+{"state": "complete", "job": "h8_day04", "completed": 32, "total": 35}
+{"state": "started", "day_id": 19, "horizon": 8, "job_id": "h8_day19", "weekday": 5, "worker_pid": 29852}

@@ -1,0 +1,112 @@
+{
+  "status": "passed",
+  "check_kind": "structural-proof cross-check; not a solver run",
+  "zero_terminal_trajectories_used": false,
+  "seed": 1,
+  "dataset_manifest_hash": "b67e37406c14deea6d43f8d791676805f6ee3d5fa98ccd17185a8bd58864832c",
+  "source_hashes": {
+    "src/candidate_network.py": "a0f63d5c336e1f342a000be21a0dbf45921ce34e00535ec531f967fc5446d637",
+    "src/path_state.py": "9ca2b52b348f7baac6296a2d87609b9b90d8a0a12bff97bae36f3eb6d1594842",
+    "src/dayahead_plan.py": "5885af989ecf8e03022b99015ad4035779f1155516511ac76e61b88e7fbe987b",
+    "src/execution.py": "7070f59c02f8cae816a0f440cca377fbdcccd485a8e676184afb0e95201ff004",
+    "src/parameters.py": "ce6dc4a9032d1ffc790488b697f9ad45a5ed1f90f6f7511798e4c66a47823dea",
+    "src/scenario.py": "ef45162270e387237eb7aed0a1005d43f01d76f54fa270724d7e12f1d11bff96",
+    "src/forecast.py": "f2c529c8aa235fae32eae85c98434b149eae4fbdd5b0e51da547e28ec1ec21c7",
+    "check_perfect_information_path_coverage.py": "7da11cd19d639b564dc54c5508a50afcce62fb34dec2fca3cf1fbcb5198ef102"
+  },
+  "input_hashes": {
+    "scenarios/day_01.json": "6c9ecd934d54c1c4ae3dd32d51805d50b95cebdeb8f75fe07f7def90b8efa826",
+    "dayahead/day_01.json": "b65738e4c93551a9cd1034d6947f59f0968e870d6d53f05dde905ecc1bcebb39",
+    "scenarios/day_37.json": "c476144e1ea63fcb903e721e0ff420b9c77e3496a0165253718e89e7b84065d3",
+    "dayahead/day_37.json": "cd3e07b0e1251877a48ce92fa5b4047780d2f3c03c86361b472270b5f91154d5",
+    "scenarios/day_03.json": "c68787d0886d30679463f47049f6f17fce6272a156dfee72d0f96497c84c04e0",
+    "dayahead/day_03.json": "3066f717be03450eee373c7db07401d0be459240dac0f68a143f03f578deaea5",
+    "scenarios/day_04.json": "e2e6471b49d84ed27087518acdadec87ef0ff88c9caedd5b983731246422cdff",
+    "dayahead/day_04.json": "436d2026c22f5f34f3162fdaeffdb3f0241e9e3d587b7668a8b2497f2626825e",
+    "scenarios/day_19.json": "ba32c2650d2f6f31bd440c7aafde5aefc0520b56672d8f9c61a774a847009846",
+    "dayahead/day_19.json": "0e51e2996d4aadb6bb49e415ea36347fea465fc7ae3040232c83748b1695ebcb",
+    "scenarios/day_13.json": "261198bba1274434f6aada94ec36e7680bf4e570dd3ff9dfa596f0cc5f9b6682",
+    "dayahead/day_13.json": "59b772b6afb7ed13514fab8eeea80a4f6b1651fbe2c0327c3c54f62bf3ba66d9",
+    "scenarios/day_14.json": "9d7c51224e34bc4f8d99f8297d4d9c6875aca87aebaa448a68562be9ae2296dc",
+    "dayahead/day_14.json": "cce16e4ab9f7efbe6c90212a0de85cb361ee8e2635deb276da698a7a4a4023f2"
+  },
+  "test_days": [
+    1,
+    37,
+    3,
+    4,
+    19,
+    13,
+    14
+  ],
+  "earliest_actual_entry_hours": 0.044889218789684215,
+  "totals": {
+    "users": 1400,
+    "initial_paths": 7050,
+    "reported_paths": 6607,
+    "states": 102197,
+    "suffix_paths": 1248414
+  },
+  "per_day": [
+    {
+      "day_id": 1,
+      "users": 200,
+      "initial_paths": 1118,
+      "reported_paths": 1013,
+      "states": 16675,
+      "suffix_paths": 223870
+    },
+    {
+      "day_id": 37,
+      "users": 200,
+      "initial_paths": 948,
+      "reported_paths": 877,
+      "states": 13070,
+      "suffix_paths": 144598
+    },
+    {
+      "day_id": 3,
+      "users": 200,
+      "initial_paths": 1027,
+      "reported_paths": 933,
+      "states": 14988,
+      "suffix_paths": 196446
+    },
+    {
+      "day_id": 4,
+      "users": 200,
+      "initial_paths": 832,
+      "reported_paths": 787,
+      "states": 10682,
+      "suffix_paths": 107289
+    },
+    {
+      "day_id": 19,
+      "users": 200,
+      "initial_paths": 975,
+      "reported_paths": 925,
+      "states": 14139,
+      "suffix_paths": 175224
+    },
+    {
+      "day_id": 13,
+      "users": 200,
+      "initial_paths": 908,
+      "reported_paths": 867,
+      "states": 12162,
+      "suffix_paths": 139164
+    },
+    {
+      "day_id": 14,
+      "users": 200,
+      "initial_paths": 1242,
+      "reported_paths": 1205,
+      "states": 20481,
+      "suffix_paths": 261823
+    }
+  ],
+  "conclusion": "fixed clairvoyant paths cover online realized route sequences",
+  "required_initialization": "actual entry SOC plus the original protected day-ahead plan",
+  "required_objective": "realized net profit; no repeated unpublished-plan penalties",
+  "elapsed_seconds": 22.277783800003817
+}
