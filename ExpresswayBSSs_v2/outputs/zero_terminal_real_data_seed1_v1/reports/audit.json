@@ -1,0 +1,456 @@
+{
+  "audited_at_utc": "2026-09-19T03:26:52.028152+00:00",
+  "experiment_finished_at_utc": "2026-09-18T21:20:39.567107+00:00",
+  "auditor_sha256": "5f265b8d6acf21cdb47c3c23dcb437ba6f96c68b895c99a468b0981a8ab91d90",
+  "dataset_manifest_hash": "b67e37406c14deea6d43f8d791676805f6ee3d5fa98ccd17185a8bd58864832c",
+  "audit": {
+    "checks": {
+      "source_csv_hashes": 1,
+      "archived_source_hashes": 10,
+      "poisson_hash": 1,
+      "fixed_test_split": 1,
+      "63_day_pool": 1,
+      "poisson_reproduction": 70,
+      "scenario_hash": 70,
+      "scenario_reproduction": 70,
+      "dayahead_reproduction": 70,
+      "daily_input_counts": 70,
+      "35_completed_jobs": 1,
+      "frozen_dataset_identity": 1,
+      "complete_worker": 35,
+      "frozen_run_parameters": 35,
+      "shared_scenario_initial_state_and_paths": 35,
+      "frozen_dayahead_plan": 35,
+      "run_settings": 35,
+      "rebuilt_statistics_exact": 35,
+      "rebuilt_metrics_exact": 1225,
+      "journal_equals_result": 4387,
+      "journal_length": 35,
+      "cleanup_under_safety_bound": 35,
+      "250_real_slots": 35,
+      "initial_full_inventory": 35,
+      "zero_terminal": 4422,
+      "untruncated_H": 4387,
+      "historical_mean_forecast_only": 4387,
+      "path_update_clock": 4387,
+      "feasible_solver_status": 4387,
+      "optimizer_objective": 4387,
+      "frozen_paths_between_updates": 525313,
+      "valid_path_stations": 525313,
+      "spacing_pruning_with_feasible_and_protected_paths": 525313,
+      "path_soc_reachability": 784358,
+      "exit_soc_feasible": 525313,
+      "only_actual_publication_charged": 7996,
+      "all_random_truth_once": 7035,
+      "random_truth_match": 21000,
+      "reservation_actual_entry": 14000,
+      "no_new_demand_after_24h": 7000,
+      "only_observed_service": 13719,
+      "reservation_priority_and_fcfs": 14013,
+      "30_minute_wait": 13719,
+      "no_service_after_failure": 19176,
+      "actual_downstream_service_dependency": 10682,
+      "actual_vehicle_soc": 10682,
+      "deadline_boundary_rule": 3963,
+      "one_failure_per_user": 2188,
+      "completed_service_exit_feasible": 4812,
+      "final_failure_coverage": 2188,
+      "executed_slot_power_bounds": 35,
+      "all_400_final_outcomes": 35,
+      "realized_accounting": 35,
+      "failure_cost_1000_once": 35,
+      "adjustment_cost_10": 35,
+      "worker_source_snapshot_hashes": 952,
+      "mathematical_model_source_unchanged": 35,
+      "seven_paired_days": 5
+    },
+    "violations": {},
+    "examples": {},
+    "passed": true
+  },
+  "job_count": 35,
+  "total_rounds": 4387,
+  "test_days_monday_to_sunday": [
+    1,
+    37,
+    3,
+    4,
+    19,
+    13,
+    14
+  ],
+  "aggregation": "arithmetic mean of seven per-day metrics; demand solve statistics use 96 periods; other solver metrics include cleanup",
+  "provenance": [
+    {
+      "job_id": "h4_day01",
+      "result_sha256": "58cc9de6091cd53ca19a5466e706604bb53cbb00f2c0dc51cef86ae4ebc542ff",
+      "journal_sha256": "f4881c24a128eb759ceb679a2a87614126cdb70d4d43739e95eec52ff997331b",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day01\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 230.9325627000071,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day37",
+      "result_sha256": "6e684d78e1da67d0ce0bb6d8e4ec86754f45a41e0044f060b8d7eea36dbe6ac2",
+      "journal_sha256": "20fa1cbae32eb1d108f9cdb9f90e8d9f7258350d36bd3aa4b38a8473aa4631c4",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day37\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 200.637392500008,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day03",
+      "result_sha256": "18c8a5546e8936aedc44ce8c221cdc6345e1e5e4cd18b28a9c5e924fe2ec7b5f",
+      "journal_sha256": "1a5874f86fee8ccee2060029974bbd336cf0a73761c100014d6547747d588d91",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day03\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 201.2366202000121,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day04",
+      "result_sha256": "fd85a59fa75be7365d9059ab4089d0c55d5fabac356d831d820835035046873c",
+      "journal_sha256": "0a8974b1bbe378cd18870528f7adec6e3b82f9d8f16e812b867ec3d25a165a28",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day04\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 202.9719664999866,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day19",
+      "result_sha256": "1df2be199c1f51a9d2e94304b09a753da842554d11bfd968bc05daacfbeda023",
+      "journal_sha256": "9f588de24e7f338093988a73ba0f212265d272325ba055be72a9792075479bd1",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day19\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 197.79400949997944,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day13",
+      "result_sha256": "b75ae4324fbf0b67737fe58bdb2aae68777c9c04a5d4f58d9a15b5e540617b58",
+      "journal_sha256": "153c430cc64736460caa83ce0e6c97c3ef17cb51fca53ee0181c46b82b34dd3e",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day13\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 196.85222860000795,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h4_day14",
+      "result_sha256": "ecb1cb6c4b4587abc8405a8b423a9a347c032b391802a1d7eeb2351c58464466",
+      "journal_sha256": "e9ad49f20bd07df24a8b24c392c5f5c39886de5ec65bd8be9cd5b45d4a404cc5",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h4_day14\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 205.07436759999837,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day01",
+      "result_sha256": "ad7b14ad7bd6cb24833c1f0f9e52e537939277d29df6f3fd61dd3f38288cb825",
+      "journal_sha256": "ce1f4ad1e3562c0e769088d06e84e70caf4816898f69e8c6fd972e22ac299be7",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day01\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 230.8421190000081,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day37",
+      "result_sha256": "c2a22d4ed21a8829afee0c89f36f54223021a82a558bd1fe56fee48cc86b3717",
+      "journal_sha256": "15c8ff2d8fe1083225b9b737c0f81b58599638d7a07146ccbc54ad77a0d4f492",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day37\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 234.29473879997386,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day03",
+      "result_sha256": "5aaa5ae80668574ad0bb1d0b40b00eea756236b4cfa5f7120d690e4476272da9",
+      "journal_sha256": "0ba20394a12ec4b31e85bdb05a287d7272cb7f84019d2d5558bf23f71e264a05",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day03\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 220.7846775999933,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day04",
+      "result_sha256": "e32ff583015b228ec68411a177d553445382db400306f323511e7a70a8b78b4b",
+      "journal_sha256": "08d8a8fa240c104106b101e97e767889e1e0ca94d61322619cb4292d03433d5d",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day04\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 269.81455210002605,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day19",
+      "result_sha256": "7494617840a2cd378eec933e3e7fd03ee47bc741ec19d4c9769a1feca356357e",
+      "journal_sha256": "7fb31b42e4803401d6d806c82926124a37bcafb7212f04ec02897f8a4ef83217",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day19\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 262.7697511999868,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day13",
+      "result_sha256": "a846157d4f000b6fb491b79df8cf8148c0a1140c4d83e407f31b92addc23f336",
+      "journal_sha256": "15b467531391b8544203957490399eb6cf6a12f3ea79b4f66fd9bedec023584b",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day13\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 234.98526729998412,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h5_day14",
+      "result_sha256": "f4018b7591319738163474c9284ed9368b5077d68ea01450190b224c0651723e",
+      "journal_sha256": "4c198e702baaedc561ecee2d1ed9d5dfcd053bd092c2bade2768abc9026e98e3",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h5_day14\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 213.82108009999502,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day01",
+      "result_sha256": "2cbba39cd0dcdd7dbc2d5ddf003113a4cbdcc9c13d0213cfb53bf95c76fdd59d",
+      "journal_sha256": "181c4c2a42924ccb3d18fac927d2704d25d74d2f95f0adcb7e1c170aa5b0c414",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day01\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 381.23166780002066,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day37",
+      "result_sha256": "0ae37b3787b1f58cd7251d3933ba7e4129ec547070bc5a6414b299e865d32466",
+      "journal_sha256": "4aabecc9ee104dd26aea37c6ac8456e5a9ec943acdc7e037169cf8481f88cbfe",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day37\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 287.5579859999998,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day03",
+      "result_sha256": "1ccc4f69fa20f043be7c382f9fc0830dc10b8e54bca50e257968552e6888d193",
+      "journal_sha256": "fe3864388503dc4701854c44ac276e3d0355d48cff92f1494e5544a3d299288b",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day03\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 460.49317050000536,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day04",
+      "result_sha256": "0541722ee28489eb0fd9494a4a269d1f41602eccf5cf26b85a36daa5630d3867",
+      "journal_sha256": "e533443a8e06840ecb54d7754ec67283feafba5c418f99ceb719702982bdec9e",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day04\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 296.0587334999873,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day19",
+      "result_sha256": "71f9080a00261f03e36b78aa16ba61c4b8a7bad8c994717540370d92a854c566",
+      "journal_sha256": "ba054282435f1a402f720bf15d2a322a143813184544ab66eaecb6df78b526ea",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day19\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 493.70236060000025,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day13",
+      "result_sha256": "fcd031870b6ee2e0949fdccf6a9fa0e198fd9fa20df780d8e56dc0cdfe0f53af",
+      "journal_sha256": "6ba937414b85c884610337912d561298f3c6e1d643b6a9b9112fbb6e9a617440",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day13\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 259.1017754000204,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h6_day14",
+      "result_sha256": "803f5f9ad0a72af3a78f7f5e68d70464bb3f2319853209f6b995a3bb34943b90",
+      "journal_sha256": "7d90c185eb9bd0f574682fb8f24eeb77e25c12dfbe60cb82882173a74e814ab6",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h6_day14\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 252.26351980000618,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day01",
+      "result_sha256": "124bb554a2c2054af397deeaa74970b211a322a7bf9f1088de5e46a7007bedea",
+      "journal_sha256": "5f807205af5034657bcd09c5e50148d1fb69b436758f4a0157f7a4106634cb52",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day01\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2579.8278963999765,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day37",
+      "result_sha256": "02e508af491c42092cf7bc93920d0daa91dd08d819223e3504a19683b8d83056",
+      "journal_sha256": "f9d5ffb2e796b4dcdb43f45536cadc4583f5518404618a3c42df80b8147f0085",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day37\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 3120.8028200999834,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day03",
+      "result_sha256": "93cbed6fe73f96849f3f10d48a2f12890655f00edce0ddeafc563f0ed27eb69e",
+      "journal_sha256": "99930bb2e4a8c7374bf4cfb6673db4e53a9c98bebf8e9f888b98951e1ff47845",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day03\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2645.90099200001,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day04",
+      "result_sha256": "11fd04b2ae75d269bc02b4e5d45ba233528f8c1e9ac6b55ec66dda07f7b79c58",
+      "journal_sha256": "7cddce4382331f40430ef4b4b35e9d5b9af6b8cc7c68ec348af6a6c6048f40ab",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day04\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2237.0168678000045,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 1
+    },
+    {
+      "job_id": "h7_day19",
+      "result_sha256": "594fea476b3551dcab98ab777ffb22b88ff50b52d796b3773eabf70c130364e0",
+      "journal_sha256": "324ad096103561cec452f9df061baaec49b2a46dd4e5de48fa0c04c52b300d4a",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day19\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2156.7450236000004,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day13",
+      "result_sha256": "616b02b6ccabc7dcd6658b128d427c9a06f2725772b6ab215d4b46824366a6a1",
+      "journal_sha256": "c52fb8a2e8b5952b58fb7ce9398203cb20e415da113d99d383ffce3ed268bd27",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day13\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2743.8217860999866,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h7_day14",
+      "result_sha256": "63f098f0243250a40bf23002ea2c633bf59a40b79230edc8a8a3f15fc9a95dad",
+      "journal_sha256": "0c3cd7852ffdadf062ac5dfb515da6286f02081fcd413b1df5204504335ef549",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h7_day14\\source_snapshots\\e04451463b9d6545577ff982cb3a33775239dc78ba1d91c5d8a88c86fabb05aa",
+      "source_changes_from_original": [],
+      "worker_wall_seconds": 2531.407541499997,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h8_day01",
+      "result_sha256": "e32219e24a581e106a8b4d5846a34564a952190e3c3679ebbf1a6149024c4981",
+      "journal_sha256": "80958f0b6f9784e07929da35e171a0043ea85624ff073e98c45c1535f6fa4446",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day01\\source_snapshots\\ab6a4edd93da12f2c3274fb2f6c253995674cccb18c880e56c1138d9c19c7b37",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 5957.618218800024,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 1
+    },
+    {
+      "job_id": "h8_day37",
+      "result_sha256": "fd974f09679e55c08b8fa6c9dd7f951568a681af27afc652f90d206d6e802f2c",
+      "journal_sha256": "f6970ec4a95eb68901c54e0b51a26ce76dae4711c6b89e3ba435b034f96a7c65",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day37\\source_snapshots\\ab6a4edd93da12f2c3274fb2f6c253995674cccb18c880e56c1138d9c19c7b37",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 5607.426822299982,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h8_day03",
+      "result_sha256": "56df80125969cbaedf8c43fab4e8bf3081fb80d94918711fc503235be2e73967",
+      "journal_sha256": "76e0549dc4749a8d18825c772a7520a6be57f607fd282d2e5ee2df132210b01b",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day03\\source_snapshots\\ab6a4edd93da12f2c3274fb2f6c253995674cccb18c880e56c1138d9c19c7b37",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 5035.077474099991,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h8_day04",
+      "result_sha256": "7b06431f75934880b68b02ee7e82cebf952000b29c41833593e2ed618a70aa7d",
+      "journal_sha256": "e6d2866c19d3464d238647639bb06fefe8237c89af0b39cbfc60adf11c05f265",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day04\\source_snapshots\\bbb97d08cc6193d6f6886a6fec6078efbcccd559ce89c1e0f75fb0dcf6892ad8",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 4724.7029683,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 2
+    },
+    {
+      "job_id": "h8_day19",
+      "result_sha256": "763a7a9ff69ff2b3fbef79b2fe1360438cd9880882ed6b18a145909c12ab356c",
+      "journal_sha256": "bf4e1482d9613d798e44e55d0a5dc856083a2df4b04ff04158e7e6375a2cc13f",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day19\\source_snapshots\\bbb97d08cc6193d6f6886a6fec6078efbcccd559ce89c1e0f75fb0dcf6892ad8",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 5504.972677599988,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h8_day13",
+      "result_sha256": "baf9b5b2b08a9e22fc0b4bf2d8ab88728ac3eea1f38ffe4ac7484aef570c803c",
+      "journal_sha256": "6a4ed434be8bc443bcf7af688bf0819aabe47a25de7a93a863f35f6f4d7384fb",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day13\\source_snapshots\\bbb97d08cc6193d6f6886a6fec6078efbcccd559ce89c1e0f75fb0dcf6892ad8",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 5125.016459200007,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    },
+    {
+      "job_id": "h8_day14",
+      "result_sha256": "8b3410608e26a33f562047159d3332d0216ea08ba7d10015c5dfeb637be89a50",
+      "journal_sha256": "6b1159786856c8a795694c48c80eb2c520134a8d1a770e683ce81c25ff256b84",
+      "source_snapshot": "D:\\Myfiles\\vscode_files\\cleanrl_BSS\\ExpresswayBSSs_v2\\outputs\\zero_terminal_real_data_seed1_v1\\runs\\h8_day14\\source_snapshots\\bbb97d08cc6193d6f6886a6fec6078efbcccd559ce89c1e0f75fb0dcf6892ad8",
+      "source_changes_from_original": [
+        "src\\atomic_io.py",
+        "src\\execution.py"
+      ],
+      "worker_wall_seconds": 4709.17053470001,
+      "runtime_timing_incomplete": false,
+      "attempt_history_count": 0
+    }
+  ]
+}

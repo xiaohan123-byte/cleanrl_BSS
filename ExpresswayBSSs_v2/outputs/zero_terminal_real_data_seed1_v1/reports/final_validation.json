@@ -1,0 +1,17 @@
+{
+  "paper_numeric_rows_verified": 5,
+  "sections_5_2_and_later_preserved": true,
+  "latex_errors_and_box_warnings": 0,
+  "pdf_text_numeric_content_checked": true,
+  "cpu_reported_from_registry": "12th Gen Intel(R) Core(TM) i7-12650H",
+  "artifact_sha256": {
+    "paper_v2\\main.pdf": "a50ebca0715746fc2481cd780a42b5a428f8a2833514cb35ff0bcbd625aee6a8",
+    "paper_v2\\sections\\05_numerical_experiments.tex": "ec8f28ad2571a01551ba3f78635cb9b935ad81a43db304ada495879c2f39011a",
+    "outputs\\zero_terminal_real_data_seed1_v1\\reports\\audit.json": "c325bb4b348aa9f637888f25722f9fecb917408c4693dd28a6accf23ee6cb83a",
+    "outputs\\zero_terminal_real_data_seed1_v1\\reports\\summary_by_horizon.csv": "b097804c832facf44e4dff4b57474655515f39009445c7b131acc08d3d526697",
+    "outputs\\zero_terminal_real_data_seed1_v1\\reports\\verification_report.md": "9ed5a53b588af55df2dad01bffc4c3c089e9c27ddacccdd8bcb3aab16c4b5f8d"
+  },
+  "latexmk_exit_code": 0,
+  "audited_jobs": 35,
+  "audited_rounds": 4387
+}
