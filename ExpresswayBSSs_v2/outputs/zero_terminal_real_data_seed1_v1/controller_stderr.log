@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "D:\Myfiles\vscode_files\cleanrl_BSS\ExpresswayBSSs_v2\run_zero_terminal.py", line 248, in <module>
+    raise SystemExit(main())
+  File "D:\Myfiles\vscode_files\cleanrl_BSS\ExpresswayBSSs_v2\run_zero_terminal.py", line 232, in main
+    raise RuntimeError(f"{job['job_id']} stopped (exit {code}): {outcome.get('error', 'no completion marker')}")
+RuntimeError: h8_day04 stopped (exit 1): invalid slot charging power: station=9 slot=13 power=60.000000017965135 limit=60.0 tolerance=1e-08

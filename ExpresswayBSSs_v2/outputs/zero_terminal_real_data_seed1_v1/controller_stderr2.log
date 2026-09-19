@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "D:\Myfiles\vscode_files\cleanrl_BSS\ExpresswayBSSs_v2\run_zero_terminal.py", line 249, in <module>
+    raise SystemExit(main())
+  File "D:\Myfiles\vscode_files\cleanrl_BSS\ExpresswayBSSs_v2\run_zero_terminal.py", line 233, in main
+    raise RuntimeError(f"{job['job_id']} stopped (exit {code}): {outcome.get('error', 'no completion marker')}")
+RuntimeError: h8_day04 stopped (exit 75): Paused at an execution boundary by a saved pause request.

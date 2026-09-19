@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-09-18T03:11:43.710330+00:00",
+  "job": "h7_day04",
+  "failure": "Windows PermissionError during atomic metadata replacement",
+  "durable_completed_periods": 14,
+  "resume_from_zero_based_period": 14,
+  "journal_sha256": "d51669987e474496c286721286a41bdf061a16d2f38bc41afdc3cb7ecdbd0bbf",
+  "test_count": 5,
+  "test_failures": 0,
+  "model_data_solver_changes": false,
+  "completed_jobs_preserved": 24,
+  "remaining_jobs_including_resumed": 11,
+  "recovery_policy": "bounded retries of the same atomic JSON write; original source snapshot; no completed trajectory repeated"
+}

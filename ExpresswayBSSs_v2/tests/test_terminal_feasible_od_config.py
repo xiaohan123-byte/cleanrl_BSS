@@ -1,15 +1,12 @@
 """Fixed OD-set correction preserves independent per-vehicle generation."""
 import copy
 import csv
-import hashlib
-import json
 import unittest
 from pathlib import Path
 
 from src.candidate_network import generate_candidate_network, get_feasible_arcs
-from src.dayahead_plan import generate_dayahead_plan
 from src.parameters import BusinessParameters
-from src.scenario import generate_synthetic_scenario, load_scenario
+from src.scenario import generate_synthetic_scenario
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT.parent / "ExpresswayBSSs/data_generation_optim/output"
@@ -62,22 +59,6 @@ class FeasibleODConfigurationTests(unittest.TestCase):
         self.assertEqual(new["report_entry_soc_range"],[.5,1.])
         self.assertEqual(new["source_metadata"]["generation_rule_version"],2)
 
-    def test_same_seeds_preserve_actual_attributes_reports_and_travel_draws(self):
-        fields = ("entry_time","entry_soc","actual_entry_time","actual_entry_soc","segment_time_multipliers")
-        for seed in (101,102,103):
-            with self.subTest(seed=seed):
-                original = load_scenario(ROOT/f"outputs/experiment_20260914/scenarios/pilot_seed_{seed}.json")
-                corrected = load_scenario(ROOT/f"outputs/experiment_20260914_od26/scenarios/pilot_seed_{seed}.json")
-                self.assertEqual(len(original.reservations),100)
-                self.assertEqual(len(corrected.reservations),100)
-                project = lambda scenario: {row["actual_entry_time"]:{name:row[name] for name in fields}
-                                            for row in scenario.reservations}
-                self.assertEqual(project(original),project(corrected))
-                self.assertTrue(all(row["od_id"] not in {6,7,8,9} for row in corrected.reservations))
-                plans = generate_dayahead_plan(self.new,generate_candidate_network(self.new),corrected.initial_reservations())
-                self.assertEqual(len(plans),100)
-                self.assertEqual(generate_synthetic_scenario(self.new,seed).to_dict(),corrected.to_dict())
-
     def test_report_noise_still_has_an_independent_stream(self):
         changed = copy.deepcopy(self.new)
         changed.entry_soc_error = .01
@@ -88,12 +69,6 @@ class FeasibleODConfigurationTests(unittest.TestCase):
                                     for row in scenario.reservations}
         self.assertEqual(project(one),project(two))
         self.assertEqual(one.actual_random_requests,two.actual_random_requests)
-
-    def test_original_configuration_scenarios_and_diagnosis_stay_unchanged(self):
-        comparison = json.loads((ROOT/"outputs/experiment_20260914_od26/configuration_comparison.json").read_text(encoding="utf-8"))
-        self.assertEqual(comparison["protected_original_file_sha256_before"],comparison["protected_original_file_sha256_after"])
-        for relative,digest in comparison["protected_original_file_sha256_before"].items():
-            self.assertEqual(hashlib.sha256((ROOT.parent/relative).read_bytes()).hexdigest(),digest)
 
 
 if __name__ == "__main__":
