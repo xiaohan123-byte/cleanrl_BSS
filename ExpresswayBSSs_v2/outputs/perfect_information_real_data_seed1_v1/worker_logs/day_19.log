@@ -1,0 +1,62 @@
+Setting parameter 'Logging' to 1
+Setting parameter 'Threads' to 8
+Setting parameter 'TimeLimit' to 1800
+Setting parameter 'RelGap' to 0.0001
+Setting parameter 'AbsGap' to 0
+Setting parameter 'FeasTol' to 1e-08
+Setting parameter 'IntTol' to 1e-08
+Failed to open 'D:\Users\wo\ÎÄµµ\vscode files\cleanrl_BSS\ExpresswayBSSs_v2\outputs\perfect_information_real_data_seed1_v1\days\day_19\solver.log' for logging
+Model fingerprint: 51887b5d
+
+Using Cardinal Optimizer v8.0.6 on Windows (25H2 Build 26200 - x86_64)
+The CPU model is Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+Hardware has 4 physical cores and 8 logical cores. Using instruction set X86_AVX2 (10)
+Maximizing a MIP problem
+
+The original problem has:
+    129562 rows, 170295 columns and 2602951 non-zero elements
+    77045 binaries
+
+Starting the MIP solver with 8 threads and 32 tasks
+
+Presolving the problem
+
+The presolved problem has:
+    69724 rows, 120115 columns and 592080 non-zero elements
+    75368 binaries and 290 integers
+
+Problem info:
+    Range of matrix coefficients:    [2e-03,2e+01]
+    Range of rhs coefficients:       [1e-01,1e+03]
+    Range of bound coefficients:     [4e-02,8e+01]
+    Range of cost coefficients:      [6e-02,4e+02]
+    Density of cost:                     75.3%
+
+     Nodes    Active  LPit/n  IntInf     BestBound  BestSolution     Gap   Time
+         0         1      --       0  6.027539e+06            --     Inf 18.82s
+H        0         1      --       0  6.027539e+06 -7.355729e+03 100.12% 19.65s
+         0         1      --    7622  5.594463e+04 -7.355729e+03 113.15% 56.42s
+H        0         1      --    7622  5.594463e+04  3.423788e+04  38.80%   200s
+H        0         1      --    7622  5.594463e+04  3.445785e+04  38.41%   200s
+         0         1      --    7477  5.593754e+04  3.445785e+04  38.40%   352s
+         0         1      --    7235  5.593052e+04  3.445785e+04  38.39%   547s
+         0         1      --    7351  5.592766e+04  3.445785e+04  38.39%   771s
+         0         1      --    7711  5.591597e+04  3.445785e+04  38.38%   967s
+         0         1      --    7922  5.588492e+04  3.445785e+04  38.34%  1199s
+         0         1      --    7906  5.586825e+04  3.445785e+04  38.32%  1491s
+         1         1  381970    7906  5.586825e+04  3.445785e+04  38.32%  1800s
+         1         1  381970    7906  5.586825e+04  3.445785e+04  38.32%  1800s
+
+Best solution   : 34457.845286067
+Best bound      : 55868.245236577
+Best gap        : 38.3230%
+Solve time      : 1800.06
+Solve node      : 1
+MIP status      : stopped (time limit reached)
+Solution status : integer feasible
+
+Violations      :     absolute     relative
+    bounds      :  8.52651e-14  8.52651e-14
+    rows        :  7.10543e-15  7.10543e-15
+    integrality :            0
+{"day_id": 19, "state": "finished", "has_verified_incumbent": true}
