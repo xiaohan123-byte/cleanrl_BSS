@@ -1,0 +1,97 @@
+Setting parameter 'Logging' to 1
+Setting parameter 'Threads' to 8
+Setting parameter 'TimeLimit' to 7200
+Setting parameter 'RelGap' to 0.0001
+Setting parameter 'AbsGap' to 0
+Setting parameter 'FeasTol' to 1e-08
+Setting parameter 'IntTol' to 1e-08
+Failed to open 'D:\Users\wo\ÎÄµµ\vscode files\cleanrl_BSS\ExpresswayBSSs_v2\outputs\perfect_information_real_data_seed1_day03_t7200\days\day_03\solver.log' for logging
+Model fingerprint: f438c7bf
+
+Using Cardinal Optimizer v8.0.6 on Windows (25H2 Build 26200 - x86_64)
+The CPU model is Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+Hardware has 4 physical cores and 8 logical cores. Using instruction set X86_AVX2 (10)
+Maximizing a MIP problem
+
+The original problem has:
+    131812 rows, 174872 columns and 2815948 non-zero elements
+    81622 binaries
+
+Starting the MIP solver with 8 threads and 32 tasks
+
+Presolving the problem
+
+The presolved problem has:
+    73947 rows, 127147 columns and 632468 non-zero elements
+    80143 binaries and 376 integers
+
+Problem info:
+    Range of matrix coefficients:    [2e-03,2e+01]
+    Range of rhs coefficients:       [9e-02,1e+03]
+    Range of bound coefficients:     [2e-02,9e+01]
+    Range of cost coefficients:      [2e-02,4e+02]
+    Density of cost:                     75.2%
+
+     Nodes    Active  LPit/n  IntInf     BestBound  BestSolution     Gap   Time
+         0         1      --       0  6.473268e+06            --     Inf 17.96s
+         0         1      --    7935  5.602042e+04            --     Inf 71.99s
+H        0         1      --    7935  5.602042e+04  2.934129e+04  47.62%   231s
+H        0         1      --    7935  5.602042e+04  2.944207e+04  47.44%   231s
+         0         1      --    7528  5.600844e+04  2.944207e+04  47.43%   354s
+         0         1      --    6945  5.600397e+04  2.944207e+04  47.43%   465s
+         0         1      --    6697  5.599949e+04  2.944207e+04  47.42%   534s
+         0         1      --    6779  5.599835e+04  2.944207e+04  47.42%   593s
+         0         1      --    7019  5.599494e+04  2.944207e+04  47.42%   706s
+         0         1      --    6909  5.599274e+04  2.944207e+04  47.42%   817s
+         0         1      --    6990  5.599220e+04  2.944207e+04  47.42%   888s
+         0         1      --    6787  5.599173e+04  2.944207e+04  47.42%   962s
+         0         1      --    7163  5.599129e+04  2.944207e+04  47.42%  1113s
+         0         1      --    6820  5.599036e+04  2.944207e+04  47.42%  1257s
+         0         1      --    7088  5.598834e+04  2.944207e+04  47.41%  1463s
+
+     Nodes    Active  LPit/n  IntInf     BestBound  BestSolution     Gap   Time
+         0         1      --    6862  5.597775e+04  2.944207e+04  47.40%  1596s
+         0         1      --    7064  5.596979e+04  2.944207e+04  47.40%  1733s
+         0         1      --    7296  5.596168e+04  2.944207e+04  47.39%  1917s
+         0         1      --    7681  5.595846e+04  2.944207e+04  47.39%  2071s
+         0         1      --    7237  5.595274e+04  2.944207e+04  47.38%  2186s
+         0         1      --    7179  5.594623e+04  2.944207e+04  47.37%  2246s
+         0         1      --    7220  5.594096e+04  2.944207e+04  47.37%  2421s
+         0         1      --    7585  5.591780e+04  2.944207e+04  47.35%  2656s
+         0         1      --    7505  5.590820e+04  2.944207e+04  47.34%  2873s
+         0         1      --    7736  5.590040e+04  2.944207e+04  47.33%  3027s
+         0         1      --    7611  5.589847e+04  2.944207e+04  47.33%  3206s
+         0         1      --    7870  5.589658e+04  2.944207e+04  47.33%  3374s
+         0         1      --    7848  5.589173e+04  2.944207e+04  47.32%  3665s
+         0         1      --    7532  5.588615e+04  2.944207e+04  47.32%  3773s
+         0         1      --    7510  5.588566e+04  2.944207e+04  47.32%  3859s
+
+     Nodes    Active  LPit/n  IntInf     BestBound  BestSolution     Gap   Time
+         0         1      --    7990  5.587982e+04  2.944207e+04  47.31%  4060s
+         0         1      --    7773  5.587325e+04  2.944207e+04  47.31%  4216s
+         0         1      --    7471  5.586779e+04  2.944207e+04  47.30%  4280s
+         0         1      --    7161  5.586651e+04  2.944207e+04  47.30%  4429s
+         0         1      --    7575  5.586125e+04  2.944207e+04  47.29%  4645s
+         0         1      --    7248  5.585948e+04  2.944207e+04  47.29%  4806s
+         0         1      --    7584  5.585693e+04  2.944207e+04  47.29%  5083s
+         0         1      --    7335  5.584419e+04  2.944207e+04  47.28%  5281s
+         0         1      --    7851  5.583888e+04  2.944207e+04  47.27%  5680s
+         0         1      --    8017  5.583318e+04  2.944207e+04  47.27%  6053s
+         0         1      --    7585  5.583110e+04  2.944207e+04  47.27%  6252s
+         0         1      --    7698  5.582998e+04  2.944207e+04  47.26%  6452s
+         1         1 1465014    7698  5.582998e+04  2.944207e+04  47.26%  7200s
+         1         1 1465014    7698  5.582998e+04  2.944207e+04  47.26%  7200s
+
+Best solution   : 29442.073721289
+Best bound      : 55829.981234305
+Best gap        : 47.2648%
+Solve time      : 7200.07
+Solve node      : 1
+MIP status      : stopped (time limit reached)
+Solution status : integer feasible
+
+Violations      :     absolute     relative
+    bounds      :  2.70006e-13  2.70006e-13
+    rows        :  7.32747e-15  7.32747e-15
+    integrality :            0
+{"day_id": 3, "state": "finished", "has_verified_incumbent": true}
