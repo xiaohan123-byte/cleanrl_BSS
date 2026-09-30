@@ -47,7 +47,23 @@ def digest(path):
 
 def source_files():
     return sorted([*ROOT.joinpath('src').glob('*.py'), Path(__file__).resolve(),
+                   ROOT / 'check_strengthened_perfect_information.py',
+                   ROOT / 'check_perfect_information_consistency.py',
                    ROOT / 'check_perfect_information_path_coverage.py'])
+
+
+def unpack_solution(payload):
+    values = dict(payload)
+    values['services'] = [ServiceDecision(**v) for v in values['services']]
+    return MPCSolution(**values)
+
+
+def check_warm_start_parameters(saved, params):
+    previous, current = dict(saved), params.to_dict()
+    previous.pop('solver', None)
+    current.pop('solver', None)
+    if previous != current:
+        raise ValueError('warm start physical/economic parameters differ from this experiment')
 
 
 def frozen_inputs(dataset):
@@ -88,9 +104,37 @@ def prepare(args):
     sources = {p.relative_to(ROOT).as_posix(): digest(p) for p in source_files()}
     identity = dict(dataset_dir=str(dataset), inputs=frozen_inputs(dataset), source_hashes=sources,
                     days=args.days, solver=dict(time_limit_sec=args.time_limit, mip_gap=args.gap,
-                                               threads=args.threads, absolute_gap=0., feasibility_tol=1e-8),
+                                               threads=args.threads, absolute_gap=0., feasibility_tol=1e-8,
+                                               root_cut_rounds=args.root_cut_rounds),
                     failure_penalty=args.failure_penalty, seed=1,
+                    formulation=args.formulation,
                     version='perfect_information_fixed_protected_routes_v1')
+    if args.warm_start is not None:
+        source = args.warm_start.resolve()
+        previous = read_json(source)
+        previous_run = read_json(source.parents[2] / 'run.json')
+        if (args.days != [previous['day_id']] or not previous['has_incumbent']
+                or previous['run_id'] != previous_run['run_id']
+                or previous_run['identity']['inputs'] != identity['inputs']):
+            raise ValueError('warm start must be a feasible result from the same frozen day/data')
+        p = BusinessParameters.from_dict(read_json(dataset / f'scenarios/day_{args.days[0]:02d}.json')['params'])
+        p.reservation_failure_penalty = args.failure_penalty
+        check_warm_start_parameters(previous['parameter_snapshot'], p)
+        identity['warm_start'] = dict(source=str(source), sha256=digest(source),
+                                      source_run_id=previous['run_id'], objective=previous['incumbent_objective'])
+    if args.consistency_report is not None:
+        check = read_json(args.consistency_report)
+        if check['status'] != 'passed' or check['source_hashes'] != sources or check['inputs'] != identity['inputs']:
+            raise ValueError('consistency report is stale or not successful')
+        if args.days != [check['day_id']] or args.failure_penalty != check['failure_penalty']:
+            raise ValueError('consistency report describes a different model')
+        if check.get('formulation', 'baseline') != args.formulation:
+            raise ValueError('consistency report describes a different formulation')
+        if 'warm_start' in identity and check['warm_start_sha256'] != identity['warm_start']['sha256']:
+            raise ValueError('consistency report checked a different warm start')
+        identity['consistency_check'] = dict(source=str(args.consistency_report.resolve()),
+                                             sha256=digest(args.consistency_report),
+                                             fingerprints=check['fixed_fingerprints'])
     run_id = fingerprint(identity)
     run_path = output / 'run.json'
     if run_path.exists():
@@ -99,6 +143,11 @@ def prepare(args):
             raise ValueError('existing output uses different inputs/code/configuration; choose a new output directory')
         return existing
     output.mkdir(parents=True, exist_ok=True)
+    for key, filename in [('warm_start', 'warm_start.json'), ('consistency_check', 'model_consistency.json')]:
+        if key in identity:
+            shutil.copyfile(identity[key]['source'], output / filename)
+            if digest(output / filename) != identity[key]['sha256']:
+                raise ValueError(f'{key} changed while freezing inputs')
     snapshot = output / 'code' / run_id
     for relative, expected in sources.items():
         destination = snapshot / relative
@@ -115,7 +164,7 @@ def prepare(args):
                                    numpy=importlib.metadata.version('numpy'),
                                    coptpy=importlib.metadata.version('coptpy'),
                                    platform=platform.platform(), cpu=platform.processor(),
-                                   logical_processors=os.cpu_count()),
+                                   logical_processors=os.cpu_count(), worker_python_hash_seed=1),
                   reporting='manual, only on user request; no automatic paper changes')
     write_json(run_path, record)
     return record
@@ -177,20 +226,31 @@ def worker(args):
         plans = read_json(dataset / f'dayahead/day_{day:02d}.json')
         window = build_perfect_window(params, scene, plans)
         initial = no_service_solution(params, window, plans)
+        warm = None
+        if 'warm_start' in identity:
+            source = output / 'warm_start.json'
+            if digest(source) != identity['warm_start']['sha256']:
+                raise ValueError('frozen warm start hash mismatch')
+            saved = read_json(source)
+            check_warm_start_parameters(saved['parameter_snapshot'], params)
+            warm = unpack_solution(saved['solution'])
+            initial = warm
         initial_check = replay_solution(params, scene, plans, window, initial)
         write_json(day_dir / 'initial_check.json', {k: v for k, v in initial_check.items()
                                                    if k not in {'ledger', 'state_checks', 'final_state'}})
         del initial_check
         write_json(day_dir / 'status.json', dict(marker, state='running', phase='build_and_solve'))
-        result = solve_perfect(params, window, plans, log_path=day_dir / 'solver.log')
+        expected = identity.get('consistency_check', {}).get('fingerprints')
+        result = solve_perfect(params, window, plans, log_path=day_dir / 'solver.log',
+                               warm_start=warm, audit_path=day_dir / 'model_audit.json',
+                               expected_fingerprints=expected, formulation=identity.get('formulation', 'baseline'),
+                               root_cut_rounds=config.get('root_cut_rounds', -1))
         result.update(run_id=run['run_id'], day_id=day, parameter_snapshot=params.to_dict())
         write_json(day_dir / 'solver_result.json', result)
         write_json(day_dir / 'status.json', dict(marker, state='running', phase='replay'))
         audit, verified = None, False
         if result['has_incumbent']:
-            payload = dict(result['solution'])
-            payload['services'] = [ServiceDecision(**v) for v in payload['services']]
-            replay = replay_solution(params, scene, plans, window, MPCSolution(**payload))
+            replay = replay_solution(params, scene, plans, window, unpack_solution(result['solution']))
             gzip_json(day_dir / 'replay.json.gz', replay)
             audit = {k: v for k, v in replay.items() if k not in {'ledger', 'state_checks', 'final_state'}}
             verified = True
@@ -230,7 +290,8 @@ def run_controller(args, run):
                 command = [sys.executable, '-u', '-B', str(Path(run['snapshot']) / Path(__file__).name),
                            '--worker-day', str(day), '--output-dir', str(output)]
                 completed = subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT,
-                                           cwd=run['snapshot'], creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+                                           cwd=run['snapshot'], env=dict(os.environ, PYTHONHASHSEED='1'),
+                                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             outcomes.append(dict(day_id=day, action='attempted', returncode=completed.returncode))
         write_json(output / 'controller_status.json', dict(state='finished', run_id=run['run_id'],
                                                           finished_at=now(), outcomes=outcomes))
@@ -250,8 +311,12 @@ def main():
     parser.add_argument('--time-limit', type=float, default=1800.)
     parser.add_argument('--gap', type=float, default=.0001)
     parser.add_argument('--threads', type=int, default=min(8, os.cpu_count() or 1))
+    parser.add_argument('--formulation', choices=['baseline', 'strengthened', 'strengthened_compact'], default='baseline')
+    parser.add_argument('--root-cut-rounds', type=int, default=-1)
     parser.add_argument('--failure-penalty', type=float, default=200.,
                         help='reservation failure penalty overriding the frozen scenario value')
+    parser.add_argument('--warm-start', type=Path, help='saved solver_result.json for the single selected day')
+    parser.add_argument('--consistency-report', type=Path, help='passed deterministic/model-equivalence report')
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument('--prepare-only', action='store_true')
     modes.add_argument('--report-only', action='store_true')
@@ -265,7 +330,7 @@ def main():
         return 0
     if (len(set(args.days)) != len(args.days) or not set(args.days) <= set(DAYS)
             or args.time_limit <= 0 or not 0 <= args.gap <= 1 or args.threads < 1
-            or args.failure_penalty < 0):
+            or args.failure_penalty < 0 or args.root_cut_rounds < -1):
         parser.error('invalid experiment days or solver configuration')
     run = prepare(args)
     if args.prepare_only:

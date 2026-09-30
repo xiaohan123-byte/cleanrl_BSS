@@ -8,15 +8,23 @@ from __future__ import annotations
 from collections import defaultdict
 from itertools import combinations
 from math import isfinite
+import json
+from pathlib import Path
 from time import perf_counter
 
 from .domain import MPCSolution, ServiceDecision, user_key_text
 from .parameters import price_at, slots_at
 from .perfect_information import grid_time
+from .perfect_information_checks import model_fingerprints
+from .perfect_information_strengthening import add_strengthening, canonicalize_slots, cooldown_sets
+
+
+def node_order(node):
+    return (0, 0) if node == 'entry' else (2, 0) if node == 'exit' else (1, int(node))
 
 
 def request_timing(params, window):
-    requests = {r.request_id: r for r in window.requests}
+    requests = {r.request_id: r for r in sorted(window.requests, key=lambda r: r.request_id)}
     if len(requests) != len(window.requests):
         raise ValueError('duplicate candidate request ID')
     ordered, possible, cases, visiting = [], {}, {}, set()
@@ -35,10 +43,10 @@ def request_timing(params, window):
             raise ValueError('cyclic service dependency')
         visiting.add(rid)
         req = requests[rid]
-        for q in req.predecessors:
+        for q in sorted(req.predecessors):
             visit(q)
         values = [(grid_time(n * delta + req.travel_time, delta), q, n)
-                  for q in req.predecessors for n in possible[q]] if req.predecessors else [
+                  for q in sorted(req.predecessors) for n in possible[q]] if req.predecessors else [
                       (req.arrival_time, None, None)]
         if any(deadline(req, t) >= end for t, _, _ in values):
             raise ValueError('full-day horizon cannot settle every possible request')
@@ -59,11 +67,27 @@ def valid_upper_bound(value, status):
             and status in {'optimal', 'time_limit', 'interrupted', 'node_limit', 'iteration_limit'})
 
 
-def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
+def solve_perfect(params, window, plans, *, log_path=None, build_only=False,
+                  warm_start=None, audit_path=None, expected_fingerprints=None,
+                  formulation='baseline', root_cut_rounds=-1, relaxation_only=False,
+                  restriction='none'):
     import coptpy as cp
     from coptpy import COPT
 
     started = perf_counter()
+    if formulation not in {'baseline', 'strengthened', 'strengthened_compact'}:
+        raise ValueError('unknown perfect-information formulation')
+    if restriction not in {'none', 'routes', 'services'}:
+        raise ValueError('unknown diagnostic restriction')
+    if restriction != 'none' and warm_start is None:
+        raise ValueError('diagnostic restrictions require a warm start')
+    if restriction != 'none' and set(warm_start.paths) != set(window.networks):
+        raise ValueError('fixed route user set differs from the model')
+    bound_scope = 'original_full_problem' if restriction == 'none' else 'restricted_subproblem_only'
+    strengthened = formulation != 'baseline'
+    permutation = []
+    if formulation == 'strengthened' and warm_start is not None:
+        warm_start, permutation = canonicalize_slots(params, window, warm_start)
     if window.ell != 0 or window.state.period != 0:
         raise ValueError('the perfect-information model starts at time zero')
     requests, ordered, possible, cases, deadline = request_timing(params, window)
@@ -83,6 +107,8 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
             model.setParam(getattr(COPT.Param, name), value)
         if log_path is not None:
             model.setLogFile(str(log_path))
+        if root_cut_rounds >= 0:
+            model.setParam(COPT.Param.RootCutRounds, root_cut_rounds)
         variables, start_values = [], []
 
         def var(*, seed=0., **kwargs):
@@ -94,14 +120,17 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
             return value
 
         y = {}
-        for key, network in window.networks.items():
-            arcs = [tuple(a) for a in network.arcs]
+        for key, network in sorted(window.networks.items()):
+            arcs = sorted(map(tuple, network.arcs), key=lambda a: (node_order(a[0]), node_order(a[1])))
             seed_arcs = set(zip(['entry', *plans[key]], [*plans[key], 'exit']))
             if not seed_arcs <= set(arcs):
                 raise ValueError('initial route outside the protected candidate network')
+            fixed_arcs = (set(zip(['entry', *warm_start.paths[key]], [*warm_start.paths[key], 'exit']))
+                          if restriction != 'none' else None)
             for arc in arcs:
-                y[key, arc] = var(vtype=COPT.BINARY, name=f'y[{key},{arc}]', seed=arc in seed_arcs)
-            for node in {v for a in arcs for v in a}:
+                bounds = dict(lb=float(arc in fixed_arcs), ub=float(arc in fixed_arcs)) if fixed_arcs is not None else {}
+                y[key, arc] = var(vtype=COPT.BINARY, name=f'y[{key},{arc}]', seed=arc in seed_arcs, **bounds)
+            for node in sorted({v for a in arcs for v in a}, key=node_order):
                 outgoing = cp.quicksum(y[key, a] for a in arcs if a[0] == node)
                 incoming = cp.quicksum(y[key, a] for a in arcs if a[1] == node)
                 rhs = 1 if node == network.origin else -1 if node == 'exit' else 0
@@ -130,7 +159,8 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
                 eligible = cp.quicksum(v for t, v in arrivals[rid] if t <= n * delta <= deadline(req, t))
                 previous = cp.quicksum(service[rid, m] for m in possible[rid] if m < n)
                 seed_queue = seed_active if not req.predecessors else 0
-                qvar = var(vtype=COPT.BINARY, name=f'Q[{rid},{n}]', seed=seed_queue)
+                qvar = var(vtype=COPT.CONTINUOUS if strengthened else COPT.BINARY, lb=0., ub=1.,
+                           name=f'Q[{rid},{n}]', seed=seed_queue)
                 queue[rid, n] = qvar
                 model.addConstr(qvar <= active)
                 model.addConstr(qvar <= eligible)
@@ -139,7 +169,7 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
                 model.addConstr(service[rid, n] <= qvar)
             if req.kind == 'reservation':
                 arrived = cp.quicksum(v for _, v in arrivals[rid])
-                fvar = var(vtype=COPT.BINARY, name=f'failed[{rid}]',
+                fvar = var(vtype=COPT.CONTINUOUS if strengthened else COPT.BINARY, lb=0., ub=1., name=f'failed[{rid}]',
                            seed=seed_active if not req.predecessors else 0)
                 failure[rid] = fvar
                 model.addConstr(fvar <= active)
@@ -157,7 +187,9 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
                 model.addConstr(service[r, n] <= 2 - queue[q, n] + service[q, n] - precedes)
 
         period_sets = {rid: set(values) for rid, values in possible.items()}
-        for ids in by_station.values():
+        earlier_variables = []
+        for station in sorted(by_station):
+            ids = sorted(by_station[station])
             for q, r in combinations(ids, 2):
                 qr, rr = requests[q], requests[r]
                 if qr.user_key is not None and qr.user_key == rr.user_key:
@@ -190,6 +222,7 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
                 for first, second, diff, seed in [(q, r, qrank - rrank, qseed < rseed),
                                                    (r, q, rrank - qrank, rseed < qseed)]:
                     earlier = var(vtype=COPT.BINARY, name=f'earlier[{first},{second}]', seed=seed)
+                    earlier_variables.append((earlier, diff))
                     model.addConstr(diff <= bound * (1 - earlier) - 1)
                     model.addConstr(diff >= -bound * earlier)
                     priority(first, second, shared, earlier)
@@ -218,10 +251,79 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
                              price_at(params, 'swap_service_price', requests[rid].station, n) * a
                              for (rid, _, n), a in alpha.items())
         failed_cost = params.reservation_failure_penalty * cp.quicksum(failure.values())
+        prefix, strengthening = {}, {}
+        if strengthened:
+            prefix, strengthening = add_strengthening(cp, model, var, params, window, requests,
+                alpha, service, total, activation, arrivals, failure, first_use=formulation == 'strengthened')
+        if restriction == 'services':
+            # Freeze the entire served set and its periods, not the battery slots.
+            # All unlisted request-period pairs are explicitly fixed to zero.
+            fixed = {(d.request_id, d.period) for d in warm_start.services}
+            for key, expression in service.items():
+                model.addConstr(expression == float(key in fixed))
         model.setObjective(income - charging - failed_cost, COPT.MAXIMIZE)
+        model.update()
+
+        def start_value(expr):
+            if isinstance(expr, (int, float)):
+                return float(expr)
+            if isinstance(expr, cp.Var):
+                return start_values[expr.index]
+            return expr.getConstant() + sum(expr.getCoeff(k) * start_values[expr.getVar(k).index]
+                                            for k in range(expr.getSize()))
+
+        if warm_start is not None:
+            if set(warm_start.paths) != set(window.networks):
+                raise ValueError('warm start user set differs from the model')
+            for key in sorted(window.networks):
+                route = warm_start.paths[key]
+                arcs = set(zip(['entry', *route], [*route, 'exit']))
+                if not arcs <= {a for k, a in y if k == key}:
+                    raise ValueError(f'warm start route is outside the candidate network: {key}')
+                for (k, a), variable in y.items():
+                    if k == key:
+                        start_values[variable.index] = float(a in arcs)
+            for variable in alpha.values():
+                start_values[variable.index] = 0.
+            seen = set()
+            for decision in warm_start.services:
+                rid = decision.request_id
+                key = (rid, decision.slot, decision.period)
+                if (rid in seen or key not in alpha or requests[rid].station != decision.station):
+                    raise ValueError(f'invalid or duplicate warm start service: {rid}')
+                seen.add(rid)
+                start_values[alpha[key].index] = 1.
+            for values, target, size in [(warm_start.power, power, h), (warm_start.soc, soc, h + 1)]:
+                if (len(values) != len(counts) or any(len(values[i]) != count for i, count in enumerate(counts))
+                        or any(len(row) != size for station in values for row in station)):
+                    raise ValueError('warm start battery/time dimensions differ from the model')
+                for (i, b, n), variable in target.items():
+                    start_values[variable.index] = float(values[i][b][n])
+            for rid in ordered:
+                active = start_value(activation[rid]) > .5
+                for n in possible[rid]:
+                    eligible = sum(start_value(v) for t, v in arrivals[rid]
+                                   if t <= n * delta <= deadline(requests[rid], t))
+                    previous = sum(start_value(service[rid, m]) for m in possible[rid] if m < n)
+                    start_values[queue[rid, n].index] = float(active and eligible > .5 and previous < .5)
+                if rid in failure:
+                    arrived = sum(start_value(v) for _, v in arrivals[rid])
+                    start_values[failure[rid].index] = float(active and arrived > .5 and start_value(total[rid]) < .5)
+            for variable, diff in earlier_variables:
+                start_values[variable.index] = float(start_value(diff) < -.5)
+            count_by_slot_period = defaultdict(int)
+            for decision in warm_start.services:
+                count_by_slot_period[decision.station, decision.slot, decision.period] += 1
+            for (i, b, n), variable in prefix.items():
+                start_values[variable.index] = sum(count_by_slot_period[i, b, m] for m in range(n + 1))
 
         # Check the complete deterministic MIP start against every generated row.
         seed_residual = 0.
+        for variable, value in zip(variables, start_values):
+            if not isfinite(value):
+                raise ValueError('nonfinite warm start value')
+            seed_residual = max(seed_residual, variable.lb - value, value - variable.ub,
+                                abs(value - round(value)) if variable.vtype != COPT.CONTINUOUS else 0.)
         for constraint in model.getConstrs():
             row = model.getRow(constraint)
             lhs = row.getConstant() + sum(row.getCoeff(k) * start_values[row.getVar(k).index]
@@ -230,16 +332,54 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
             seed_residual = max(seed_residual, lo - lhs, lhs - hi)
         if seed_residual > solver.feasibility_tol:
             raise ValueError(f'initial MIP solution violates constraints by {seed_residual}')
+        initial_objective = start_value(income - charging - failed_cost)
+        if warm_start is not None and abs(initial_objective - warm_start.objective) > max(1e-4, abs(warm_start.objective) * 1e-8):
+            raise ValueError('warm start objective does not match the rebuilt model')
         if model.ismip:
+            # Explicit mode ensures a supplied full start is processed, not left
+            # to the solver's automatic choice of initial-solution handling.
+            model.setParam(COPT.Param.MipStartMode, 1)
             model.setMipStart(variables, start_values)
             model.loadMipStart()
+        fingerprints = model_fingerprints(model)
+        if expected_fingerprints is not None and fingerprints != expected_fingerprints:
+            raise ValueError('model differs from the independently verified build')
         diagnostics = dict(model_variables=int(model.getAttr(COPT.Attr.Cols)),
                            model_constraints=int(model.getAttr(COPT.Attr.Rows)),
                            model_binary_variables=int(model.getAttr(COPT.Attr.Bins)),
-                           initial_max_constraint_residual=seed_residual)
+                           initial_max_constraint_residual=seed_residual,
+                           initial_objective=initial_objective, mip_start_mode=1,
+                           warm_start_used=warm_start is not None, fingerprints=fingerprints,
+                           formulation=formulation, root_cut_rounds=root_cut_rounds,
+                           strengthening=strengthening, warm_start_slot_permutation=permutation,
+                           restriction=restriction, bound_scope=bound_scope,
+                           fixed_route_variables=len(y) if restriction != 'none' else 0,
+                           fixed_service_periods=len(service) if restriction == 'services' else 0,
+                           service_assignment_variables=len(alpha))
+        if audit_path is not None:
+            Path(audit_path).write_text(json.dumps(diagnostics, indent=2, allow_nan=False), encoding='utf-8')
         build_seconds = perf_counter() - started
         if build_only:
             return dict(status='built', diagnostics=diagnostics, build_seconds=build_seconds)
+        if relaxation_only:
+            model.solveLP()
+            solved = model.lpstatus == COPT.OPTIMAL
+            data = dict(status='lp_optimal' if solved else f'lp_status_{model.lpstatus}',
+                        lp_bound=float(model.lpobjval) if solved else None,
+                        solve_seconds=float(model.solvingtime), build_seconds=build_seconds,
+                        diagnostics=diagnostics)
+            if model.haslpsol:
+                values, _, _, _ = model.getLpSolution()
+                fractional = defaultdict(int)
+                for v, x in zip(variables, values):
+                    if v.vtype != COPT.CONTINUOUS and abs(x - round(x)) > 1e-7:
+                        fractional[v.name.split('[')[0]] += 1
+                violations = [sum(values[alpha[key].index] for key in keys) - upper
+                              for _, _, _, keys, upper in cooldown_sets(params, window, requests, alpha)]
+                data.update(fractional_integer_variables=dict(fractional),
+                            violated_cooldown_cliques=sum(v > 1e-6 for v in violations),
+                            max_cooldown_violation=max([0., *violations]))
+            return data
         model.solve()
         names = {COPT.OPTIMAL: 'optimal', COPT.TIMEOUT: 'time_limit', COPT.INTERRUPTED: 'interrupted',
                  COPT.INFEASIBLE: 'infeasible', COPT.INF_OR_UNB: 'infeasible_or_unbounded',
@@ -250,11 +390,14 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False):
         bound = float(model.bestbnd) if model.ismip else (float(model.objval) if has_solution else None)
         upper = bound if valid_upper_bound(bound, status) else None
         result = dict(status=status, has_incumbent=has_solution, best_bound=upper,
+                      bound_scope=bound_scope,
                       raw_best_bound=bound if bound is not None and isfinite(bound) else None,
                       incumbent_objective=float(model.objval) if has_solution else None,
                       relative_gap=float(model.bestgap) if has_solution and model.ismip else
                       (0. if has_solution else None), solve_seconds=float(model.solvingtime),
                       build_seconds=build_seconds, diagnostics=diagnostics, solution=None)
+        if warm_start is not None and (not has_solution or result['incumbent_objective'] < initial_objective - max(1e-4, abs(initial_objective) * 1e-8)):
+            raise ValueError('solver failed to preserve the validated warm start incumbent')
         if has_solution:
             def value(expr):
                 if isinstance(expr, (int, float)):

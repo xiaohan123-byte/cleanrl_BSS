@@ -3,11 +3,21 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from run_perfect_information import day_disposition
+from run_perfect_information import check_warm_start_parameters, day_disposition
+from src.parameters import BusinessParameters
 from src.perfect_information_reporting import aggregate
 
 
 class PerfectRunnerTest(unittest.TestCase):
+    def test_warm_start_allows_solver_changes_but_not_business_changes(self):
+        params = BusinessParameters()
+        saved = params.to_dict()
+        params.solver.time_limit_sec = 3600.
+        check_warm_start_parameters(saved, params)
+        params.reservation_failure_penalty += 1.
+        with self.assertRaisesRegex(ValueError, 'physical/economic'):
+            check_warm_start_parameters(saved, params)
+
     def test_attempt_markers_prevent_implicit_resolve(self):
         with tempfile.TemporaryDirectory() as path:
             day = Path(path) / 'day'

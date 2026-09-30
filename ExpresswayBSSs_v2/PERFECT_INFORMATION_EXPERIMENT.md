@@ -81,3 +81,44 @@ whole-day solves, not MPC rounds. The latest paper must then be read and its
 perfect-information text/rows updated without changing zero-terminal or RL rows.
 
 Tests: `python -B -m unittest discover -s tests -p 'test_perfect_information*.py' -v`.
+
+## Deterministic builds and a saved-solution warm start (2026-09-29)
+
+The offline model now sorts users, mixed-type nodes, arcs, requests,
+predecessors and station request pairs before building. It saves two SHA-256
+fingerprints: an ordered matrix digest and an order-independent digest of the
+named variables, bounds, types, objective coefficients and linear rows. The
+latter normalizes row sign, retains duplicate rows, and does not round numbers.
+No physical/economic constraint is changed by this ordering update.
+
+`check_perfect_information_consistency.py --warm-start <solver_result.json>
+--output-dir <check-dir>` makes four build-only checks: the old frozen model
+and current model, each under Python hash seeds 1 and 17. These are not scenario
+seeds or optimization repetitions. It requires identical named algebra in all
+four builds and identical ordered fingerprints in the two current builds.
+It also replays the saved solution and checks its complete reconstructed start
+against every new constraint and variable bound. The source and data hashes
+are frozen in `<check-dir>/report.json`.
+
+For one selected day, the runner accepts `--warm-start <solver_result.json>`
+and `--consistency-report <check-dir>/report.json`. The original inputs and
+business parameters must match; solver limits may change. Paths, assignments,
+power and SOC are restored, and queue/failure/precedence binaries are rebuilt.
+The runner freezes the input result, explicitly sets `MipStartMode=1`, records
+the start objective, and rejects a final incumbent worse than that start.
+Solver acceptance is visible as `Initial MIP solution ... was accepted` in
+the log. `model_audit.json` is saved before optimization, and its matrix must
+match the verified build. The worker uses `PYTHONHASHSEED=1` as an additional
+process setting. This imports a feasible solution, not the previous search
+tree. Wall-clock-limited solves are not promised to be bitwise reproducible.
+
+Optional exact model strengthening is available through
+`--formulation strengthened_compact --root-cut-rounds 8`. The compact profile
+adds arrival/service hull and recharge interval cuts and makes implied queue
+and failure indicators continuous. `--formulation strengthened` additionally
+orders identical slots by first use; its initial full-day LP diagnostic was
+too slow for the current trial. The default remains `baseline`. Read
+`PERFECT_INFORMATION_STRENGTHENING.md` for equivalence arguments, tests and
+diagnostic results. Generate a current validation report using
+`check_strengthened_perfect_information.py`, then pass it through the existing
+`--consistency-report` option. Source/formulation/data mismatches are rejected.

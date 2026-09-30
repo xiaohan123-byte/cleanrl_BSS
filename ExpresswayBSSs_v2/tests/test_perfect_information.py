@@ -1,11 +1,14 @@
 """Small exact solves and independent physical replay for the offline model."""
 import copy
+import tempfile
+from pathlib import Path
 import unittest
 
 from src.domain import MPCSolution, ServiceDecision
 from src.parameters import BusinessParameters, StationParameters, ODPairParameters, SolverParameters
 from src.perfect_information import build_perfect_window, no_service_solution, replay_solution
 from src.perfect_information_model import request_timing, solve_perfect, valid_upper_bound
+from src.perfect_information_strengthening import canonicalize_slots, recharge_periods
 from src.scenario import SyntheticScenario
 
 
@@ -167,6 +170,113 @@ class PerfectInformationTest(unittest.TestCase):
         for bound, status in [(float('inf'), 'time_limit'), (1e30, 'time_limit'),
                               (42., 'numerical'), (42., 'infeasible'), (None, 'optimal')]:
             self.assertFalse(valid_upper_bound(bound, status))
+
+    def test_reordered_inputs_build_the_same_matrix(self):
+        random = [dict(request_id='a', station=0, arrival_time=.25, return_soc=.8, deadline=.5),
+                  dict(request_id='b', station=0, arrival_time=.26, return_soc=.1, deadline=.5)]
+        p, scene, plans = fixture(random=random)
+        w = build_perfect_window(p, scene, plans)
+        first = solve_perfect(p, w, plans, build_only=True)
+        w.requests.reverse()
+        w.networks = dict(reversed(list(w.networks.items())))
+        for network in w.networks.values():
+            network.arcs = list(reversed(network.arcs))
+        second = solve_perfect(p, w, plans, build_only=True)
+        self.assertEqual(first['diagnostics']['fingerprints'], second['diagnostics']['fingerprints'])
+
+    def test_complete_warm_start_is_accepted_and_preserved(self):
+        p, scene, plans = fixture()
+        w, previous, _ = self.solve_replay(p, scene, plans)
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / 'solver.log'
+            p.solver.output_flag = 1
+            result = solve_perfect(p, w, plans, warm_start=unpack(previous), log_path=log)
+            text = log.read_text(encoding='utf-8')
+            self.assertIn('Initial MIP solution # 1', text)
+            self.assertIn('was accepted', text)
+        self.assertGreaterEqual(result['incumbent_objective'] + 1e-6, previous['incumbent_objective'])
+        self.assertAlmostEqual(result['diagnostics']['initial_objective'], previous['incumbent_objective'])
+        self.assertTrue(result['diagnostics']['warm_start_used'])
+        self.assertEqual(replay_solution(p, scene, plans, w, unpack(result))['status'], 'passed')
+
+    def test_invalid_warm_start_is_rejected_before_solving(self):
+        p, scene, plans = fixture()
+        w, previous, _ = self.solve_replay(p, scene, plans)
+        warm = unpack(previous)
+        warm.power[0][0][0] = 100.
+        with self.assertRaisesRegex(ValueError, 'violates constraints'):
+            solve_perfect(p, w, plans, warm_start=warm, build_only=True)
+        warm = unpack(previous)
+        warm.objective += 10.
+        with self.assertRaisesRegex(ValueError, 'objective does not match'):
+            solve_perfect(p, w, plans, warm_start=warm, build_only=True)
+
+    def test_strengthened_formulation_preserves_small_exact_optima(self):
+        examples = [fixture(), fixture(entry=1.9), fixture(power=0.),
+                    fixture(counts=(2, 3), random=[dict(request_id='r', station=0,
+                            arrival_time=.26, deadline=.5, return_soc=.1)])]
+        for p, scene, plans in examples:
+            for formulation in ['strengthened', 'strengthened_compact']:
+                self.check_strengthened_example(p, scene, plans, formulation)
+
+    def check_strengthened_example(self, p, scene, plans, formulation):
+        with self.subTest(formulation=formulation, entry=scene.reservations[0]['actual_entry_time']):
+            w, baseline, _ = self.solve_replay(p, scene, plans)
+            improved = solve_perfect(p, w, plans, formulation=formulation, warm_start=unpack(baseline))
+            self.assertEqual(improved['status'], 'optimal')
+            self.assertAlmostEqual(improved['incumbent_objective'], baseline['incumbent_objective'], places=6)
+            self.assertEqual(replay_solution(p, scene, plans, w, unpack(improved))['status'], 'passed')
+            self.assertLess(improved['diagnostics']['model_binary_variables'], baseline['diagnostics']['model_binary_variables'])
+
+    def test_recharge_cuts_remove_fractional_repeated_swaps(self):
+        random = [dict(request_id=str(n), station=0, arrival_time=n*.25,
+                       deadline=n*.25, return_soc=.1) for n in range(3)]
+        p, scene, plans = fixture(reservations=False, random=random)
+        w = build_perfect_window(p, scene, plans)
+        baseline = solve_perfect(p, w, plans, relaxation_only=True)
+        tightened = solve_perfect(p, w, plans, formulation='strengthened', relaxation_only=True)
+        integer = solve_perfect(p, w, plans, formulation='strengthened')
+        self.assertEqual(baseline['status'], 'lp_optimal')
+        self.assertGreater(baseline['violated_cooldown_cliques'], 0)
+        self.assertGreater(baseline['lp_bound'], tightened['lp_bound'] + 1.)
+        self.assertAlmostEqual(tightened['lp_bound'], integer['incumbent_objective'], places=6)
+        self.assertEqual(tightened['violated_cooldown_cliques'], 0)
+
+    def test_slot_relabeling_preserves_replay_and_first_use(self):
+        p, scene, plans = fixture(counts=(3, 3))
+        w, baseline, _ = self.solve_replay(p, scene, plans)
+        original = unpack(baseline)
+        canonical, _ = canonicalize_slots(p, w, original)
+        self.assertEqual(replay_solution(p, scene, plans, w, canonical)['status'], 'passed')
+        self.assertEqual(canonical.objective, original.objective)
+        for i in range(2):
+            first = [min([d.period for d in canonical.services if d.station == i and d.slot == b], default=w.horizon + 1)
+                     for b in range(3)]
+            self.assertEqual(first, sorted(first))
+
+    def test_recharge_boundaries_and_no_charging(self):
+        self.assertEqual(recharge_periods(.5, .25, 10), 2)
+        self.assertEqual(recharge_periods(.499, .25, 10), 3)
+        self.assertEqual(recharge_periods(1., 0., 10), 1)
+        self.assertEqual(recharge_periods(.9, 0., 10), 11)
+
+    def test_first_use_order_allows_later_service_counts_to_cross(self):
+        random = [dict(request_id=str(n), station=0, arrival_time=n*.25,
+                       deadline=n*.25, return_soc=.99) for n in range(3)]
+        p, scene, plans = fixture(counts=(2, 1), reservations=False, random=random)
+        w = build_perfect_window(p, scene, plans)
+        warm = no_service_solution(p, w, plans)
+        warm.services = [ServiceDecision('0', 0, 1, 0), ServiceDecision('1', 0, 0, 1),
+                         ServiceDecision('2', 0, 0, 2)]
+        for d in warm.services:
+            warm.power[d.station][d.slot][d.period] = .01 * p.battery_capacity_kwh / (p.station.charging_efficiency * p.interval_hours)
+        warm.objective_terms.update(income=3., charging_cost=3. / p.station.charging_efficiency * .5)
+        warm.objective = warm.objective_terms['income'] - warm.objective_terms['charging_cost']
+        canonical, _ = canonicalize_slots(p, w, warm)
+        self.assertEqual([d.slot for d in canonical.services], [0, 1, 1])
+        self.assertEqual(replay_solution(p, scene, plans, w, canonical)['status'], 'passed')
+        result = solve_perfect(p, w, plans, warm_start=warm, formulation='strengthened', build_only=True)
+        self.assertLess(result['diagnostics']['initial_max_constraint_residual'], 1e-8)
 
 
 if __name__ == '__main__':
