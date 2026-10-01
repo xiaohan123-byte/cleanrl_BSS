@@ -150,3 +150,13 @@ ExpresswayBSSs_v2/paper_v2/**
 
 # Temporary outputs and source backup used to verify the section split.
 ExpresswayBSSs_v2/tmp/paper-section-split-verification/
+
+
+ExpresswayBSSs_v3/paper_v3/**
+!ExpresswayBSSs_v3/paper_v3/**/
+!ExpresswayBSSs_v3/paper_v3/**/*.pdf
+!ExpresswayBSSs_v3/paper_v3/**/*.tex
+!ExpresswayBSSs_v3/paper_v3/**/*.bib
+!ExpresswayBSSs_v3/paper_v3/**/*.sty
+!ExpresswayBSSs_v3/paper_v3/**/*.cls
+!ExpresswayBSSs_v3/paper_v3/figures/**

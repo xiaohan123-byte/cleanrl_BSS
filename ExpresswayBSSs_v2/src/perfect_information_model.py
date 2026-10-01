@@ -16,7 +16,8 @@ from .domain import MPCSolution, ServiceDecision, user_key_text
 from .parameters import price_at, slots_at
 from .perfect_information import grid_time
 from .perfect_information_checks import model_fingerprints
-from .perfect_information_strengthening import add_strengthening, canonicalize_slots, cooldown_sets
+from .perfect_information_strengthening import (add_strengthening, add_total_service_order,
+                                               canonicalize_slots, cooldown_sets)
 
 
 def node_order(node):
@@ -70,13 +71,17 @@ def valid_upper_bound(value, status):
 def solve_perfect(params, window, plans, *, log_path=None, build_only=False,
                   warm_start=None, audit_path=None, expected_fingerprints=None,
                   formulation='baseline', root_cut_rounds=-1, relaxation_only=False,
-                  restriction='none'):
+                  restriction='none', slot_order='none'):
     import coptpy as cp
     from coptpy import COPT
 
     started = perf_counter()
     if formulation not in {'baseline', 'strengthened', 'strengthened_compact'}:
         raise ValueError('unknown perfect-information formulation')
+    if slot_order not in {'none', 'total_services'}:
+        raise ValueError('unknown slot ordering')
+    if formulation == 'strengthened' and slot_order != 'none':
+        raise ValueError('first-use and total-service orderings cannot be combined')
     if restriction not in {'none', 'routes', 'services'}:
         raise ValueError('unknown diagnostic restriction')
     if restriction != 'none' and warm_start is None:
@@ -88,6 +93,8 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False,
     permutation = []
     if formulation == 'strengthened' and warm_start is not None:
         warm_start, permutation = canonicalize_slots(params, window, warm_start)
+    if slot_order == 'total_services' and warm_start is not None:
+        warm_start, permutation = canonicalize_slots(params, window, warm_start, order=slot_order)
     if window.ell != 0 or window.state.period != 0:
         raise ValueError('the perfect-information model starts at time zero')
     requests, ordered, possible, cases, deadline = request_timing(params, window)
@@ -255,6 +262,8 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False,
         if strengthened:
             prefix, strengthening = add_strengthening(cp, model, var, params, window, requests,
                 alpha, service, total, activation, arrivals, failure, first_use=formulation == 'strengthened')
+        order_rows = (add_total_service_order(cp, model, params, window, requests, alpha)
+                      if slot_order == 'total_services' else 0)
         if restriction == 'services':
             # Freeze the entire served set and its periods, not the battery slots.
             # All unlisted request-period pairs are explicitly fixed to zero.
@@ -353,6 +362,7 @@ def solve_perfect(params, window, plans, *, log_path=None, build_only=False,
                            formulation=formulation, root_cut_rounds=root_cut_rounds,
                            strengthening=strengthening, warm_start_slot_permutation=permutation,
                            restriction=restriction, bound_scope=bound_scope,
+                           slot_order=slot_order, total_service_order_rows=order_rows,
                            fixed_route_variables=len(y) if restriction != 'none' else 0,
                            fixed_service_periods=len(service) if restriction == 'services' else 0,
                            service_assignment_variables=len(alpha))

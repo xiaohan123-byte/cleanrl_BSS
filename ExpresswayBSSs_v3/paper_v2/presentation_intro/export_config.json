@@ -1,0 +1,36 @@
+{
+  "width": 1920,
+  "height": 1080,
+  "slides": [
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(0)",
+      "selector": "deck-stage > [data-deck-active]"
+    },
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(1)",
+      "selector": "deck-stage > [data-deck-active]"
+    },
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(2)",
+      "selector": "deck-stage > [data-deck-active]"
+    },
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(3)",
+      "selector": "deck-stage > [data-deck-active]"
+    },
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(4)",
+      "selector": "deck-stage > [data-deck-active]"
+    },
+    {
+      "showJs": "document.querySelector('deck-stage').goTo(5)",
+      "selector": "deck-stage > [data-deck-active]"
+    }
+  ],
+  "hideSelectors": [
+    ".note-toggle",
+    "#notesPanel"
+  ],
+  "resetTransformSelector": "deck-stage",
+  "filename": "引言汇报_红色学术_6页"
+}

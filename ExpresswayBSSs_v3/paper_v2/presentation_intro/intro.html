@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高速公路预约换电联合优化 · 引言</title>
+<style>
+:root{--red:#A51C30;--darkred:#751324;--soft:#F8EFF0;--ink:#26272B;--muted:#72747C;--line:#DDDDE1;--pale:#F5F5F6;--white:#FFFFFF;--type-title:64px;--type-subtitle:44px;--type-body:38px;--type-small:30px;--type-caption:24px;--type-num:150px;--pad-x:112px;--pad-top:70px;--pad-bottom:70px;--gap-title:40px;--gap-item:26px}
+*{box-sizing:border-box}body{margin:0;background:#E9E9EC;font-family:"Microsoft YaHei",Arial,sans-serif;color:var(--ink)}
+deck-stage{width:100vw;height:100vh}section[data-label]>*:not(img):not(picture):not(video):not(svg):not(canvas){height:100%;box-sizing:border-box}
+.page{position:relative;background:var(--white);color:var(--ink);overflow:hidden}.topbar{position:absolute;left:0;right:0;top:0;height:12px;background:var(--red)}
+.kicker{position:absolute;top:var(--pad-top);left:var(--pad-x);font-size:var(--type-caption);font-weight:700;letter-spacing:2px;color:var(--red)}
+h1,h2,h3,p{margin:0}h1{position:absolute;top:124px;left:var(--pad-x);font-size:var(--type-title);line-height:1.25;font-weight:700;letter-spacing:-1px}
+.rule{position:absolute;top:227px;left:var(--pad-x);right:var(--pad-x);height:2px;background:var(--line)}
+.footer{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:var(--pad-bottom);border-top:2px solid var(--line);padding-top:20px;display:flex;justify-content:space-between;color:var(--muted);font-size:var(--type-caption)}
+.pageno{color:var(--red);font-weight:700}.abs{position:absolute}.red{color:var(--red)}.muted{color:var(--muted)}.bold{font-weight:700}.body{font-size:var(--type-body);line-height:1.55}.small{font-size:var(--type-small);line-height:1.5}.caption{font-size:var(--type-caption);line-height:1.45}.sub{font-size:var(--type-subtitle);font-weight:700;line-height:1.3}.center{text-align:center}
+.line{height:3px;background:var(--line)}.arrow{font-family:Arial,sans-serif;font-size:var(--type-subtitle);line-height:1;color:var(--red)}
+.battery{position:absolute;border:4px solid var(--red);border-radius:8px;width:70px;height:120px;background:white}.battery:before{content:"";position:absolute;width:28px;height:10px;top:-14px;left:17px;background:var(--red);border-radius:2px}.battery .fill{position:absolute;bottom:6px;left:6px;right:6px;background:var(--red)}
+.process{background:var(--pale);border:2px solid var(--line);text-align:center;font-size:var(--type-body);font-weight:700;padding:28px 10px}.process.redbox{background:var(--soft);border-color:var(--red);color:var(--red)}
+.station{position:absolute;width:94px;height:94px;border-radius:50%;border:5px solid var(--line);background:white;display:flex;align-items:center;justify-content:center;font-size:var(--type-subtitle);font-family:Arial,sans-serif;font-weight:700;color:var(--muted)}.station.selected{background:var(--red);border-color:var(--red);color:white}
+.number{font-family:Arial,sans-serif;font-weight:700;color:var(--red)}
+.note-toggle{position:fixed;right:20px;top:15px;z-index:30;background:#FFFFFFED;border:1px solid #DDD;padding:9px 16px;border-radius:6px;color:#751324;font:14px "Microsoft YaHei",sans-serif;cursor:pointer}
+#notesPanel{display:none;position:fixed;left:18%;right:4%;bottom:22px;z-index:40;background:#FFF;border:1px solid #D4C0C4;border-top:4px solid #A51C30;box-shadow:0 6px 30px #0002;padding:20px 28px;border-radius:5px;font-size:18px;line-height:1.7;color:#333}#notesPanel.open{display:block}#notesTitle{font-weight:700;color:#A51C30;margin-bottom:8px}
+@media print{.note-toggle,#notesPanel{display:none!important}}
+</style>
+</head>
+<body>
+<button class="note-toggle" id="noteToggle" aria-expanded="false">讲稿 N</button>
+<aside id="notesPanel"><div id="notesTitle"></div><div id="notesText"></div></aside>
+<deck-stage width="1920" height="1080">
+
+<section data-label="01 研究背景" data-speaker-notes="电动汽车规模扩大后，高速长途出行对补能效率和可靠性的要求更高。换电通过提前充电、到站换电，减少用户停留时间。对运营商来说，关键是结合分时电价安排充电，在用户需要时准备好电池，同时控制成本。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 研究背景</div>
+<h1>高速换电与充电调度</h1><div class="rule"></div>
+<div class="abs small muted" style="left:112px;top:281px">2025 年底 · 中国电动汽车保有量</div>
+<div class="abs number" style="left:104px;top:333px;font-size:var(--type-num);line-height:1">4,400</div>
+<div class="abs sub red" style="left:558px;top:409px">万辆</div>
+<div class="abs body" style="left:112px;top:536px">长距离出行</div><div class="abs body" style="left:112px;top:604px">有限续航与较长补能时间</div><div class="abs body" style="left:112px;top:672px">高峰期需求集中</div>
+<div class="abs" style="left:779px;top:292px;width:2px;height:430px;background:var(--line)"></div>
+<div class="abs sub red" style="left:884px;top:286px">换电：提前充电，到站换电</div>
+<div class="abs process" style="left:884px;top:411px;width:240px;height:114px">站内充电</div>
+<div class="abs arrow" style="left:1154px;top:445px">→</div>
+<div class="abs process redbox" style="left:1230px;top:411px;width:240px;height:114px">满电库存</div>
+<div class="abs arrow" style="left:1500px;top:445px">→</div>
+<div class="abs process" style="left:1576px;top:411px;width:232px;height:114px">到站换电</div>
+<div class="abs body center" style="left:884px;top:572px;width:924px">电池充电与车辆停留在时间上分离</div>
+<div class="abs line" style="left:884px;top:657px;width:924px"></div>
+<div class="abs body red bold center" style="left:884px;top:692px;width:924px">及时备好电池，同时控制充电成本</div>
+<div class="abs caption muted" style="left:112px;top:840px;width:1660px">来源：IEA《Global EV Outlook 2026》。电动汽车口径含纯电动与插电式混合动力；该规模并非可换电车辆数。</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">01 / 06</span></div>
+</div></section>
+
+<section data-label="02 研究问题" data-speaker-notes="长途用户一次行程可能需要多次换电。我们考虑全行程预约：用户提前提供起讫点、入口时间和电量，运营商安排沿途换电站。路径决定各站需求，充电决定到站时能否供给，因此两者需要联合优化，兼顾服务可靠性和运营净收益。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 研究问题</div>
+<h1>预约路径与充电联合优化</h1><div class="rule"></div>
+<div class="abs sub red" style="left:112px;top:275px">全行程预约</div>
+<div class="abs body" style="left:454px;top:276px">起讫点 O–D　＋　计划入口时间　＋　入口 SOC</div>
+<div class="abs caption muted" style="left:454px;top:338px">SOC：电池荷电状态</div>
+<div class="abs" style="left:205px;top:497px;width:1497px;height:8px;background:#DDDDE1"></div>
+<div class="abs" style="left:205px;top:491px;width:1497px;height:4px;background:var(--red)"></div>
+<div class="abs station" style="left:160px;top:451px">O</div>
+<div class="abs station selected" style="left:466px;top:451px">A</div>
+<div class="abs station" style="left:772px;top:451px">B</div>
+<div class="abs station selected" style="left:1078px;top:451px">C</div>
+<div class="abs station" style="left:1384px;top:451px">D</div>
+<div class="abs station" style="left:1688px;top:451px">E</div>
+<div class="abs small center" style="left:124px;top:576px;width:162px">入口</div>
+<div class="abs small center red bold" style="left:438px;top:576px;width:150px">换电</div>
+<div class="abs small center muted" style="left:744px;top:576px;width:150px">经过</div>
+<div class="abs small center red bold" style="left:1050px;top:576px;width:150px">换电</div>
+<div class="abs small center muted" style="left:1356px;top:576px;width:150px">经过</div>
+<div class="abs small center" style="left:1660px;top:576px;width:150px">出口</div>
+<div class="abs caption muted" style="left:1450px;top:388px">示意路径：O → A → C → E</div>
+<div class="abs" style="left:112px;top:685px;width:735px;height:150px;background:var(--soft)"></div>
+<div class="abs sub red" style="left:150px;top:709px">换电路径</div><div class="abs small" style="left:150px;top:773px">在哪些站换电？形成怎样的站点需求？</div>
+<div class="abs arrow" style="left:925px;top:729px">⇄</div>
+<div class="abs" style="left:1036px;top:685px;width:772px;height:150px;background:var(--pale)"></div>
+<div class="abs sub red" style="left:1074px;top:709px">站内充电计划</div><div class="abs small" style="left:1074px;top:773px">何时充、充多少？到站时能否提供满电电池？</div>
+<div class="abs small center bold" style="left:112px;top:875px;width:1696px">联合目标：协调服务可靠性与运营净收益</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">02 / 06</span></div>
+</div></section>
+
+<section data-label="03 滚动优化" data-speaker-notes="实际入口时间和电量、站间旅行时间以及随机到站需求都会变化，所以日前方案需要持续修正。每轮先更新状态，再优化未来一段时间，只执行当前一段，随后向前滚动。充电可以频繁调整，路径按较低频率更新，以减少对用户行程的打扰。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 动态决策</div>
+<h1>滚动更新路径与充电计划</h1><div class="rule"></div>
+<div class="abs small red bold" style="left:112px;top:282px">不确定信息</div>
+<div class="abs body" style="left:360px;top:279px">入口时间 / SOC 偏差</div>
+<div class="abs body" style="left:902px;top:279px">站间旅行时间变化</div>
+<div class="abs body" style="left:1404px;top:279px">随机到站需求</div>
+<div class="abs small" style="left:112px;top:419px">当前轮</div><div class="abs small muted" style="left:112px;top:570px">下一轮</div>
+<div class="abs small red" style="left:412px;top:370px">仅执行首段</div>
+<div class="abs" style="left:410px;top:425px;width:173px;height:88px;background:var(--red)"></div>
+<div class="abs" style="left:588px;top:425px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:766px;top:425px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:944px;top:425px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:1122px;top:425px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:1300px;top:425px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs small" style="left:1525px;top:445px">预测未来 H 段</div>
+<div class="abs" style="left:588px;top:576px;width:173px;height:88px;background:var(--red)"></div>
+<div class="abs" style="left:766px;top:576px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:944px;top:576px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:1122px;top:576px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:1300px;top:576px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs" style="left:1478px;top:576px;width:173px;height:88px;background:#E9B9C0"></div>
+<div class="abs caption muted" style="left:411px;top:689px">t</div><div class="abs caption muted" style="left:577px;top:689px">t + 1</div><div class="abs caption muted" style="left:1433px;top:689px">t + H</div>
+<div class="abs body bold red center" style="left:112px;top:781px;width:1696px">观测更新　→　联合优化　→　执行首段　→　窗口前移</div>
+<div class="abs small muted center" style="left:112px;top:855px;width:1696px">充电频繁更新；换电路径按较低频率调整</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">03 / 06</span></div>
+</div></section>
+
+<section data-label="04 终端价值" data-speaker-notes="短预测域会遗漏两类后续影响：一是电池在域外还有服务价值，二是已经安排的换电可能在域外才发生，比如用户在 H 加 3 时到达 C 站。我们把终端 SOC 分布和未完成服务一起交给价值函数，用运营轨迹学习后续净收益，再嵌入滚动模型。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 末端效应与处理方法</div>
+<h1>终端资源与未完成服务</h1><div class="rule"></div>
+<div class="abs sub" style="left:112px;top:280px">① 电池仍有后续服务价值</div>
+<div class="abs sub" style="left:1010px;top:280px">② 已安排的服务可能跨越预测域</div>
+<div class="abs" style="left:938px;top:282px;width:2px;height:370px;background:var(--line)"></div>
+<div class="abs small muted" style="left:131px;top:365px">预测终点</div>
+<div class="battery" style="left:135px;top:449px"><div class="fill" style="height:25px"></div></div>
+<div class="battery" style="left:244px;top:449px"><div class="fill" style="height:9px"></div></div>
+<div class="battery" style="left:353px;top:449px"><div class="fill" style="height:9px"></div></div>
+<div class="abs body red bold" style="left:482px;top:447px">可能过度消耗库存</div>
+<div class="abs small" style="left:482px;top:510px">或推迟必要的充电</div>
+<div class="abs caption muted" style="left:131px;top:609px">需要评价终端 SOC 分布及其满电供应能力</div>
+<div class="abs" style="left:1020px;top:412px;width:482px;height:116px;background:var(--soft)"></div>
+<div class="abs small center red" style="left:1020px;top:447px;width:482px">当前预测域 [0, H)</div>
+<div class="abs" style="left:1502px;top:386px;width:3px;height:176px;background:var(--red)"></div>
+<div class="abs small red" style="left:1488px;top:569px">H</div>
+<div class="abs" style="left:1505px;top:469px;width:216px;border-top:4px dashed var(--red)"></div>
+<div class="abs station selected" style="left:1684px;top:423px">C</div>
+<div class="abs small red center" style="left:1645px;top:555px;width:168px">H + 3 到达</div>
+<div class="abs caption muted" style="left:1020px;top:620px">域外的电池消耗与服务义务，也由当前路径决定</div>
+<div class="abs line" style="left:112px;top:686px;width:1696px"></div>
+<div class="abs small red bold" style="left:112px;top:735px">终端价值估计</div>
+<div class="abs small bold center" style="left:406px;top:730px;width:366px">终端 SOC 分布<br>＋ 未完成服务</div>
+<div class="abs arrow" style="left:805px;top:752px">→</div>
+<div class="abs small bold center red" style="left:879px;top:730px;width:400px">RL 学习<br>后续累计净收益</div>
+<div class="abs arrow" style="left:1323px;top:752px">→</div>
+<div class="abs small bold center" style="left:1407px;top:730px;width:401px">分段线性价值函数<br>嵌入滚动优化模型</div>
+<div class="abs small muted center" style="left:112px;top:860px;width:1696px">有限预测域内，同时评价当期收益与留给未来的运营状态</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">04 / 06</span></div>
+</div></section>
+
+<section data-label="05 研究贡献" data-speaker-notes="本文主要有四方面工作：建立全程换电路径与充电联合优化模型；设计不同更新频率的滚动框架；学习同时考虑电池和未完成服务的终端价值；进一步通过实验分析预约服务的适用条件与电池库存配置。最后一部分的具体结论仍需实验验证。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 研究贡献</div>
+<h1>模型、方法与管理分析</h1><div class="rule"></div>
+<div class="abs number" style="left:112px;top:284px;font-size:var(--type-title)">01</div>
+<div class="abs sub" style="left:267px;top:293px">联合优化建模</div>
+<div class="abs body" style="left:738px;top:292px">统一全程换电路径、站内充电与服务约束</div>
+<div class="abs line" style="left:267px;top:405px;width:1541px"></div>
+<div class="abs number" style="left:112px;top:443px;font-size:var(--type-title)">02</div>
+<div class="abs sub" style="left:267px;top:452px">动态滚动决策</div>
+<div class="abs body" style="left:738px;top:451px">实时更新信息，以不同频率调整路径和充电</div>
+<div class="abs line" style="left:267px;top:564px;width:1541px"></div>
+<div class="abs number" style="left:112px;top:602px;font-size:var(--type-title)">03</div>
+<div class="abs sub" style="left:267px;top:611px">学习终端价值</div>
+<div class="abs body" style="left:738px;top:610px">联合评价终端电池状态与域外未完成服务</div>
+<div class="abs line" style="left:267px;top:723px;width:1541px"></div>
+<div class="abs number" style="left:112px;top:761px;font-size:var(--type-title)">04</div>
+<div class="abs sub" style="left:267px;top:770px">运营管理分析</div>
+<div class="abs body" style="left:738px;top:769px">分析预约服务的适用边界与电池库存配置</div>
+<div class="abs caption muted" style="left:738px;top:838px">研究目标；具体管理结论待实验验证</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">05 / 06</span></div>
+</div></section>
+
+<section data-label="06 文章结构" data-speaker-notes="后文先介绍运营场景和基本假设，再建立联合优化模型，随后说明终端价值学习，最后通过数值实验评价方法并总结。下面先从系统的运营过程讲起。">
+<div class="page">
+<div class="topbar"></div><div class="kicker">引言 / 文章结构</div>
+<h1>从运营场景到数值验证</h1><div class="rule"></div>
+<div class="abs" style="left:112px;top:302px;width:546px;height:561px;background:var(--red)"></div>
+<div class="abs small" style="left:166px;top:354px;color:#F1DADF">后续内容</div>
+<div class="abs sub" style="left:166px;top:448px;color:white;line-height:1.8">场景与模型<br>终端价值学习<br>实验与结论</div>
+<div class="abs small" style="left:166px;top:764px;color:#F1DADF">下一部分：问题描述</div>
+<div class="abs" style="left:811px;top:336px;width:3px;height:475px;background:var(--line)"></div>
+<div class="abs" style="left:798px;top:331px;width:29px;height:29px;border-radius:50%;background:var(--red)"></div>
+<div class="abs small red bold" style="left:869px;top:318px">第 2 节</div><div class="abs body bold" style="left:1080px;top:311px">问题描述与基本假设</div>
+<div class="abs" style="left:800px;top:450px;width:25px;height:25px;border-radius:50%;background:#C88590"></div>
+<div class="abs small red bold" style="left:869px;top:437px">第 3 节</div><div class="abs body" style="left:1080px;top:430px">模型建立</div>
+<div class="abs" style="left:800px;top:569px;width:25px;height:25px;border-radius:50%;background:#C88590"></div>
+<div class="abs small red bold" style="left:869px;top:556px">第 4 节</div><div class="abs body" style="left:1080px;top:549px">终端价值学习</div>
+<div class="abs" style="left:800px;top:688px;width:25px;height:25px;border-radius:50%;background:#C88590"></div>
+<div class="abs small red bold" style="left:869px;top:675px">第 5 节</div><div class="abs body" style="left:1080px;top:668px">数值实验</div>
+<div class="abs" style="left:800px;top:807px;width:25px;height:25px;border-radius:50%;background:#C88590"></div>
+<div class="abs small red bold" style="left:869px;top:794px">第 6 节</div><div class="abs body" style="left:1080px;top:787px">结论</div>
+<div class="footer"><span>高速公路预约换电 · 路径与充电联合优化</span><span class="pageno">06 / 06</span></div>
+</div></section>
+</deck-stage>
+<script src="deck-stage.js"></script>
+<script>
+const stage=document.querySelector('deck-stage');const panel=document.getElementById('notesPanel');const toggle=document.getElementById('noteToggle');
+function updateNotes(){const s=stage.querySelector('[data-deck-active]')||stage.querySelector('section');document.getElementById('notesTitle').textContent=s.dataset.label;document.getElementById('notesText').textContent=s.dataset.speakerNotes;}
+function toggleNotes(){panel.classList.toggle('open');toggle.setAttribute('aria-expanded',panel.classList.contains('open'));updateNotes();}
+toggle.addEventListener('click',toggleNotes);stage.addEventListener('slidechange',updateNotes);document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='n'&&!e.ctrlKey&&!e.metaKey){e.preventDefault();toggleNotes();}});updateNotes();
+</script>
+</body></html>

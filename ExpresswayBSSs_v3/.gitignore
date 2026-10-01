@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+outputs/*
+!outputs/.gitkeep
+# Exclude runtime lock files (e.g. controller/worker locks with restricted ACLs).
+*.lock

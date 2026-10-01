@@ -16,17 +16,22 @@ def slot_groups(params, window, station):
     return [group for _, group in sorted(groups.items()) if len(group) > 1]
 
 
-def canonicalize_slots(params, window, solution):
-    """Sort first use within each identical (initial SOC, power) slot class."""
+def canonicalize_slots(params, window, solution, *, order='first_use'):
+    """Relabel complete trajectories within identical (SOC, power) classes."""
+    if order not in {'first_use', 'total_services'}:
+        raise ValueError('unknown slot ordering')
     result = deepcopy(solution)
     first = {}
+    counts = defaultdict(int)
     for decision in solution.services:
         key = (decision.station, decision.slot)
+        counts[key] += 1
         first[key] = min(first.get(key, (window.horizon + 1, '')), (decision.period, decision.request_id))
     mapping = {}
     for i in range(params.station.num_stations):
         for group in slot_groups(params, window, i):
-            ordered = sorted(group, key=lambda b: (*first.get((i, b), (window.horizon + 1, '')), b))
+            ordered = (sorted(group, key=lambda b: (-counts[i, b], b)) if order == 'total_services' else
+                       sorted(group, key=lambda b: (*first.get((i, b), (window.horizon + 1, '')), b)))
             for new, old in zip(group, ordered):
                 mapping[i, old] = new
                 result.power[i][new] = deepcopy(solution.power[i][old])
@@ -34,6 +39,26 @@ def canonicalize_slots(params, window, solution):
     result.services = [replace(d, slot=mapping.get((d.station, d.slot), d.slot)) for d in solution.services]
     return result, [{'station': i, 'old_slot': old, 'new_slot': new}
                     for (i, old), new in sorted(mapping.items()) if old != new]
+
+
+def add_total_service_order(cp, model, params, window, requests, alpha):
+    """Order whole-day counts, never counts at every intermediate boundary.
+
+Within each identical slot class, a single global permutation of service,
+power and SOC trajectories sorts these totals. Thus every original feasible
+operating plan has an equally valuable representative. No auxiliary variables.
+"""
+    by_slot = defaultdict(list)
+    for (rid, b, n), variable in alpha.items():
+        by_slot[requests[rid].station, b].append(variable)
+    rows = 0
+    for i in range(params.station.num_stations):
+        for group in slot_groups(params, window, i):
+            totals = {b: cp.quicksum(by_slot[i, b]) for b in group}
+            for before, after in zip(group, group[1:]):
+                model.addConstr(totals[before] >= totals[after], name=f'total_service_order[{i},{before},{after}]')
+                rows += 1
+    return rows
 
 
 def recharge_periods(return_soc, soc_gain, horizon):

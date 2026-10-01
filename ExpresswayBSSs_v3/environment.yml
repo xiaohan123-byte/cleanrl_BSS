@@ -1,0 +1,9 @@
+name: py310
+channels:
+  - defaults
+dependencies:
+  - python=3.10.19
+  - numpy=2.2.6
+  - pip
+  - pip:
+      - coptpy==8.0.6

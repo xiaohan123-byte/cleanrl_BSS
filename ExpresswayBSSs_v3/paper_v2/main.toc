@@ -1,0 +1,37 @@
+\contentsline {section}{\numberline {1}引言}{4}{section.1}%
+\contentsline {section}{\numberline {2}问题描述与基本假设}{7}{section.2}%
+\contentsline {subsection}{\numberline {2.1}问题描述}{7}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}基本假设}{9}{subsection.2.2}%
+\contentsline {section}{\numberline {3}模型建立}{9}{section.3}%
+\contentsline {subsection}{\numberline {3.1}候选路径网络}{12}{subsection.3.1}%
+\contentsline {subsection}{\numberline {3.2}日前换电路径计算}{13}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}滚动时域优化模型}{13}{subsection.3.3}%
+\contentsline {paragraph}{请求与输入信息。}{13}{paragraph*.2}%
+\contentsline {paragraph}{决策变量与计算量。}{13}{paragraph*.3}%
+\contentsline {paragraph}{目标函数。}{14}{paragraph*.4}%
+\contentsline {paragraph}{（1）流平衡约束。}{15}{paragraph*.5}%
+\contentsline {paragraph}{（2）路径调整约束。}{15}{paragraph*.6}%
+\contentsline {paragraph}{（3）换电次数约束。}{15}{paragraph*.7}%
+\contentsline {paragraph}{（4）到站时刻与等待期限。}{16}{paragraph*.8}%
+\contentsline {paragraph}{（5）等待和服务顺序。}{17}{paragraph*.9}%
+\contentsline {paragraph}{（6）未满足预约请求的判定。}{18}{paragraph*.10}%
+\contentsline {paragraph}{（7）满电交付和充电。}{19}{paragraph*.11}%
+\contentsline {paragraph}{滚动执行与记账。}{20}{paragraph*.12}%
+\contentsline {section}{\numberline {4}终端价值学习}{21}{section.4}%
+\contentsline {subsection}{\numberline {4.1}状态与终端价值}{21}{subsection.4.1}%
+\contentsline {paragraph}{预测终端状态。}{21}{paragraph*.13}%
+\contentsline {paragraph}{状态编码与价值计算。}{23}{paragraph*.14}%
+\contentsline {subsection}{\numberline {4.2}实际收益与状态更新}{25}{subsection.4.2}%
+\contentsline {subsection}{\numberline {4.3}价值函数训练}{26}{subsection.4.3}%
+\contentsline {section}{\numberline {5}数值实验}{26}{section.5}%
+\contentsline {subsection}{\numberline {5.1}The role of RL terminal value function}{29}{subsection.5.1}%
+\contentsline {subsection}{\numberline {5.2}The value of route and charging power optimization}{33}{subsection.5.2}%
+\contentsline {subsection}{\numberline {5.3}敏感性分析}{35}{subsection.5.3}%
+\contentsline {section}{\numberline {6}结论}{35}{section.6}%
+\contentsline {section}{\numberline {A}正文各部分的线性化方法}{36}{appendix.A}%
+\contentsline {subsection}{\numberline {A.1}路径调整约束线性化}{36}{subsection.A.1}%
+\contentsline {subsection}{\numberline {A.2}等待和服务顺序约束线性化}{37}{subsection.A.2}%
+\contentsline {subsection}{\numberline {A.3}未满足预约请求判定约束线性化}{38}{subsection.A.3}%
+\contentsline {subsection}{\numberline {A.4}预测终端状态的线性化}{38}{subsection.A.4}%
+\contentsline {subsection}{\numberline {A.5}状态编码与价值计算的线性化}{39}{subsection.A.5}%
+\contentsline {subsection}{\numberline {A.6}基准充电规则线性化}{40}{subsection.A.6}%

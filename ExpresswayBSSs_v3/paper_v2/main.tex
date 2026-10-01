@@ -1,0 +1,50 @@
+% !LW recipe = latexmk (xelatex)
+\documentclass[12pt,a4paper,UTF8]{ctexart}
+\usepackage{SJTUReport}
+\usepackage{booktabs,tabularx,longtable,mathtools,enumitem,needspace,tikz}
+\usepackage[section]{placeins}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric}
+\numberwithin{equation}{section}
+\setlength{\emergencystretch}{2em}
+\setlength{\headheight}{15pt}
+\setlist[enumerate]{itemsep=3pt,topsep=5pt,parsep=0pt}
+\setlist[itemize]{itemsep=3pt,topsep=5pt,parsep=0pt}
+\renewcommand{\arraystretch}{1.18}
+\newcommand{\todoresult}[1]{\textcolor{gray}{#1}}
+\newcommand{\ind}{\mathbb I}
+\newcommand{\R}{\mathcal R}
+\def\subsectionautorefname{节}
+\title{\vspace{1.6cm}\heiti\LARGE 基于强化学习终端价值的高速公路\\[0.4em]换电路径与充电功率滚动时域优化\par\vspace{1.2cm}}
+\author{\relax}
+\date{}
+
+\begin{document}
+\cover
+\thispagestyle{empty}
+\clearpage
+\begin{abstract}
+% 面向高速公路长途出行场景，本文研究预约与随机两类用户共同参与的换电站运营问题。车辆在一次行程中可能多次换电，换电站的选择决定沿线各站的服务需求和退回电池状态，充电功率则影响电池恢复服务能力的时间及购电费用。本文对预约用户的换电路径和换电站充电功率进行滚动时域优化，利用强化学习估计预测域的终端价值，综合考虑终端库存和预测域外未完成服务的影响。模型根据车辆续航构建候选网络，以日前换电路径作为在线调整的基准，并结合电池 SOC、等待窗口、服务顺序和站点总充电功率上限描述运营过程。充电功率与换电路径采用不同的更新周期，每轮执行当前时间段的决策，再根据新观测更新模型。价值函数通过运营轨迹中的实际收益训练，并以分段线性形式纳入优化目标。数值实验分别围绕换电路径与充电功率联合优化、RL 终端价值和运行条件设置对照，为评价所提方法提供统一的实验方案。
+
+\medskip
+\noindent\textbf{关键词：}高速公路；换电站；滚动时域优化；充电功率；强化学习；终端价值
+\end{abstract}
+\clearpage
+\tableofcontents
+\clearpage
+
+\input{sections/01_introduction}
+\input{sections/02_problem_description}
+\input{sections/03_model}
+\input{sections/04_terminal_value_learning}
+\input{sections/05_numerical_experiments}
+\input{sections/06_conclusion}
+\appendix
+\input{sections/appendix_linearization}
+\begin{thebibliography}{9}
+\bibitem{moreno2022terminal}
+Moreno-Mora F, Beckenbach L, Streif S.
+Predictive Control with Learning-Based Terminal Costs Using Approximate Value Iteration[EB/OL].
+arXiv:2212.00361, 2022.
+\url{https://arxiv.org/abs/2212.00361}.
+\end{thebibliography}
+\end{document}

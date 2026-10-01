@@ -108,3 +108,107 @@ The authorized full-day trial uses this compact profile, RootCutRounds=8,
 3600 seconds, gap=0.01, 16 threads, seed=1, day=1, failure penalty=200 and
 the original 3600-second incumbent. Its purpose is to test search progress
 under the full time budget; the LP diagnosis alone establishes no MIP speedup.
+
+## Whole-day service-count ordering, 2026-10-01
+
+The independent `slot_order='total_services'` option adds, within each station
+and each class of identical initial SOC and slot power limit,
+
+`sum_(request,period) alpha[request,b,period] >= sum_(request,period) alpha[request,b+1,period]`.
+
+For the frozen data every slot within a station is identical, so this adds
+exactly `sum_i (B_i-1) = 250-11 = 239` rows and no new variables. It orders
+WHOLE-DAY totals, not cumulative counts at every period, SOC, or first use.
+The first-use profile cannot be combined with this option: two independent
+canonicalization rules need not have a common representative.
+
+Proof: simultaneously permute complete assignment, charging-power and SOC
+trajectories within an identical-slot class. Initial conditions, slot bounds,
+SOC equations, station power sums, all service/queue decisions and the
+objective remain unchanged. Choose the permutation that sorts service totals
+in descending order. Every original feasible operational plan retains a
+representative, including every optimum. Thus the ordered full model's
+maximization bound is valid for the original full problem. Warm starts are
+permuted in precisely this way and replayed before use.
+
+The same argument also applies to fractional LP trajectories and real-valued
+service totals. Consequently, these count-order inequalities alone do not
+change the optimal initial LP objective. Their intended benefit is reducing
+permutation symmetry in integer search; their effects on presolve, cuts and
+runtime must be measured, and speedup is not guaranteed.
+
+`run_perfect_information_count_order.py` compares the existing compact profile
+with and without these rows, leaving paths and service choices free. Both use
+the exact same count-canonicalized feasible start, 16 threads, RootCutRounds=8,
+600-second MIP limits and RelGap=0.01. Separate relaxation checks have 60-second
+limits. The baseline matrix must match the prior full-model fingerprint; the
+MIP matrices must exactly match their corresponding checked LP builds. Seed=1,
+test day=1, reservation failure penalty=200. There is no station decomposition.
+
+Before this comparison, `src/perfect_information_charging.py` substitutes the
+fixed service/request/slot/time decisions into the original full-delivery and
+SOC equations. Its only variables are continuous charging power and SOC. It
+keeps all 11 stations in one LP and all 186 periods, with the original cyclic
+prices, efficiency, power limits and no terminal inventory target or salvage.
+Its cost bound is conditional on the fixed assignment, not an original-problem
+profit bound. Both physical replay and unchanged service assignments are checked.
+
+All 34 perfect-information regression tests passed before launching the trial.
+The added tests cover exact small optimum equivalence, zero extra variables,
+the precise number of ordering rows, crossing intermediate service counts,
+heterogeneous-slot classes and continuous charging optimum/replay checks.
+Inputs, code, logs and results are frozen under
+`outputs/pi_count_order_day01_f200_t600_20261001/`.
+
+### Measured results
+
+The fixed-assignment LP has 93250 continuous variables and 49381 rows, with
+zero integer variables. It reached its optimum in **0.125 seconds**, with
+2.971 seconds of model construction/audit. The optimal charging cost was
+11706.850287675 yuan and profit remained 46766.938986392 yuan. Thus the supplied
+incumbent already had optimal charging for its fixed assignment. The code
+submitted one all-station LP; COPT automatically recognized 11 independent
+blocks, all included in the reported solve time. No separate station trials
+were run.
+
+| Quantity | Compact baseline | Compact + count ordering |
+|---|---:|---:|
+| Original variables | 175088 | 175088 |
+| Original binary variables | 77797 | 77797 |
+| Original rows | 155534 | 155773 |
+| Standalone LP solve seconds | 2.701, optimal | 60.051, time limit |
+| Standalone certified optimal LP objective | 55005.4318963 | not obtained within limit |
+| Presolved MIP columns | 134528 | 140227 |
+| Presolved MIP binaries / other integers | 79267 / 0 | 84163 / 228 |
+| First root LP bound logged at about | 51 seconds | 113 seconds |
+| MIP solve seconds | 600.055 | 600.030 |
+| Verified profit | 46766.9389864 | 46766.9389864 |
+| MIP upper bound | 54992.3264959 | 55005.4318125 |
+| MIP gap | 14.9573% | 14.9776% |
+| Nodes reported | 1 | 1 |
+
+Both MIPs used byte-identical starts, with SHA256
+`2b631988f8e47eaf47f4f85fbde06507794f27e24418c60b662f3ce64ad7d700`.
+The count-order option did not improve the feasible objective or the final
+bound within this budget. It increased LP/root work and the presolved size;
+adding few rows was not enough to guarantee faster optimization. It remains
+an opt-in diagnostic feature, disabled by default. This result concerns the
+current instance and formulation; it does not show that all symmetry-handling
+methods are ineffective.
+
+All three integer-feasible trajectories passed the original physical replay
+and a separate ledger/conservation check. Each completed 199 reservations,
+failed 1, served 157 random requests and timed out 43, with no unsettled users.
+The maximum independent accounting residual was below 5.3e-9 yuan. The charging
+LP preserved all 585 request/time/slot decisions. The ordered MIP also passed
+explicit whole-day count checks.
+
+The two MIP bounds apply to the original full problem by the permutation
+argument above. The charging LP bound only applies to the fixed assignment.
+The previously obtained full-problem upper bound 54930.165935947 remains
+stronger than either new bound. The best known original-problem interval is
+therefore unchanged at [46766.938986392, 54930.165935947], gap **14.8611%**.
+
+`comparison.json` and `comparison.txt` contain the checked summary. The
+`best_feasible/days/day_01/solver_result.json` export can be reused as a warm
+start by the existing runner. Neither experiment changed the paper's results.

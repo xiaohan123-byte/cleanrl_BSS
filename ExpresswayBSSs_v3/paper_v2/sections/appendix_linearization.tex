@@ -1,0 +1,211 @@
+% !TeX root = ../main.tex
+\section{正文各部分的线性化方法}
+\label{lin:appendix}
+
+本附录按正文对应部分说明线性化方法，各小节开头给出相应公式编号。流平衡、换电次数、到站时刻与等待期限、满电交付和充电等关系已按线性形式给出，可直接使用。每轮求解时，网络参数和各表达式的有效上下界均为已知常数，新增变量仅用于表达相应关系。
+
+\subsection{路径调整约束线性化}
+\label{lin:path_adjustment_section}
+本节对应正文的“路径调整约束”，给出式~\eqref{eq:path_freeze} 和式~\eqref{eq:path_change} 的等价线性表达。
+
+对各 $p\in\mathcal P$ 和 $i\in\mathcal S$，式~\eqref{eq:path_freeze} 中的绝对值不等式可直接写为
+\begin{equation}
+\begin{aligned}
+-g_\ell\le x_i^{p,k}-\widehat{x}_i^{p,k}&\le g_\ell,
+&&k\in\mathcal K^{\mathrm{fut},p},\\
+-g_\ell\le x_i^{p,k}-x_i^{p,k,\mathrm{pub}}&\le g_\ell,
+&&k\in\mathcal K^{\mathrm{enr},p},
+\end{aligned}
+\label{lin:path_freeze}
+\end{equation}
+其中，$\widehat{x}_i^{p,k}$ 表示尚未进入高速公路的用户在上一轮保留的未发布计划，初始取日前安排 $\bar x_i^{p,k}$；$x_i^{p,k,\mathrm{pub}}$ 表示在途用户最近一次已发布路径中尚未完成的换电安排。两者在本轮求解时均已知。比较范围与正文一致，各条路径均去除已经完成的换电和当前正在等待的换电。$g_\ell=0$ 时，式~\eqref{lin:path_freeze} 要求保持这些安排；$g_\ell=1$ 时，允许调整换电站点。
+
+计算式~\eqref{eq:path_change} 中的路径改变标记时，尚未进入高速公路的用户与日前路径比较，在途用户与最近一次已发布的剩余路径比较。为简化本附录的表达，记
+\begin{equation}
+x_i^{p,k,\mathrm{ref}}=
+\begin{cases}
+\bar x_i^{p,k}, & k\in\mathcal K^{\mathrm{fut},p},\\
+x_i^{p,k,\mathrm{pub}}, & k\in\mathcal K^{\mathrm{enr},p},
+\end{cases}
+\label{lin:path_reference}
+\end{equation}
+对上述两类用户的每个站点引入连续变量 $D_i^{p,k}$，用以下约束表示 $D_i^{p,k}=|x_i^{p,k}-x_i^{p,k,\mathrm{ref}}|$：
+\begin{equation}
+\begin{aligned}
+D_i^{p,k}&\ge x_i^{p,k}-x_i^{p,k,\mathrm{ref}},&
+D_i^{p,k}&\ge x_i^{p,k,\mathrm{ref}}-x_i^{p,k},\\
+D_i^{p,k}&\le x_i^{p,k}+x_i^{p,k,\mathrm{ref}},&
+D_i^{p,k}&\le 2-x_i^{p,k}-x_i^{p,k,\mathrm{ref}},\\
+0&\le D_i^{p,k}\le1.
+\end{aligned}
+\label{lin:path_difference}
+\end{equation}
+由于 $x_i^{p,k}$ 和 $x_i^{p,k,\mathrm{ref}}$ 均取 $0$ 或 $1$，式~\eqref{lin:path_difference} 在两者相同时要求 $D_i^{p,k}=0$，在两者不同时要求 $D_i^{p,k}=1$。对各 $p\in\mathcal P$ 和 $k\in\mathcal K^{\mathrm{fut},p}\cup\mathcal K^{\mathrm{enr},p}$，再加入
+\begin{equation}
+\begin{aligned}
+\chi_{p,k}&\ge D_i^{p,k}\quad(i\in\mathcal S),\\
+\chi_{p,k}&\le\sum_{i\in\mathcal S}D_i^{p,k},
+\qquad \chi_{p,k}\in\{0,1\},
+\end{aligned}
+\label{lin:path_change}
+\end{equation}
+即可得到式~\eqref{eq:path_change} 的等价线性约束。式~\eqref{lin:path_change} 要求：只要有一个站点的换电安排与比较路径不同，$\chi_{p,k}$ 就取 $1$；所有站点的安排均相同时，$\chi_{p,k}$ 取 $0$。因此，即使目标函数中的路径调整费用系数为零，这些约束仍能确定正确的路径改变标记。
+
+\subsection{等待和服务顺序约束线性化}
+\label{lin:waiting_priority_section}
+本节对应正文的“等待和服务顺序”，处理式~\eqref{eq:queue_status} 中的变量乘积和式~\eqref{eq:priority} 中的服务先后条件。
+
+由换电次数约束，请求在任意时刻之前的换电总次数只能为 $0$ 或 $1$。因此，对所有 $r\in\R$ 和 $n\in\mathcal T_\ell\cup\{\ell+H\}$，式~\eqref{eq:queue_status} 等价于
+\begin{equation}
+\begin{aligned}
+0\le Q_{r,n}&\le a_r,\\
+Q_{r,n}&\le e_{r,n},\\
+Q_{r,n}&\le1-
+\sum_{\substack{m\in\mathcal T_\ell\\m<n}}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,m},\\
+Q_{r,n}&\ge a_r+e_{r,n}-1-
+\sum_{\substack{m\in\mathcal T_\ell\\m<n}}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,m}.
+\end{aligned}
+\label{lin:queue_status}
+\end{equation}
+三个条件全部满足时，上述约束要求 $Q_{r,n}=1$；任一条件不满足时，要求 $Q_{r,n}=0$。当前时刻 $n=\ell$ 的求和为空，预测终点的求和则包含本轮全部换电。
+
+对于同站的预约请求和随机请求，正文式~\eqref{eq:priority} 已是线性约束，可直接使用。
+
+对于同站同类的两个不同请求 $q,r$，令 $M_i^{\mathrm{arr}}$ 为本站所有候选到站时刻的最大值与最小值之差。候选值包括给定到站时刻、前站在各 $t_m$ 换电后得到的 $t_m+\tau_{j,i}^{p,k}$，以及时间尚未确定时的零值。该常数在本轮求解前计算。对所有同站同类的有序请求对和 $n\in\mathcal T_\ell$，施加
+\begin{equation}
+t_r^{\mathrm{arr}}-t_q^{\mathrm{arr}}
+\le M_i^{\mathrm{arr}}\left(
+2-Q_{q,n}
+-\sum_{b\in\mathcal B_i}\alpha_{b,r,n}
++\sum_{b\in\mathcal B_i}\alpha_{b,q,n}
+\right).
+\label{lin:arrival_priority}
+\end{equation}
+只有请求 $r$ 本次获得服务、请求 $q$ 正在等待但本次未获服务时，右侧括号内才为 $0$，此时要求 $r$ 不晚于 $q$ 到站。其他情况下，右侧至少为 $M_i^{\mathrm{arr}}$，约束自动满足。因此，式~\eqref{lin:arrival_priority} 与正文的先到先服务条件等价；同时到站时不规定先后，尚未到站或到站时间尚未确定的请求也不会阻止其他请求获得服务。
+
+\subsection{未满足预约请求判定约束线性化}
+\label{lin:unmet_requests_section}
+本节对应正文的“未满足预约请求的判定”。式~\eqref{eq:deadline_passed} 已是线性表达；需要转换的是式~\eqref{eq:failure_exact} 中的变量乘积。
+
+对所有 $r\in\R^A$，式~\eqref{eq:failure_exact} 等价于
+\begin{equation}
+\begin{aligned}
+0\le f_r&\le a_r,\\
+f_r&\le h_r,\\
+f_r&\le1-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n},\\
+f_r&\ge a_r+h_r-1-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n}.
+\end{aligned}
+\label{lin:unmet_reservation}
+\end{equation}
+这些约束要求：只有请求需要服务、截止早于预测终点，且本轮未完成换电时，$f_r$ 才取 $1$。
+
+\subsection{预测终端状态的线性化}
+\label{lin:terminal_state_section}
+本节对应第~\ref{sec:value}~节的“预测终端状态”，处理式~\eqref{eq:terminal_pending}、式~\eqref{eq:terminal_random} 和式~\eqref{eq:terminal_vehicle_state} 中的变量乘积。
+
+对预约请求 $r\in\R_{p,k}^A$，式~\eqref{eq:terminal_pending} 等价于
+\begin{equation}
+\begin{aligned}
+0\le w_r&\le a_r,\\
+w_r&\le1-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n},\\
+w_r&\le1-\sum_{q\in\R_{p,k}^A}f_q,\\
+w_r&\ge a_r-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n}
+-\sum_{q\in\R_{p,k}^A}f_q.
+\end{aligned}
+\label{lin:terminal_pending}
+\end{equation}
+对随机请求 $r\in\R^R$，式~\eqref{eq:terminal_random} 等价于
+\begin{equation}
+\begin{aligned}
+0\le w_r&\le1-h_r,\\
+w_r&\le1-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n},\\
+w_r&\ge1-h_r-\sum_{n\in\mathcal T_\ell}
+\sum_{b\in\mathcal B_{i(r)}}\alpha_{b,r,n}.
+\end{aligned}
+\label{lin:terminal_random}
+\end{equation}
+两组约束分别确定预测终点仍需服务的预约请求和随机请求。
+
+式~\eqref{eq:terminal_vehicle_state} 中，候选车辆信息是已知常数。对其中出现的乘积 $w_r\alpha_{b,q,m}$，引入辅助量 $u_{b,q,r,m}$，并施加
+\begin{equation}
+\begin{aligned}
+0\le u_{b,q,r,m}&\le w_r,\\
+u_{b,q,r,m}&\le\alpha_{b,q,m},\\
+u_{b,q,r,m}&\ge w_r+\alpha_{b,q,m}-1.
+\end{aligned}
+\label{lin:terminal_vehicle_product}
+\end{equation}
+该式适用于 $r\in\R^A$、$q\in\mathcal P_r$、$m\in\mathcal T_\ell$ 和 $b\in\mathcal B_{i(q)}$。将相应乘积替换为 $u_{b,q,r,m}$ 后，终端车辆信息即为辅助量与已知候选值的线性组合。终端电池电量、等待标记、到站时刻以及路径记录继续使用正文已有关系。
+
+\subsection{状态编码与价值计算的线性化}
+\label{lin:value_computation_section}
+本节对应第~\ref{sec:value}~节的“状态编码与价值计算”，处理式~\eqref{eq:state_encoding} 中请求标记与特征的乘积，以及式~\eqref{eq:value_network} 和特征网络中的分段线性函数。
+
+设 $x\in[L,U]$、$b\in\{0,1\}$，引入连续变量 $w=bx$，其等价表达为
+\begin{equation}
+\begin{aligned}
+Lb\le w&\le Ub,\\
+x-U(1-b)\le w&\le x-L(1-b).
+\end{aligned}
+\label{lin:product}
+\end{equation}
+当 $b=0$ 时得到 $w=0$，当 $b=1$ 时得到 $w=x$。该表达适用于含负值的区间，可用于请求状态标记与连续特征的乘积。
+
+对 $h=\max\{0,x\}$，若 $L<0<U$，引入二元变量 $\xi$，有
+\begin{equation}
+\begin{aligned}
+h&\ge 0, & h&\ge x,\\
+h&\le U\xi, & h&\le x-L(1-\xi),
+\qquad \xi\in\{0,1\}.
+\end{aligned}
+\label{lin:relu}
+\end{equation}
+当 $U\le0$ 时直接置 $h=0$；当 $L\ge0$ 时直接置 $h=x$。对式~\eqref{eq:value_network} 中每个仿射输入 $x_m=\boldsymbol v_m^\top\Phi_\theta(s)+d_m$ 分别使用上述约束，并将对应的输出变量 $h_m$ 代入
+\begin{equation}
+V_\theta(s)=d_0+\boldsymbol v_0^\top\Phi_\theta(s)+\sum_m a_m h_m.
+\label{lin:network}
+\end{equation}
+上述等式和约束共同确定网络值，适用于任意符号的输出权重 $a_m$。状态编码中的分段线性特征按相同方法展开；其输出作为后续网络的输入，从而将特征提取与价值计算一并纳入优化模型。
+
+上述乘积和 ReLU 约束所需的上下界按以下方式确定。
+SOC 的边界取 $[0,1]$，请求状态标记取 $[0,1]$，功率使用正文中的设备和站级上限。请求数量由当前有限请求集合限定；到站时刻及与等待期限有关的时间特征根据本轮已知时刻及有效等待窗口确定范围。对于含状态标记的特征，先求连续部分的边界，再使用式~\eqref{lin:product}。若某层输入向量为 $\boldsymbol e$，$x=\boldsymbol v^\top\boldsymbol e+d$ 且 $e_j\in[\underline e_j,\overline e_j]$，令 $v_j^+=\max\{v_j,0\}$、$v_j^-=\min\{v_j,0\}$，则可取
+\begin{equation}
+\begin{aligned}
+L&=d+\sum_j\left(v_j^+\underline e_j+v_j^-\overline e_j\right),\\
+U&=d+\sum_j\left(v_j^+\overline e_j+v_j^-\underline e_j\right).
+\end{aligned}
+\label{lin:interval}
+\end{equation}
+ReLU 输出的区间为 $[\max\{0,L\},\max\{0,U\}]$。依次传递各层区间，可得到隐藏单元和最终输出的有限上下界，并据此固定本轮线性化常数。若求解前能够由业务约束得到更紧的边界，则使用相应边界以缩小连续松弛范围。
+
+\subsection{基准充电规则线性化}
+\label{lin:baseline_charging_section}
+对式~\eqref{eq:baseline_power}，记已知常数与仿射表达式为
+\begin{equation}
+\begin{aligned}
+\bar p_{i,b}
+&=\min\left\{\overline P_{i,b}^{\mathrm{ch}},
+\frac{\overline P_i^{\mathrm{sta}}}{|\mathcal B_i|}\right\},\\
+q_{i,b,n}&=\frac{E_B(1-S_{i,b,n}^{+})}{\eta_i\delta},
+\qquad Q_i=\frac{E_B}{\eta_i\delta}.
+\end{aligned}
+\label{lin:baseline_bounds}
+\end{equation}
+由 $0\le S_{i,b,n}^{+}\le1$ 可得 $0\le q_{i,b,n}\le Q_i$。若 $\bar p_{i,b}=0$，直接置 $P_{i,b,n}^{\mathrm{base}}=0$；若 $\bar p_{i,b}\ge Q_i$，直接置 $P_{i,b,n}^{\mathrm{base}}=q_{i,b,n}$。在 $0<\bar p_{i,b}<Q_i$ 时，引入 $\zeta_{i,b,n}\in\{0,1\}$，写成
+\begin{equation}
+\begin{aligned}
+P_{i,b,n}^{\mathrm{base}}&\le\bar p_{i,b},\\
+P_{i,b,n}^{\mathrm{base}}&\le q_{i,b,n},\\
+P_{i,b,n}^{\mathrm{base}}&\ge\bar p_{i,b}\zeta_{i,b,n},\\
+P_{i,b,n}^{\mathrm{base}}&\ge q_{i,b,n}-(Q_i-\bar p_{i,b})\zeta_{i,b,n}.
+\end{aligned}
+\label{lin:baseline_min}
+\end{equation}
+当 $\zeta_{i,b,n}=1$ 时功率取设备与站级额度共同确定的上限；当 $\zeta_{i,b,n}=0$ 时功率取本段可充电量对应的值。两种情况均满足两项上界，因而精确表示二者的最小值。运营结束条件与基准功率的乘积 $P_{i,b,n}=(1-d_n^{\mathrm{end}})P_{i,b,n}^{\mathrm{base}}$ 按式~\eqref{lin:product} 表达，其中基准功率的有效区间为 $[0,\min\{\bar p_{i,b},Q_i\}]$。

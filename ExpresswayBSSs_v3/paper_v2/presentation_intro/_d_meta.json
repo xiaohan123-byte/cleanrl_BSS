@@ -1,0 +1,22 @@
+{
+  "type": "design",
+  "designSystems": [],
+  "primaryDesignSystem": null,
+  "assets": {
+    "高速公路预约换电引言 · 红色学术 · 6页": {
+      "versions": [
+        {
+          "path": "引言汇报.html",
+          "createdAt": "2026-09-20T14:09:05.151Z",
+          "status": "needs-review",
+          "viewport": {
+            "width": 1920,
+            "height": 1080
+          }
+        }
+      ]
+    }
+  },
+  "createdAt": "2026-09-20T14:09:05.152Z",
+  "updatedAt": "2026-09-20T14:09:05.152Z"
+}
